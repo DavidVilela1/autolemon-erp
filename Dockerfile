@@ -3,12 +3,14 @@
 # Pin the base image by digest in CI after resolution (docs/DEPENDENCIES.md).
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@12.18.0 --activate
+RUN npm install --global pnpm@12.18.0
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY packages/contracts/package.json packages/contracts/
-RUN pnpm install --frozen-lockfile
+# --ignore-scripts: sources are not copied yet, so the root postinstall (contracts build)
+# must not run here; packages are built explicitly below.
+RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY tsconfig.base.json ./
 COPY packages packages
 COPY apps/api apps/api
