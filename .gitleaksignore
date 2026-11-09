@@ -1,0 +1,2 @@
+# Reviewed false positive (example Idempotency-Key in docs, not a secret); removed in a later commit.
+8e8175e56561219bf2eba7371e1a1ddcc8045fb5:docs/API.md:generic-api-key:47

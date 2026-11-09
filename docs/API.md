@@ -44,7 +44,7 @@ Cookie: __Host-al_sid=…
 Origin: https://erp.example.internal
 X-Requested-With: autolemon
 X-CSRF-Token: …
-Idempotency-Key: 6b0d6f8a0f2b4a6aa0c5e1f2d3c4b5a6
+Idempotency-Key: example-receive-0001
 Content-Type: application/json
 
 { "stagingNodeId": "9a1c…", "lines": [ { "barcode": "5601234567890", "qty": 20 } ] }

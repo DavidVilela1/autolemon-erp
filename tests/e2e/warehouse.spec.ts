@@ -5,7 +5,7 @@
  * @module tests/e2e
  */
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { totpNow } from '../../apps/api/src/platform/auth/totp.js';
 
 const PASSWORD = 'cavalo correto bateria agrafo 2026';
@@ -21,6 +21,16 @@ async function freshCode(): Promise<string> {
 }
 
 test.describe.configure({ mode: 'serial' });
+
+/**
+ * Navigates via the sidebar and waits until the target page's <h1> is rendered. Several pages
+ * share field names (e.g. "Código"), so interacting before the route switch completes could
+ * fill the previous page's form on slower machines (observed on GitHub runners).
+ */
+async function go(page: Page, link: string, heading: string): Promise<void> {
+  await page.getByRole('link', { name: link, exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible();
+}
 
 test('invitation enrolment, MFA login and accessible login page', async ({ page }) => {
   const res = await page.goto(`/#/convite/${token}`);
@@ -49,7 +59,7 @@ test('invitation enrolment, MFA login and accessible login page', async ({ page 
   expect(storage).toBe('{}{}');
 
   // --- structure
-  await page.getByRole('link', { name: 'Estrutura' }).click();
+  await go(page, 'Estrutura', 'Estrutura do armazém');
   const createNode = async (kind: string, code: string, parent?: string) => {
     await page.getByRole('combobox', { name: 'Tipo', exact: true }).first().selectOption({ label: kind });
     if (parent) await page.getByLabel('Dentro de').selectOption({ label: parent });
@@ -72,7 +82,7 @@ test('invitation enrolment, MFA login and accessible login page', async ({ page 
   await expect(page.getByRole('alert')).toContainText('Não é suportado');
 
   // --- SKU with hostile description rendered as text
-  await page.getByRole('link', { name: 'Artigos' }).click();
+  await go(page, 'Artigos', 'Artigos');
   await page.getByRole('textbox', { name: 'Código', exact: true }).fill('BRK-E2E');
   await page.getByLabel('Código de barras (EAN)').fill('5600000009999');
   await page.getByRole('textbox', { name: 'Descrição', exact: true }).fill('<img src=x onerror="window.__xss=1">Pastilhas');
@@ -82,7 +92,7 @@ test('invitation enrolment, MFA login and accessible login page', async ({ page 
   expect(await page.evaluate(() => (window as unknown as { __xss?: number }).__xss)).toBeUndefined();
 
   // --- receiving with scanner input
-  await page.getByRole('link', { name: 'Receção' }).click();
+  await go(page, 'Receção', 'Receção');
   await page
     .getByLabel('Artigo previsto (vazio = não planeada)')
     .selectOption({ label: 'BRK-E2E · <img src=x onerror="window.__xss=1">Pastilhas' });
@@ -99,14 +109,14 @@ test('invitation enrolment, MFA login and accessible login page', async ({ page 
   await expect(page.getByText(/faltas\/excessos registados/)).toBeVisible();
 
   // --- putaway
-  await page.getByRole('link', { name: 'Arrumação' }).click();
+  await go(page, 'Arrumação', 'Arrumação');
   await page.getByRole('button', { name: 'Arrumar' }).first().click();
   await page.getByLabel('Destino').selectOption({ label: 'Z1/R1/P1 (SHELF)' });
   await page.getByRole('button', { name: 'Confirmar' }).click();
   await expect(page.getByText('Arrumação registada.')).toBeVisible();
 
   // --- stock page shows 4 available units; accessibility of an operational screen
-  await page.getByRole('link', { name: 'Stock' }).click();
+  await go(page, 'Stock', 'Stock');
   await expect(page.getByRole('row', { name: /BRK-E2E/ }).first()).toContainText('4');
   const a11y2 = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
   expect(a11y2.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
