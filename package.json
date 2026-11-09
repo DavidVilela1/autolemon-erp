@@ -1,0 +1,53 @@
+{
+  "name": "autolemon-erp",
+  "version": "0.5.0",
+  "private": true,
+  "description": "AutoLemon ERP \u2014 modular monolith foundation with an autonomous Warehouse Management System (WMS). Not production-ready: see docs/PROJECT_STATE.md.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "packageManager": "pnpm@12.18.0",
+  "engines": {
+    "node": ">=22.12.0",
+    "pnpm": "12.18.0"
+  },
+  "scripts": {
+    "postinstall": "pnpm --filter @autolemon/contracts build",
+    "dev": "node scripts/dev.mjs",
+    "build": "pnpm --filter @autolemon/contracts build && pnpm --filter @autolemon/api build && pnpm --filter @autolemon/web build",
+    "typecheck": "pnpm -r --workspace-concurrency=1 typecheck && tsc -p tsconfig.tooling.json",
+    "lint": "eslint --max-warnings=0 . && node scripts/check-file-headers.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:migrate": "pnpm --filter @autolemon/api db:migrate",
+    "db:seed": "pnpm --filter @autolemon/api db:seed",
+    "db:reset:dev": "pnpm --filter @autolemon/api db:reset:dev",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "node scripts/with-test-db.mjs vitest run --project integration",
+    "test:security": "node scripts/with-test-db.mjs vitest run --project security",
+    "test:e2e": "node scripts/run-e2e.mjs",
+    "test:all": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm api:check && pnpm test:unit && pnpm test:integration && pnpm test:security && pnpm test:e2e",
+    "security:scan": "node scripts/security-scan.mjs",
+    "backup:local": "node scripts/backup-local.mjs",
+    "restore:smoke": "node scripts/restore-smoke.mjs",
+    "verify:handover": "node scripts/verify-handover.mjs",
+    "release:zip": "node scripts/package-release.mjs",
+    "api:check": "pnpm --filter @autolemon/api exec tsx src/openapi/generate.ts --check"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.65.0",
+    "@types/node": "22.20.5",
+    "@types/pg": "8.23.1",
+    "eslint": "10.14.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "fast-check": "4.10.2",
+    "globals": "17.14.0",
+    "pg": "8.23.1",
+    "prettier": "3.9.10",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1",
+    "vitest": "5.1.0"
+  }
+}

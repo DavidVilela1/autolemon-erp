@@ -1,0 +1,30 @@
+# Production-shaped example (owning module: operations) — NOT DEPLOYED / UNVERIFIED.
+# Shows network segmentation and container hardening; real deployments use the provider's
+# managed Postgres (private subnet, encrypted storage) and a managed KMS.
+name: autolemon-prod-example
+services:
+  proxy:
+    image: nginx:stable-alpine # pin by digest
+    ports: ['443:443'] # exposed ONLY to the ZTNA connector / WAF origin network
+    networks: [edge, app]
+    read_only: true
+    tmpfs: [/var/cache/nginx, /var/run]
+    volumes: ['../nginx/autolemon.conf:/etc/nginx/conf.d/default.conf:ro', './web:/srv/autolemon/web:ro', './tls:/etc/ssl/autolemon:ro']
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE, CHOWN, SETGID, SETUID]
+  api:
+    image: registry.example.internal/autolemon-api@sha256:REPLACE_WITH_SIGNED_DIGEST
+    env_file: ./api.env # rendered from the secrets manager at deploy time; never committed
+    networks: [app, data]
+    read_only: true
+    user: '1000:1000'
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    mem_limit: 768m
+    pids_limit: 256
+    healthcheck: { test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1))"], interval: 30s }
+networks:
+  edge: {}
+  app: { internal: true }
+  data: { internal: true } # managed Postgres reachable only from here; egress restricted

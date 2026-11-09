@@ -1,0 +1,11 @@
+# systemd timer (owning module: operations) — NOT DEPLOYED / UNVERIFIED example.
+[Unit]
+Description=Daily AutoLemon backup
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 Europe/Lisbon
+Persistent=true
+RandomizedDelaySec=10m
+
+[Install]
+WantedBy=timers.target

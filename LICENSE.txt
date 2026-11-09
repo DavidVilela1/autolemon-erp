@@ -1,0 +1,5 @@
+Copyright (c) 2026 David Vilela. All rights reserved.
+
+This repository is published for viewing and evaluation purposes only.
+No permission is granted to use, copy, modify, or distribute this code,
+in whole or in part, without prior written permission.

@@ -1,0 +1,54 @@
+/*
+ * AutoLemon ERP design tokens (owning module: web). See docs/DESIGN_SYSTEM.md.
+ * Warm neutral surfaces, deep slate text, restrained teal for actions, lemon only as accent.
+ * All text/background pairs below meet WCAG 2.2 AA (4.5:1) — verified ratios in the doc.
+ */
+@import 'tailwindcss';
+
+@theme {
+  --color-paper: #f7f8f3;
+  --color-surface: #ffffff;
+  --color-ink: #202a29;
+  --color-ink-soft: #4a5654;
+  --color-line: #dfe4de;
+  --color-line-strong: #6b7774;
+  --color-teal: #246b66;
+  --color-teal-dark: #1b524e;
+  --color-teal-soft: #e3efed;
+  --color-lemon: #e7cc4b;
+  --color-lemon-soft: #faf4d6;
+  --color-danger: #a3271f;
+  --color-danger-soft: #fbe9e7;
+  --color-ok: #1f6b3a;
+  --color-ok-soft: #e4f2e8;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+html,
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+}
+
+/* Visible, consistent keyboard focus everywhere (WCAG 2.4.7 / 2.4.11). */
+:focus-visible {
+  outline: 3px solid var(--color-teal);
+  outline-offset: 2px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+}

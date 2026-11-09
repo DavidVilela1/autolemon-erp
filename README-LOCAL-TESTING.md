@@ -1,0 +1,108 @@
+# Local setup and testing — AutoLemon ERP v0.5.0
+
+Owning module: repository. Archive: **`AutoLemon-ERP-v0.5.0-WMS.zip`**, root folder
+**`autolemon-erp/`**. Checksum file: `AutoLemon-ERP-v0.5.0-WMS.zip.sha256`.
+
+## Prerequisites
+
+| Tool                           | Version                        | Notes                                                                                             |
+| ------------------------------ | ------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Node.js                        | ≥ 22.12.0 (26 LTS recommended) | verified on 22.23.4                                                                               |
+| pnpm                           | **12.18.0**                    | `npm install --global pnpm@12.18.0` (or `corepack enable`)                                        |
+| Docker Engine / Docker Desktop | current                        | runs PostgreSQL 18 (`docker-compose.yml`), bound to 127.0.0.1:5432                                |
+| Chromium for E2E               | —                              | `pnpm exec playwright install chromium` (once) or set `PLAYWRIGHT_CHROME_PATH` to a Chrome binary |
+| Git                            | optional                       | not required                                                                                      |
+
+If port 5432 is busy, change `POSTGRES_PORT` **and** the port in `DATABASE_URL` /
+`APP_DATABASE_URL` in `.env`.
+
+## Verify the archive
+
+```bash
+sha256sum -c AutoLemon-ERP-v0.5.0-WMS.zip.sha256          # Linux
+shasum -a 256 -c AutoLemon-ERP-v0.5.0-WMS.zip.sha256      # macOS
+```
+
+```powershell
+(Get-FileHash .\AutoLemon-ERP-v0.5.0-WMS.zip -Algorithm SHA256).Hash   # compare with the .sha256 file
+```
+
+## macOS / Linux
+
+```bash
+unzip AutoLemon-ERP-v0.5.0-WMS.zip -d AutoLemon-ERP-extracted
+cd AutoLemon-ERP-extracted/autolemon-erp
+node --version
+npm install --global pnpm@12.18.0
+pnpm --version
+pnpm install --frozen-lockfile
+cp .env.example .env
+docker compose up -d
+docker compose ps            # wait until postgres is "healthy"
+pnpm db:migrate              # also generates dev-only secrets into .env on first run
+pnpm db:seed                 # prints DEVELOPMENT-ONLY invitation links
+pnpm exec playwright install chromium
+pnpm typecheck
+pnpm lint
+pnpm test:all
+pnpm security:scan
+pnpm restore:smoke
+pnpm build
+pnpm dev
+```
+
+## Windows PowerShell
+
+```powershell
+Expand-Archive -Path .\AutoLemon-ERP-v0.5.0-WMS.zip -DestinationPath .\AutoLemon-ERP-extracted
+Set-Location .\AutoLemon-ERP-extracted\autolemon-erp
+node --version
+npm install --global pnpm@12.18.0
+pnpm --version
+pnpm install --frozen-lockfile
+Copy-Item .env.example .env
+docker compose up -d
+docker compose ps
+pnpm db:migrate
+pnpm db:seed
+pnpm exec playwright install chromium
+pnpm typecheck
+pnpm lint
+pnpm test:all
+pnpm security:scan
+pnpm restore:smoke
+pnpm build
+pnpm dev
+```
+
+## Using the app locally
+
+1. `pnpm dev` → open **http://localhost:5173** (API on http://127.0.0.1:3000, proxied as `/api`).
+2. Open the **Admin** invitation link printed by `pnpm db:seed`
+   (`http://localhost:5173/#/convite/<token>`, valid 72 h, single use). Choose a password
+   (≥ 12 chars), add the shown TOTP secret to an authenticator app (manual key entry), confirm
+   with a code, and store the recovery codes.
+3. Log in with `admin@demo.autolemon.test` + password + TOTP code. Operator links for Porto and
+   Lisboa are printed too. All seed data is synthetic.
+4. Lost the links? `pnpm db:reset:dev && pnpm db:seed` (development databases only).
+
+## What each test command needs
+
+| Command                                       | Needs                                                                         | Notes                                                                       |
+| --------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `pnpm test:unit`                              | nothing                                                                       | pure unit + property tests                                                  |
+| `pnpm test:integration`, `pnpm test:security` | running Postgres + `.env`                                                     | creates and drops `autolemon_test_<random>`; never touches your dev DB      |
+| `pnpm test:e2e`                               | Postgres + Chromium                                                           | starts API on :3901 and web on :5199 against a disposable DB                |
+| `pnpm test:all`                               | all of the above                                                              | non-interactive, non-zero exit on any failure                               |
+| `pnpm restore:smoke`                          | Postgres; local `pg_dump`/`pg_restore` ≥ server version **or** Docker Compose | creates a backup if none exists; restores into a disposable DB and drops it |
+| `pnpm security:scan`                          | network access to the npm registry for `pnpm audit`                           | lists CI-only scanners separately                                           |
+
+Long-running/infrastructure checks not in `test:all`: `pnpm restore:smoke`, `pnpm security:scan`,
+`pnpm verify:handover`, `pnpm release:zip` (needs the `zip` CLI).
+
+## Troubleshooting
+
+- `.env not found` → `cp .env.example .env` / `Copy-Item .env.example .env`.
+- `ERR_PNPM_IGNORED_BUILDS` → the repo allows only esbuild builds; re-run `pnpm install`.
+- Playwright cannot launch → `pnpm exec playwright install chromium` or set `PLAYWRIGHT_CHROME_PATH`.
+- `pg_dump: server version mismatch` → set `PG_TOOL_MODE=docker` to use the container's tools.

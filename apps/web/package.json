@@ -1,0 +1,28 @@
+{
+  "name": "@autolemon/web",
+  "version": "0.5.0",
+  "private": true,
+  "type": "module",
+  "description": "AutoLemon ERP web client (React SPA, pt-PT, keyboard/scanner-first warehouse screens).",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@autolemon/contracts": "workspace:*",
+    "jsbarcode": "3.12.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.5",
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "tailwindcss": "4.3.5",
+    "typescript": "6.0.3",
+    "vite": "8.3.7"
+  }
+}

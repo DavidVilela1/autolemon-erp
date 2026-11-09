@@ -1,0 +1,10 @@
+# systemd unit (owning module: operations) — NOT DEPLOYED / UNVERIFIED example.
+[Unit]
+Description=AutoLemon daily encrypted full backup (pgBackRest)
+OnFailure=autolemon-alert@%n.service
+
+[Service]
+Type=oneshot
+User=postgres
+ExecStart=/usr/bin/pgbackrest --stanza=autolemon --type=full backup
+ExecStartPost=/usr/bin/pgbackrest --stanza=autolemon verify

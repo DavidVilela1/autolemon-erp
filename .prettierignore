@@ -1,0 +1,11 @@
+node_modules
+dist
+artifacts
+coverage
+pnpm-lock.yaml
+*.sql
+docs/api/openapi.json
+playwright-report
+test-results
+.env
+docs/sbom

@@ -1,0 +1,33 @@
+# AutoLemon ERP — LOCAL DEVELOPMENT services only (owning module: operations tooling).
+# NOT a production configuration: no TLS, no backups, no WAF/ZTNA. See docs/OPERATIONS.md and
+# infra/ for the production reference architecture.
+# Postgres is published on 127.0.0.1 only (never on all interfaces).
+# After the first successful pull, pin the image by digest (postgres:18-alpine@sha256:...) —
+# the digest could not be resolved in the build environment (see docs/DEPENDENCIES.md).
+name: autolemon
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-autolemon_owner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-autolemon}
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --data-checksums
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    mem_limit: 1g
+    pids_limit: 512
+volumes:
+  pgdata:
