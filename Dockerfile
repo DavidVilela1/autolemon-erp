@@ -20,6 +20,10 @@ RUN pnpm --filter @autolemon/contracts build && pnpm --filter @autolemon/api bui
 
 FROM node:22-bookworm-slim
 ENV NODE_ENV=production
+# The runtime only needs `node`. Remove the npm/corepack CLIs bundled in the base image: they
+# are never used at runtime and carry their own dependency CVEs (pacote, sigstore, brace-expansion…).
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+      /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
 WORKDIR /app
 COPY --from=build --chown=node:node /out /app
 USER node
