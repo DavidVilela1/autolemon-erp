@@ -21,19 +21,30 @@ Owning module: repository. A continuation developer should be able to start from
 - Migrations are forward-only and never edited after merge (checksum guard).
 - Strict Zod DTOs for every input; quantities as decimal strings.
 - No secrets in code, comments, logs, URLs, browser storage; dev secrets are generated into `.env`.
-- Keep docs current: PROJECT_STATE, NEXT_TASKS, CHANGELOG, ADRs, SECURITY_OPEN_ITEMS at each
-  milestone; regenerate OpenAPI (`pnpm --filter @autolemon/api openapi`).
+- Keep docs current: PROJECT_STATE, NEXT_TASKS, CHANGELOG, ADRs, SECURITY_OPEN_ITEMS and
+  `WMS_RELEASE_GATE.md` at each milestone; regenerate OpenAPI
+  (`pnpm --filter @autolemon/api openapi`) — the route-inventory security test reads it, so a new
+  route is automatically checked for authentication, CSRF and warehouse/admin scope.
+- New account-security routes that must stay reachable for an admin without a passkey need
+  `@AccountSecurity()`; everything else is blocked for them under `ADMIN_PASSKEY_REQUIRED`.
+- **Product-owner rule:** no Sales/Purchasing/CRM/Accounting/other ERP module until the WMS is
+  production-ready, independently verified and approved. The gate lives in
+  `docs/WMS_RELEASE_STATUS.json`; after changing it run `pnpm gate:render`. `pnpm gate:check`
+  refuses any state the evidence does not support (ADR-0021). Governing instructions: the
+  product owner's _Reusable Continuation Prompt v0.6_ and _WMS Production Readiness Gate v0.6_.
 
 ## 3. Documentation standard (enforced partly by `pnpm lint`)
 
 Every source file starts with `@file` + owning module; every exported symbol has TSDoc; complex
 algorithms, state transitions, crypto, authorization branches, inventory corrections and
 migrations carry "what and why" comments. The automated gate checks headers and exported-symbol
-TSDoc presence (last run: 101 files, 303 exported symbols); comment quality needs human review.
+TSDoc presence (last run: see `docs/PROJECT_STATE.md` §4); comment quality needs human review.
 
 ## 4. Where to start next
 
-`docs/NEXT_TASKS.md` T-01 (WebAuthn) and T-02 (run CI on Node 26 + PostgreSQL 18).
+`docs/WMS_RELEASE_GATE.md` — every criterion that is not PASS — in the order of
+`docs/NEXT_TASKS.md` "Next three WMS tasks", then T-20 (FEFO/serials), T-26 and the
+infrastructure block (T-03, T-05…T-07, T-13), which needs the product owner's authorisation.
 
 ## 5. Release procedure
 

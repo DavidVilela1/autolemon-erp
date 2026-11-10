@@ -32,7 +32,7 @@ import {
   requireSku,
   warehouseCode,
 } from './inventory/engine.js';
-import { cmp, neg, sub } from './inventory/qty.js';
+import { cmp, fromMilli, min, neg, sub, toMilli } from './inventory/qty.js';
 import type { WmsRunner } from './runner.js';
 
 interface TransferHeader {
@@ -83,7 +83,11 @@ export class TransferService {
         tx,
         sql`SELECT l.id, l.line_no AS "lineNo", l.sku_id AS "skuId", s.code AS "skuCode", l.qty_requested::text AS "qtyRequested",
               l.qty_shipped::text AS "qtyShipped", l.qty_received::text AS "qtyReceived", l.qty_lost::text AS "qtyLost",
-              (l.qty_shipped - l.qty_received - l.qty_lost)::text AS "qtyInTransit"
+              (l.qty_shipped - l.qty_received - l.qty_lost)::text AS "qtyInTransit",
+              coalesce((SELECT json_agg(json_build_object('lot', x.lot_code, 'qtyShipped', x.qty_shipped::text,
+                  'qtyReceived', x.qty_received::text, 'qtyLost', x.qty_lost::text,
+                  'qtyInTransit', (x.qty_shipped - x.qty_received - x.qty_lost)::text) ORDER BY x.lot_code)
+                FROM transfer_line_lots x WHERE x.transfer_line_id = l.id), '[]') AS lots
             FROM transfer_lines l JOIN skus s ON s.id = l.sku_id WHERE l.transfer_id = ${id} ORDER BY l.line_no`,
       );
       return { ...h, lines };
@@ -144,6 +148,10 @@ export class TransferService {
           assertFree(pos, l.qty);
           await applyDelta(ctx, txnId, pos, neg(l.qty));
           await ctx.tx.execute(sql`UPDATE transfer_lines SET qty_shipped = qty_shipped + ${l.qty}::numeric WHERE id = ${line.id}`);
+          // The lot travels with the goods: in-transit quantity is tracked per lot.
+          await ctx.tx.execute(sql`INSERT INTO transfer_line_lots (company_id, transfer_line_id, lot_code, qty_shipped)
+              VALUES (${ctx.companyId}, ${line.id}, ${pos.lot_code}, ${l.qty}::numeric)
+              ON CONFLICT (transfer_line_id, lot_code) DO UPDATE SET qty_shipped = transfer_line_lots.qty_shipped + EXCLUDED.qty_shipped`);
         }
         await ctx.tx.execute(sql`UPDATE transfers SET status = CASE WHEN status = 'DRAFT' THEN 'IN_TRANSIT' ELSE status END,
           dispatched_at = coalesce(dispatched_at, now()) WHERE id = ${id}`);
@@ -177,15 +185,32 @@ export class TransferService {
             'Linha',
           );
           if (cmp(l.qty, line.in_transit) > 0) throw new Conflict(`Só há ${line.in_transit} em trânsito`, 'QTY_EXCEEDS_IN_TRANSIT');
-          const pos = await ensurePosition(ctx, { skuId: line.sku_id, holder: staging, status: 'RECEIVED' });
-          await applyDelta(ctx, txnId, pos, l.qty);
-          await ctx.tx.execute(sql`UPDATE transfer_lines SET qty_received = qty_received + ${l.qty}::numeric WHERE id = ${line.id}`);
-          const task = await one<{ id: string }>(
+          // Receive per lot bucket: the requested lot, or else lots in ascending lot-code order
+          // (deterministic; oldest first when lot codes are date-based).
+          const buckets = await rows<{ id: string; lot_code: string; left: string }>(
             ctx.tx,
-            sql`INSERT INTO putaway_tasks (company_id, warehouse_id, source_type, source_id, sku_id, source_position_id, qty_total)
-              VALUES (${ctx.companyId}, ${ctx.warehouseId}, 'TRANSFER', ${id}, ${line.sku_id}, ${pos.id}, ${l.qty}::numeric) RETURNING id`,
+            sql`SELECT id, lot_code, (qty_shipped - qty_received - qty_lost)::text AS left FROM transfer_line_lots
+                WHERE transfer_line_id = ${line.id} AND qty_shipped > qty_received + qty_lost
+                  AND (${l.lot ?? null}::text IS NULL OR lot_code = ${l.lot ?? ''})
+                ORDER BY lot_code, id FOR UPDATE`,
           );
-          tasks.push(task.id);
+          let remaining = toMilli(l.qty);
+          for (const b of buckets) {
+            if (remaining <= 0n) break;
+            const take = min(b.left, fromMilli(remaining));
+            const pos = await ensurePosition(ctx, { skuId: line.sku_id, holder: staging, status: 'RECEIVED', lot: b.lot_code });
+            await applyDelta(ctx, txnId, pos, take);
+            await ctx.tx.execute(sql`UPDATE transfer_line_lots SET qty_received = qty_received + ${take}::numeric WHERE id = ${b.id}`);
+            const task = await one<{ id: string }>(
+              ctx.tx,
+              sql`INSERT INTO putaway_tasks (company_id, warehouse_id, source_type, source_id, sku_id, source_position_id, qty_total)
+                VALUES (${ctx.companyId}, ${ctx.warehouseId}, 'TRANSFER', ${id}, ${line.sku_id}, ${pos.id}, ${take}::numeric) RETURNING id`,
+            );
+            tasks.push(task.id);
+            remaining -= toMilli(take);
+          }
+          if (remaining > 0n) throw new Conflict('Quantidade superior à do lote em trânsito', 'QTY_EXCEEDS_LOT_IN_TRANSIT');
+          await ctx.tx.execute(sql`UPDATE transfer_lines SET qty_received = qty_received + ${l.qty}::numeric WHERE id = ${line.id}`);
         }
         const open = await one<{ n: number }>(
           ctx.tx,
@@ -213,6 +238,8 @@ export class TransferService {
         sql`SELECT coalesce(sum(qty_shipped - qty_received - qty_lost), 0.000)::text AS q FROM transfer_lines WHERE transfer_id = ${id}`,
       );
       await ctx.tx.execute(sql`UPDATE transfer_lines SET qty_lost = qty_shipped - qty_received WHERE transfer_id = ${id}`);
+      await ctx.tx.execute(sql`UPDATE transfer_line_lots SET qty_lost = qty_shipped - qty_received
+          WHERE transfer_line_id IN (SELECT id FROM transfer_lines WHERE transfer_id = ${id})`);
       await ctx.tx.execute(
         sql`UPDATE transfers SET status = ${t.status === 'DRAFT' ? 'CANCELLED' : 'CLOSED'}, closed_at = now() WHERE id = ${id}`,
       );
@@ -229,6 +256,18 @@ export class TransferService {
         details: { qtyLostInTransit: lost.q },
       });
       return { id, qtyLost: lost.q };
+    });
+  }
+
+  /** Source side: cancels a DRAFT transfer (nothing shipped yet). */
+  async cancel(actor: Actor, id: string, key: string) {
+    const h = await this.header(actor, id);
+    return this.runner.command(actor, h.source_warehouse_id, 'wms.transfer.dispatch', key, 'transfer.cancel', { id }, async (ctx) => {
+      const t = await one<TransferHeader>(ctx.tx, sql`SELECT * FROM transfers WHERE id = ${id} FOR UPDATE`, 'Transferência');
+      if (t.status !== 'DRAFT') throw new Conflict('Só transferências por expedir podem ser anuladas pela origem', 'INVALID_STATE');
+      await ctx.tx.execute(sql`UPDATE transfers SET status = 'CANCELLED', closed_at = now() WHERE id = ${id}`);
+      await emitEvent({ ...ctx, warehouseId: t.source_warehouse_id }, 'wms.transfer.cancelled', 'transfer', id, {});
+      return { id, status: 'CANCELLED' };
     });
   }
 

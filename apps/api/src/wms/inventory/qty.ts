@@ -59,3 +59,13 @@ export function min(a: string, b: string): string {
 export function isPositive(a: string): boolean {
   return toMilli(a) > 0n;
 }
+
+/**
+ * Exact product of two decimals. Throws when the result needs more than 3 fractional digits
+ * (e.g. 0.001 × 0.5) — quantities are never silently rounded.
+ */
+export function mul(a: string, b: string): string {
+  const p = toMilli(a) * toMilli(b);
+  if (p % 1000n !== 0n) throw new RangeError('quantity product exceeds 3 decimal places');
+  return fromMilli(p / 1000n);
+}

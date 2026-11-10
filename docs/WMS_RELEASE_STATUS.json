@@ -1,0 +1,455 @@
+{
+  "schemaVersion": 1,
+  "product": "AutoLemon ERP — WMS",
+  "version": "0.6.0",
+  "updatedAt": "2026-11-10",
+  "state": "WMS_IN_PROGRESS",
+  "allowedStates": [
+    "WMS_IN_PROGRESS",
+    "WMS_RELEASE_CANDIDATE",
+    "WMS_PRODUCTION_READY",
+    "AWAITING_NEXT_MODULE_SELECTION",
+    "NEXT_MODULE_AUTHORIZED"
+  ],
+  "stateReason": "Code-level criteria still FAIL (F-12, E-05, S-03, S-05, S-06, O-02) and infrastructure/independent criteria are BLOCKED; see openAction per criterion.",
+  "gateSource": "WMS Production Readiness Gate v0.6 (product owner, 2026-11-10) + Reusable Continuation Prompt v0.6 §0",
+  "releaseOwnerApproval": null,
+  "independentSecurityReview": null,
+  "nextModuleSelection": null,
+  "criteria": [
+    {
+      "id": "F-01",
+      "requiredResult": "Company/tenant isolation, MFA and RBAC; one warehouse per staff member; only a company Admin may navigate warehouses",
+      "verificationMethod": "Automated negative tests on real PostgreSQL (services, RLS, composite FKs, every API route)",
+      "evidence": [
+        "tests/security/isolation.test.ts",
+        "tests/security/route-inventory.test.ts",
+        "tests/security/passkeys-account.test.ts",
+        "tests/security/attacks.test.ts"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "PASS",
+      "openAction": "Human security review (S-07)"
+    },
+    {
+      "id": "F-02",
+      "requiredResult": "Stock-item master, units and barcodes; multiple positions per SKU within each warehouse",
+      "verificationMethod": "Integration tests (case barcode = 12 units on receive/pick/pack; positions on shelf, bin, box)",
+      "evidence": [
+        "tests/integration/wms-completion.test.ts (R-02)",
+        "tests/integration/acceptance.test.ts #2–#3"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "PASS",
+      "openAction": "—"
+    },
+    {
+      "id": "F-03",
+      "requiredResult": "Configurable storage hierarchies, direct locations, fixed compartments, movable containers",
+      "verificationMethod": "Integration tests incl. nesting rules, rename/deactivate, container move/close",
+      "evidence": [
+        "tests/integration/acceptance.test.ts #1, #9",
+        "tests/integration/wms-completion.test.ts (R-05)"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "PASS",
+      "openAction": "Moving whole subtrees is unsupported by design (T-24)"
+    },
+    {
+      "id": "F-04",
+      "requiredResult": "Inbound expected/unplanned receipts, shortages/overages, partial receipts and inspection",
+      "verificationMethod": "Integration tests; damaged/inspection receipt + audited quality release",
+      "evidence": [
+        "tests/integration/acceptance.test.ts #2",
+        "tests/integration/wms-completion.test.ts (R-01)"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "PASS",
+      "openAction": "Operator pilot (O-06)"
+    },
+    {
+      "id": "F-05",
+      "requiredResult": "Putaway and location/container moves with scan verification",
+      "verificationMethod": "Server rejects a scanned label ≠ destination (SCAN_MISMATCH) for putaway, stock move, container move; e2e scans wrong then right label",
+      "evidence": [
+        "tests/integration/reliability.test.ts (scan verification)",
+        "tests/e2e/warehouse.spec.ts"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "PASS",
+      "openAction": "Field test with real scanners (O-06); replenishment UI does not yet ask for the scan (API supports it)"
+    },
+    {
+      "id": "F-06",
+      "requiredResult": "Append-only stock ledger, atomic balance projections, availability, reservations and holds",
+      "verificationMethod": "Reconciliation after every scenario; property-based random sequences; append-only triggers; quality holds",
+      "evidence": [
+        "tests/integration/inventory-property.test.ts",
+        "tests/security/isolation.test.ts",
+        "tests/integration/wms-completion.test.ts"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "PASS",
+      "openAction": "—"
+    },
+    {
+      "id": "F-07",
+      "requiredResult": "WMS-native outbound requests, picking across positions, packing and dispatch",
+      "verificationMethod": "Integration tests incl. short pick, partial dispatch, backorder, un-pick, un-pack, cancel after picking",
+      "evidence": [
+        "tests/integration/acceptance.test.ts #4–#5",
+        "tests/integration/wms-completion.test.ts (R-04/R-10)"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "PASS",
+      "openAction": "Lot-aware (FEFO) allocation and serial uniqueness not implemented (T-20)"
+    },
+    {
+      "id": "F-08",
+      "requiredResult": "Inter-warehouse transfers with in-transit custody and independent source/destination roles",
+      "verificationMethod": "Integration tests incl. lots in transit, per-lot loss, source cancel, cross-warehouse refusals",
+      "evidence": [
+        "tests/integration/acceptance.test.ts #6",
+        "tests/integration/wms-completion.test.ts (R-03/R-06)",
+        "tests/security/isolation.test.ts"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "PASS",
+      "openAction": "Transfer reservations at source (T-26)"
+    },
+    {
+      "id": "F-09",
+      "requiredResult": "Internal location replenishment and low-stock recommendations (no purchasing dependency)",
+      "verificationMethod": "Integration test: rule → suggestion → execution; purchase suggestions informative only",
+      "evidence": [
+        "tests/integration/wms-completion.test.ts (replenishment)"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "PASS",
+      "openAction": "—"
+    },
+    {
+      "id": "F-10",
+      "requiredResult": "Returns, quarantines, stock dispositions and adjustment/correction workflows",
+      "verificationMethod": "Integration tests: return dispositions, quarantine/release, adjust (step-up), reversal (step-up, once, never negative)",
+      "evidence": [
+        "tests/integration/acceptance.test.ts #7",
+        "tests/integration/wms-completion.test.ts"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "PASS",
+      "openAction": "—"
+    },
+    {
+      "id": "F-11",
+      "requiredResult": "Full/cycle/blind counts, recounts, discrepancy approvals and reconciliation",
+      "verificationMethod": "Integration tests: blind cycle count, FULL count with recount, segregated approval with step-up, self-approval refused",
+      "evidence": [
+        "tests/integration/acceptance.test.ts #8",
+        "tests/integration/reliability.test.ts (full count)",
+        "tests/integration/wms-completion.test.ts (R-19)"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "PASS",
+      "openAction": "—"
+    },
+    {
+      "id": "F-12",
+      "requiredResult": "Operational reports, search/filter/export, barcode/print labels and pt-PT operator UX",
+      "verificationMethod": "Ledger filter, stock CSV export (step-up), labels, axe on every screen",
+      "evidence": [
+        "tests/security/isolation.test.ts (export)",
+        "tests/e2e/warehouse.spec.ts (axe sweep)"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "FAIL",
+      "openAction": "Activity/ledger export and cross-document search missing (R-09/T-27); operator UX needs pilot sign-off (O-06)"
+    },
+    {
+      "id": "F-13",
+      "requiredResult": "Full workflow proven with all non-WMS ERP business modules absent",
+      "verificationMethod": "Acceptance suite runs with ENABLED_MODULES=wms only; module registry refuses unknown modules",
+      "evidence": [
+        "tests/integration/acceptance.test.ts #12"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "PASS",
+      "openAction": "—"
+    },
+    {
+      "id": "E-01",
+      "requiredResult": "PostgreSQL integration and E2E tests; real workflow state machine/invariant tests",
+      "verificationMethod": "pnpm test:integration, test:security, test:e2e on disposable real databases",
+      "evidence": [
+        "docs/PROJECT_STATE.md §4"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "PASS",
+      "openAction": "—"
+    },
+    {
+      "id": "E-02",
+      "requiredResult": "Concurrency, retry, idempotency, transaction rollback and failure-injection tests",
+      "verificationMethod": "Competing reservations, idempotent replay, injected DB failure mid-command → full rollback + successful retry with the same key",
+      "evidence": [
+        "tests/security/attacks.test.ts",
+        "tests/integration/inventory-property.test.ts",
+        "tests/integration/reliability.test.ts (failure injection)"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "PASS",
+      "openAction": "Process crash / connection-loss injection under load (with E-04)"
+    },
+    {
+      "id": "E-03",
+      "requiredResult": "Validated migration upgrade/rollback or documented forward-recovery plan",
+      "verificationMethod": "Upgrade rehearsal from the v0.5.0 schema with data; forward-only + restore-based recovery documented",
+      "evidence": [
+        "tests/integration/reliability.test.ts (upgrade rehearsal)",
+        "docs/DATABASE.md §1a"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "PASS",
+      "openAction": "Rehearse on a production-sized copy in staging"
+    },
+    {
+      "id": "E-04",
+      "requiredResult": "Representative load, stress, availability and performance targets agreed and met",
+      "verificationMethod": "—",
+      "evidence": [],
+      "verifiedAt": null,
+      "reviewer": null,
+      "status": "BLOCKED",
+      "openAction": "Product owner to agree targets (warehouse sizes, concurrent users, p95); then k6/load harness (T-11)"
+    },
+    {
+      "id": "E-05",
+      "requiredResult": "Full API docs, ERD, ADRs, comments, onboarding, maintenance and incident runbooks",
+      "verificationMethod": "Documentation gate (headers + TSDoc), generated OpenAPI, ADRs 0001–0020",
+      "evidence": [
+        "docs/API.md",
+        "docs/api/openapi.json",
+        "docs/DATABASE.md",
+        "docs/DECISIONS/",
+        "docs/HANDOVER.md",
+        "docs/OPERATIONS.md"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "FAIL",
+      "openAction": "Incident and maintenance runbooks are outlines; operator/admin training manual missing (T-31)"
+    },
+    {
+      "id": "E-06",
+      "requiredResult": "Clean-room installation, local commands and full source ZIP verified",
+      "verificationMethod": "Fresh extraction of the release ZIP; README-LOCAL-TESTING flow; test:all",
+      "evidence": [
+        "docs/PROJECT_STATE.md §5"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "PASS",
+      "openAction": "Repeat on the owner's machine (Windows) — Docker there is currently unavailable"
+    },
+    {
+      "id": "S-01",
+      "requiredResult": "Authentication/session/MFA flows verified; default-deny tenant/warehouse permissions",
+      "verificationMethod": "Automated: passkeys (real WebAuthn verification), TOTP, recovery, sessions, CSRF, throttling, step-up, route inventory",
+      "evidence": [
+        "tests/security/passkeys-account.test.ts",
+        "tests/security/attacks.test.ts",
+        "tests/security/route-inventory.test.ts"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "PASS",
+      "openAction": "Independent review (S-07)"
+    },
+    {
+      "id": "S-02",
+      "requiredResult": "Input/schema validation, parametrized SQL, output encoding, upload/CSV/SSRF safeguards",
+      "verificationMethod": "Strict Zod contracts, raw-SQL gate, CSV import/export tests, XSS e2e; no server-side outbound fetches (SSRF surface absent)",
+      "evidence": [
+        "tests/security/attacks.test.ts",
+        "scripts/security-scan.mjs",
+        "tests/e2e/warehouse.spec.ts"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "PASS",
+      "openAction": "DAST (S-06/T-07)"
+    },
+    {
+      "id": "S-03",
+      "requiredResult": "Managed encryption keys, AEAD for classified sensitive fields, rotation/restore test",
+      "verificationMethod": "AES-256-GCM envelope encryption, DEK rotation/KEK rewrap and restore-decrypt tests with the LOCAL dev key provider",
+      "evidence": [
+        "tests/security/crypto.test.ts",
+        "pnpm restore:smoke"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "FAIL",
+      "openAction": "External KMS provider not implemented (T-03); key recovery through a separate controlled path not verified"
+    },
+    {
+      "id": "S-04",
+      "requiredResult": "Data-at-rest and TLS/in-transit encryption verified in target production environment",
+      "verificationMethod": "—",
+      "evidence": [],
+      "verifiedAt": null,
+      "reviewer": null,
+      "status": "BLOCKED",
+      "openAction": "Needs an approved target environment (T-05)"
+    },
+    {
+      "id": "S-05",
+      "requiredResult": "Audit logs, retention, tamper resistance and security monitoring verified",
+      "verificationMethod": "Hash-chained audit with tamper detection; bounded retention purge",
+      "evidence": [
+        "tests/security/isolation.test.ts",
+        "tests/security/retention.test.ts"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "FAIL",
+      "openAction": "Security monitoring/alerting and off-site audit digests not deployed (SEC-OPEN-003/008)"
+    },
+    {
+      "id": "S-06",
+      "requiredResult": "Applicable ASVS Level 2 controls and security negative tests have evidence",
+      "verificationMethod": "Developer self-assessment + test matrix",
+      "evidence": [
+        "docs/security/ASVS_L2_ASSESSMENT.md",
+        "docs/security/SECURITY_TEST_MATRIX.md"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "FAIL",
+      "openAction": "Open chapters: breached-password corpus, DAST, deployment controls; independent verification"
+    },
+    {
+      "id": "S-07",
+      "requiredResult": "Human security code review and independent penetration assessment completed",
+      "verificationMethod": "—",
+      "evidence": [],
+      "verifiedAt": null,
+      "reviewer": null,
+      "status": "BLOCKED",
+      "openAction": "Owner to commission (SEC-OPEN-002, T-13)"
+    },
+    {
+      "id": "S-08",
+      "requiredResult": "No unaccepted critical/high-risk findings",
+      "verificationMethod": "pnpm audit: 0 critical / 0 high; internal review findings closed or accepted",
+      "evidence": [
+        "docs/security/SECURITY_OPEN_ITEMS.md",
+        "pnpm security:scan"
+      ],
+      "verifiedAt": null,
+      "reviewer": null,
+      "status": "NOT_RUN",
+      "openAction": "Cannot be concluded before S-07 and DAST"
+    },
+    {
+      "id": "O-01",
+      "requiredResult": "Production network controls: WAF, VPN/ZTNA, isolated DB, least-privilege infrastructure",
+      "verificationMethod": "—",
+      "evidence": [
+        "infra/ (templates only, NOT DEPLOYED)"
+      ],
+      "verifiedAt": null,
+      "reviewer": null,
+      "status": "BLOCKED",
+      "openAction": "Approved environment + owner authorisation (T-05)"
+    },
+    {
+      "id": "O-02",
+      "requiredResult": "Fail-closed CI/CD, artifact signatures and gated deployments demonstrated",
+      "verificationMethod": "GitHub Actions workflow (format, lint, typecheck, DB tests, e2e, CodeQL, gitleaks, Trivy, container) — green runs reported by the owner",
+      "evidence": [
+        ".github/workflows/",
+        "owner report 2026-11-10 (run logs not attached)"
+      ],
+      "verifiedAt": "2026-11-10",
+      "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
+      "status": "FAIL",
+      "openAction": "Artifact signing, protected branches/approvals and gated deployment not implemented/demonstrated (T-32)"
+    },
+    {
+      "id": "O-03",
+      "requiredResult": "Daily encrypted, offsite/isolated backups, retention and key recovery verified",
+      "verificationMethod": "Local encrypted backup + disposable restore only",
+      "evidence": [
+        "pnpm backup:local",
+        "pnpm restore:smoke"
+      ],
+      "verifiedAt": null,
+      "reviewer": null,
+      "status": "BLOCKED",
+      "openAction": "Off-site immutable backups in the target environment (T-06)"
+    },
+    {
+      "id": "O-04",
+      "requiredResult": "Real restore rehearsal, RPO/RTO, incident and disaster-recovery playbooks tested",
+      "verificationMethod": "—",
+      "evidence": [],
+      "verifiedAt": null,
+      "reviewer": null,
+      "status": "BLOCKED",
+      "openAction": "After O-03; agree RPO/RTO with the owner"
+    },
+    {
+      "id": "O-05",
+      "requiredResult": "Monitoring/alerting, on-call/support ownership and operational playbooks demonstrated",
+      "verificationMethod": "—",
+      "evidence": [],
+      "verifiedAt": null,
+      "reviewer": null,
+      "status": "BLOCKED",
+      "openAction": "Needs environment and named owners"
+    },
+    {
+      "id": "O-06",
+      "requiredResult": "Real warehouse-operator pilot / acceptance testing signed off",
+      "verificationMethod": "—",
+      "evidence": [],
+      "verifiedAt": null,
+      "reviewer": null,
+      "status": "BLOCKED",
+      "openAction": "Owner to organise a pilot with warehouse staff"
+    },
+    {
+      "id": "O-07",
+      "requiredResult": "Release owner has approved production-readiness evidence and residual risk",
+      "verificationMethod": "—",
+      "evidence": [],
+      "verifiedAt": null,
+      "reviewer": null,
+      "status": "BLOCKED",
+      "openAction": "Only after every other criterion passes"
+    }
+  ],
+  "summary": {
+    "PASS": 18,
+    "FAIL": 6,
+    "BLOCKED": 9,
+    "NOT_RUN": 1
+  }
+}

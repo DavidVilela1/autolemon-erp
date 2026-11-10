@@ -4,7 +4,7 @@
  */
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { canon, cmp, fromMilli, sub, sum, toMilli } from './qty.js';
+import { canon, cmp, fromMilli, mul, sub, sum, toMilli } from './qty.js';
 
 const milli = fc.bigInt({ min: -(10n ** 15n), max: 10n ** 15n });
 
@@ -25,5 +25,14 @@ describe('qty (bigint milli-units)', () => {
     expect(canon('0.500')).toBe('0.5');
     expect(() => toMilli('1e3')).toThrow();
     expect(() => toMilli('1.0001')).toThrow();
+  });
+});
+
+describe('mul', () => {
+  it('multiplies exactly and refuses rounding', () => {
+    expect(mul('3', '12')).toBe('36');
+    expect(mul('2.5', '0.4')).toBe('1');
+    expect(mul('1.5', '1.5')).toBe('2.25');
+    expect(() => mul('0.001', '0.5')).toThrow(RangeError);
   });
 });

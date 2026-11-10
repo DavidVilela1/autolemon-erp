@@ -10,14 +10,19 @@
  * For protected routes additionally:
  *  - a valid ACTIVE session cookie is resolved to an Actor (idle/absolute expiry, revocation);
  *  - writes must carry the session's CSRF token in `X-CSRF-Token` (synchronizer token).
- * Authorization (permissions, warehouse scope) is NOT decided here; services do that.
+ * Coarse, route-level authorization runs here too, BEFORE any body parsing (so an
+ * unauthorized caller learns nothing, not even validation errors):
+ *  - /api/admin/** requires the ADMIN role (admin-only permissions cannot be granted to staff);
+ *  - routes with a `:wh` parameter refuse staff scoped to another warehouse (404, as the
+ *    services do). Fine-grained authorization (permissions, object ownership, company
+ *    membership of the warehouse) remains in the services.
  */
 import { type CanActivate, type ExecutionContext, Inject, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { Forbidden, Unauthenticated } from '../common/errors.js';
+import { DomainError, Forbidden, NotFound, Unauthenticated } from '../common/errors.js';
 import { SERVICES, type Services } from '../composition.js';
 import { AuthService } from '../platform/auth/auth.service.js';
-import { type AppRequest, clientInfo, PUBLIC_ROUTE, sessionToken } from './http-util.js';
+import { ACCOUNT_SECURITY_ROUTE, type AppRequest, clientInfo, PUBLIC_ROUTE, sessionToken } from './http-util.js';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -48,6 +53,18 @@ export class AuthGuard implements CanActivate {
       }
     }
     req.actor = actor;
+    // Admin passkey policy: an administrator without a passkey may only reach account-security
+    // routes (to register one); everything else is refused until then.
+    if (actor.mustRegisterPasskey) {
+      const allowed = this.reflector.getAllAndOverride<boolean>(ACCOUNT_SECURITY_ROUTE, [context.getHandler(), context.getClass()]);
+      if (!allowed) {
+        throw new DomainError(403, 'PASSKEY_REGISTRATION_REQUIRED', 'Registe uma chave de acesso (passkey) para continuar');
+      }
+    }
+    const path = (req.url ?? '').split('?')[0]!;
+    if (path.startsWith('/api/admin/') && actor.role !== 'ADMIN') throw new Forbidden('admin_route');
+    const wh = (req.params as Record<string, string> | undefined)?.wh;
+    if (wh !== undefined && actor.role !== 'ADMIN' && wh !== actor.warehouseId) throw new NotFound('Armazém', 'warehouse_scope');
     return true;
   }
 

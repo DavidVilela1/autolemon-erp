@@ -44,6 +44,13 @@ export type HolderRefInput = z.infer<typeof HolderRef>;
 
 const Lot = SafeLine(40).optional();
 
+/**
+ * Scan confirmation of the destination: the code read from the destination's label (location
+ * code or container code). Optional in the API for compatibility; the pt-PT UI always sends it,
+ * and when present the server refuses a mismatch (SCAN_MISMATCH).
+ */
+const ScanConfirm = Barcode.optional();
+
 /** Validated optional simple attributes (JSONB). Only flat string/number/boolean values. */
 export const SkuAttributes = z
   .record(z.string().regex(/^[a-z][a-z0-9_]{0,39}$/), z.union([SafeLine(200), z.number().finite(), z.boolean()]))
@@ -62,6 +69,15 @@ export const CreateNodeInput = z
   })
   .strict();
 
+/**
+ * Rename and/or (de)activate a node. Codes are immutable (printed on labels). Deactivation is
+ * refused while the node or anything below it holds stock, containers or open tasks.
+ */
+export const UpdateNodeInput = z
+  .object({ name: SafeLine(80).optional(), active: z.boolean().optional() })
+  .strict()
+  .refine((v) => v.name !== undefined || v.active !== undefined, 'Nada para alterar');
+
 /** Create a movable container placed at a fixed node. */
 export const CreateContainerInput = z
   .object({
@@ -72,7 +88,7 @@ export const CreateContainerInput = z
   .strict();
 
 /** Move a whole container (contents move with it, no redistribution). */
-export const MoveContainerInput = z.object({ toNodeId: Uuid, reason: SafeLine(200).optional() }).strict();
+export const MoveContainerInput = z.object({ toNodeId: Uuid, reason: SafeLine(200).optional(), scan: ScanConfirm }).strict();
 
 // ---------------------------------------------------------------- SKU master
 
@@ -124,6 +140,22 @@ export const MoveStockInput = z
     qty: Qty,
     to: HolderRef,
     reason: SafeLine(200).optional(),
+    scan: ScanConfirm,
+  })
+  .strict();
+
+/**
+ * Quality status change of unreserved stock (wms.adjust): block AVAILABLE stock
+ * (→ QUARANTINE/DAMAGED/INSPECTION) or release it (→ AVAILABLE, also requires step-up).
+ * Optionally moves it at the same time (e.g. quarantine area → shelf).
+ */
+export const ChangeStockStatusInput = z
+  .object({
+    positionId: Uuid,
+    qty: Qty,
+    toStatus: z.enum(['AVAILABLE', 'QUARANTINE', 'DAMAGED', 'INSPECTION']),
+    to: HolderRef.optional(),
+    reason: SafeText(500),
   })
   .strict();
 
@@ -185,7 +217,7 @@ export const ReceiveInput = z
   .strict();
 
 /** Complete (possibly partially) a putaway task. */
-export const CompletePutawayInput = z.object({ qty: Qty, to: HolderRef }).strict();
+export const CompletePutawayInput = z.object({ qty: Qty, to: HolderRef, scan: ScanConfirm }).strict();
 
 // ---------------------------------------------------------------- outbound
 
@@ -228,6 +260,15 @@ export const CreatePackageInput = z.object({ code: Code, nodeId: Uuid }).strict(
 /** Pack picked units into a package. */
 export const PackInput = z.object({ packageId: Uuid, lineId: Uuid, qty: Qty, barcode: Barcode }).strict();
 
+/**
+ * Return picked-but-unpacked units of a line from a packing (DISPATCH) node back to storage
+ * (customer cancelled, wrong pick, overpick). Stock becomes AVAILABLE again at `to`.
+ */
+export const UnpickInput = z.object({ lineId: Uuid, qty: Qty, fromNodeId: Uuid, to: HolderRef, reason: SafeLine(200).optional() }).strict();
+
+/** Take packed (not yet dispatched) units of a line back out of a package. */
+export const UnpackInput = z.object({ packageId: Uuid, lineId: Uuid, qty: Qty }).strict();
+
 /** Dispatch selected packages (partial dispatch allowed). */
 export const DispatchInput = z.object({ packageIds: z.array(Uuid).min(1).max(100), carrierRef: SafeLine(80).optional() }).strict();
 
@@ -263,7 +304,8 @@ export const ReceiveTransferInput = z
   .object({
     stagingNodeId: Uuid,
     lines: z
-      .array(z.object({ lineId: Uuid, qty: Qty }).strict())
+      // `lot` picks the lot bucket to receive; omitted → lots in transit are received in lot-code order.
+      .array(z.object({ lineId: Uuid, qty: Qty, lot: Lot }).strict())
       .min(1)
       .max(200),
   })
@@ -325,7 +367,7 @@ export const FoundStockInput = z.object({ skuId: Uuid, holder: HolderRef, qtyCou
 export const ReplenishmentRuleInput = z.object({ skuId: Uuid, pickNodeId: Uuid, minQty: QtyOrZero, targetQty: Qty }).strict();
 
 /** Execute a replenishment move. */
-export const ExecuteReplenishmentInput = z.object({ ruleId: Uuid, fromPositionId: Uuid, qty: Qty }).strict();
+export const ExecuteReplenishmentInput = z.object({ ruleId: Uuid, fromPositionId: Uuid, qty: Qty, scan: ScanConfirm }).strict();
 
 /** Reverse a posted inventory transaction with a compensating transaction. */
 export const ReverseTransactionInput = z.object({ reason: SafeLine(200) }).strict();

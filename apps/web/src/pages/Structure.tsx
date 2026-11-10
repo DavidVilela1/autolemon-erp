@@ -30,8 +30,17 @@ export function StructurePage() {
   const containers = useLoad(() => loadContainers(wh), [wh]);
   const [n, setN] = useState({ parentId: '', kind: '', code: '', name: '' });
   const [c, setC] = useState({ code: '', kind: 'BOX', nodeId: '' });
-  const [mv, setMv] = useState<{ id: string; to: string } | null>(null);
+  const [mv, setMv] = useState<{ id: string; to: string; scan: string } | null>(null);
   const [hist, setHist] = useState<{ code: string; rows: Row[] } | null>(null);
+  const [edit, setEdit] = useState<{ id: string; code: string; name: string } | null>(null);
+  const setActive = (id: string, active: boolean) =>
+    void a.run(
+      async () => {
+        await api('POST', `${wp(wh)}/nodes/${id}`, { active });
+        nodes.reload();
+      },
+      active ? 'Localização reativada.' : 'Localização desativada (incluindo as que estão abaixo).',
+    );
   const a = useAction();
   const manage = can('wms.topology.manage');
   return (
@@ -45,17 +54,58 @@ export function StructurePage() {
           {nodes.loading ? (
             <Loading />
           ) : (
-            <ul className="max-h-[28rem] overflow-auto text-sm">
+            <ul className="max-h-[28rem] overflow-auto text-sm" tabIndex={0} aria-label="Localizações fixas">
               {(nodes.data ?? []).map((x) => (
-                <li key={x.id} className="border-b border-line py-1" style={{ paddingLeft: `${x.depth * 1.25}rem` }}>
-                  <span className="font-mono">{x.code}</span> · {x.name}{' '}
-                  <span className="text-ink-soft">
-                    ({KIND_PT[x.kind]}
-                    {x.holdsStock ? ', guarda stock' : ''})
+                <li
+                  key={x.id}
+                  className={`flex items-center justify-between gap-2 border-b border-line py-1 ${x.active ? '' : 'text-ink-soft'}`}
+                  style={{ paddingLeft: `${x.depth * 1.25}rem` }}
+                >
+                  <span>
+                    <span className={`font-mono ${x.active ? '' : 'line-through'}`}>{x.code}</span> · {x.name}{' '}
+                    <span className="text-ink-soft">
+                      ({KIND_PT[x.kind]}
+                      {x.holdsStock ? ', guarda stock' : ''}
+                      {x.active ? '' : ', inativa'})
+                    </span>
                   </span>
+                  {manage && (
+                    <span className="flex shrink-0 gap-1">
+                      <Button small variant="ghost" onClick={() => setEdit({ id: x.id, code: x.code, name: x.name })}>
+                        Renomear
+                      </Button>
+                      <Button small variant="ghost" onClick={() => setActive(x.id, !x.active)}>
+                        {x.active ? 'Desativar' : 'Reativar'}
+                      </Button>
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
+          )}
+          {edit && (
+            <Form
+              className="mt-3 flex items-end gap-2"
+              onSubmit={() =>
+                void a.run(async () => {
+                  await api('POST', `${wp(wh)}/nodes/${edit.id}`, { name: edit.name });
+                  setEdit(null);
+                  nodes.reload();
+                }, 'Nome alterado.')
+              }
+            >
+              <Field
+                label={`Novo nome de ${edit.code}`}
+                value={edit.name}
+                onChange={(v) => setEdit({ ...edit, name: v })}
+                required
+                maxLength={80}
+              />
+              <Button type="submit">Guardar</Button>
+              <Button variant="secondary" onClick={() => setEdit(null)}>
+                Cancelar
+              </Button>
+            </Form>
           )}
           {manage && (
             <Form
@@ -84,7 +134,7 @@ export function StructurePage() {
                 label="Dentro de"
                 value={n.parentId}
                 onChange={(v) => setN({ ...n, parentId: v })}
-                options={(nodes.data ?? []).map((x) => ({ value: x.id, label: x.path }))}
+                options={(nodes.data ?? []).filter((x) => x.active).map((x) => ({ value: x.id, label: x.path }))}
               />
               <Field label="Código" value={n.code} onChange={(v) => setN({ ...n, code: v })} required maxLength={40} />
               <Field label="Nome" value={n.name} onChange={(v) => setN({ ...n, name: v })} required maxLength={80} />
@@ -109,10 +159,25 @@ export function StructurePage() {
                 c: (r) => (
                   <span className="flex gap-1">
                     {can('wms.putaway') && r.status === 'ACTIVE' && (
-                      <Button small variant="secondary" onClick={() => setMv({ id: r.id, to: '' })}>
+                      <Button small variant="secondary" onClick={() => setMv({ id: r.id, to: '', scan: '' })}>
                         Mover
                       </Button>
                     )}
+                    {manage && r.status === 'ACTIVE' && Number(r.qtyTotal) === 0 && (
+                      <Button
+                        small
+                        variant="secondary"
+                        onClick={() =>
+                          void a.run(async () => {
+                            await api('POST', `${wp(wh)}/containers/${r.id}/close`);
+                            containers.reload();
+                          }, 'Caixa fechada.')
+                        }
+                      >
+                        Fechar
+                      </Button>
+                    )}
+                    {r.status !== 'ACTIVE' && <span className="text-xs text-ink-soft">Fechada</span>}
                     <Button
                       small
                       variant="ghost"
@@ -132,7 +197,7 @@ export function StructurePage() {
               className="mt-3 flex items-end gap-2"
               onSubmit={() =>
                 void a.run(async () => {
-                  await api('POST', `${wp(wh)}/containers/${mv.id}/move`, { toNodeId: mv.to });
+                  await api('POST', `${wp(wh)}/containers/${mv.id}/move`, { toNodeId: mv.to, scan: mv.scan });
                   setMv(null);
                   containers.reload();
                 }, 'Caixa movida (conteúdo inalterado).')
@@ -145,6 +210,7 @@ export function StructurePage() {
                 options={nodeOptions(nodes.data)}
                 required
               />
+              <Field label="Ler etiqueta do destino" value={mv.scan} onChange={(v) => setMv({ ...mv, scan: v })} required maxLength={64} />
               <Button type="submit">Confirmar</Button>
               <Button variant="secondary" onClick={() => setMv(null)}>
                 Cancelar

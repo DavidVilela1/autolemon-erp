@@ -1,4 +1,4 @@
-# Threat model — AutoLemon ERP v0.5.0 (WMS)
+# Threat model — AutoLemon ERP v0.6.0 (WMS)
 
 Owning module: security. Method: STRIDE per trust boundary + abuse cases. Owner column names the
 role accountable for the residual risk (to be assigned to people before any production rollout).
@@ -31,7 +31,7 @@ flowchart LR
 | #   | Threat                                           | Boundary      | Mitigation                                                                                                                                                                                       | Status                                                        |
 | --- | ------------------------------------------------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
 | S1  | Stolen password                                  | TB1           | Mandatory TOTP MFA for every account; password-only session has no access; throttling + backoff; Argon2id                                                                                        | Implemented+Tested                                            |
-| S2  | Phishing of TOTP                                 | TB1           | TOTP is documented fallback; WebAuthn/passkeys planned (NEXT_TASKS T-01)                                                                                                                         | **Planned** (gap)                                             |
+| S2  | Phishing of TOTP                                 | TB1           | Passkeys (origin-bound WebAuthn) for login and step-up; admins passkey-only in production (`ADMIN_PASSKEY_REQUIRED`); TOTP remains for staff; wrong-origin/RP-id assertions rejected (tested)    | **Implemented+Tested**                                        |
 | S3  | Session theft / fixation                         | TB1           | Opaque 256-bit tokens, SHA-256 at rest, HttpOnly+Secure+SameSite=Strict `__Host-` cookie, rotation after MFA, idle 30 min / absolute 12 h, revoke on logout/reset/deactivation/permission change | Implemented+Tested                                            |
 | S4  | MFA enrolment hijack with stolen password        | TB1           | Enrolment only via admin-issued one-time token; MFA reset needs token **and** current password                                                                                                   | Implemented+Tested                                            |
 | T1  | Forged warehouse movements (direct API)          | TB1/TB2       | Default-deny permissions, object-level warehouse scope, barcode verification, state machines, strict DTOs                                                                                        | Implemented+Tested                                            |
@@ -74,12 +74,12 @@ flowchart LR
 
 ## 4. Residual risks and owners
 
-| Risk                                           | Residual                           | Owner (role)      | Treatment                                                          |
-| ---------------------------------------------- | ---------------------------------- | ----------------- | ------------------------------------------------------------------ |
-| No phishing-resistant MFA yet                  | High for admins                    | Security lead     | T-01 WebAuthn before production                                    |
-| No independent pentest / DAST executed         | High                               | Security lead     | Mandatory release gate                                             |
-| WAF/ZTNA/KMS/TLS/off-site backups not deployed | High                               | Platform/ops lead | Deploy + verify per NETWORK_AND_ZTNA / BACKUP_AND_DR               |
-| Superuser can rewrite DB history               | Medium                             | DBA + security    | Off-site WORM audit digests, separation of duties                  |
-| Local dev key provider                         | Low (refused in production config) | Platform lead     | External KMS provider implementation (T-03)                        |
-| Performance/DoS under load untested            | Medium                             | Engineering       | Load tests (T-11)                                                  |
-| Breached-password corpus is a small local list | Medium                             | Security lead     | HIBP k-anonymity via egress proxy or offline corpus (SEC-OPEN-004) |
+| Risk                                           | Residual                                        | Owner (role)      | Treatment                                                                        |
+| ---------------------------------------------- | ----------------------------------------------- | ----------------- | -------------------------------------------------------------------------------- |
+| Staff may still use TOTP (phishable)           | Medium (staff permissions are warehouse-scoped) | Security lead     | Encourage passkeys for staff; consider extending the policy after field feedback |
+| No independent pentest / DAST executed         | High                                            | Security lead     | Mandatory release gate                                                           |
+| WAF/ZTNA/KMS/TLS/off-site backups not deployed | High                                            | Platform/ops lead | Deploy + verify per NETWORK_AND_ZTNA / BACKUP_AND_DR                             |
+| Superuser can rewrite DB history               | Medium                                          | DBA + security    | Off-site WORM audit digests, separation of duties                                |
+| Local dev key provider                         | Low (refused in production config)              | Platform lead     | External KMS provider implementation (T-03)                                      |
+| Performance/DoS under load untested            | Medium                                          | Engineering       | Load tests (T-11)                                                                |
+| Breached-password corpus is a small local list | Medium                                          | Security lead     | HIBP k-anonymity via egress proxy or offline corpus (SEC-OPEN-004)               |

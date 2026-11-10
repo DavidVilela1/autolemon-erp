@@ -2,6 +2,57 @@
 
 All notable changes. Owning module: repository. Format: Keep a Changelog; versioning: SemVer.
 
+## [0.6.0-WMS] — 2026-11-10
+
+Continuation of v0.5.0 (no restart). Priority rule from the product owner: complete the
+autonomous WMS before any other ERP module. Review: `docs/reviews/REVIEW-2026-11-10-v0.5.md`;
+evidence register: `docs/WMS_RELEASE_GATE.md`.
+
+### Added
+
+- **Passkeys (WebAuthn)** as second factor and for step-up (`@simplewebauthn/server` 14.1.0,
+  `@simplewebauthn/browser` 14.0.0); `ADMIN_PASSKEY_REQUIRED` policy (mandatory in production);
+  login button "Usar chave de acesso"; step-up dialog offers the passkey (ADR-0019).
+- **A minha conta**: passkeys (register/list/remove), password change (revokes other sessions),
+  own sessions (list, end one, end all others), recovery-code regeneration.
+- WMS: quality status change (`/stock/status`: block, audited release with step-up); barcode
+  units of measure applied on receive/pick/pack; lots carried through transfers
+  (`transfer_line_lots`, per-lot receipt and loss); un-pick and un-pack; cancel after un-picking;
+  empty packages closed with their order; node rename/deactivate/reactivate; container close;
+  source-side cancel of draft transfers; UI for all of these.
+- Data-retention purge (`app_retention_purge`, every 6 h, bounded windows, audited; ADR-0020).
+- Lint-enforced module boundaries (`no-restricted-imports`) with a test proving they fire.
+- Tests: `passkeys-account` (17), `wms-completion` (16), `reliability` (5), `route-inventory`
+  (5, all 108 API operations), `retention` (2), `module-boundaries` (4), `release-gate` (3); e2e
+  passkey flow with a Chrome DevTools virtual authenticator; axe sweep over every screen. Totals:
+  unit 37, integration 34, security 73, e2e 2.
+- Migrations 0004 (passkeys/account), 0005 (WMS completion), 0006 (retention).
+- **WMS release gate as code** (product owner's Readiness Gate v0.6): `docs/WMS_RELEASE_STATUS.json`
+  (source of truth), generated `docs/WMS_RELEASE_GATE.md`, `docs/WMS_RELEASE_EVIDENCE.md`,
+  `pnpm gate:check` / `gate:render` (fail-closed state machine, in `test:all` and CI; ADR-0021).
+- **Scan-verified destinations** for putaway, stock moves, container moves and replenishment
+  (`scan` field, `SCAN_MISMATCH`; required in the UI; ADR-0022).
+- Reliability tests: failure injection mid-command (full rollback, same-key retry, replay),
+  migration upgrade rehearsal from the v0.5.0 schema, FULL count with recount.
+- `pnpm restore:smoke` upgrades a backup taken by an older build forward before verifying it.
+
+### Changed
+
+- `AuthGuard` now refuses `/api/admin/**` for non-admins and cross-warehouse `:wh` routes for staff
+  **before** request bodies are parsed (previously a 400 validation error could precede the 403/404).
+- Transaction reversal now requires step-up, like the equivalent adjustment.
+- Session refresh no longer unmounts the current screen (kept success messages/new codes visible).
+- Native checkboxes are 24×24 px (WCAG 2.5.8); wide tables and the location tree are keyboard
+  scrollable (WCAG 2.1.1).
+
+### Known gaps
+
+Gate state **`WMS_IN_PROGRESS`** (PASS 18 · FAIL 6 · BLOCKED 9 · NOT_RUN 1). Code-level FAILs:
+activity export/search (F-12), runbooks/operator manual (E-05), external KMS (S-03), monitoring
+(S-05), ASVS open items (S-06), signed artifacts/gated deployment (O-02). Also open: FEFO/serials,
+transfer reservations, load tests (targets to be agreed), manual screen-reader pass. **Not
+production-ready.**
+
 ## [0.5.0-WMS] — 2026-11-09
 
 First implementation (greenfield; no prior code in the workspace).

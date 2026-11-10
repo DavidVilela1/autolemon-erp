@@ -5,7 +5,10 @@
  * Safety: always restores into a freshly created `autolemon_restore_smoke_<random>` database and
  * drops it afterwards; it never writes to the source database. Verification:
  *  - ciphertext checksum (manifest) → authenticated decryption (GCM tag) → plaintext checksum;
- *  - schema_migrations matches the migration files of this build;
+ *  - a backup taken by an OLDER build is upgraded forward with this build's migrations (the
+ *    already-applied files must still match their checksums) — this rehearses "restore last
+ *    night's backup, then deploy the new version" (docs/DATABASE.md §1a);
+ *  - schema_migrations then matches the migration files of this build;
  *  - inventory ledger reconciles with balances, reservations reconcile;
  *  - security audit hash chains verify for every tenant;
  *  - encrypted fields (TOTP seeds, PII) decrypt with the CURRENT key provider (key access).
@@ -64,6 +67,15 @@ let ok;
 try {
   const mode = await pgToolMode(owner);
   runPgTool(mode, 'pg_restore', ['--no-owner', '--no-acl', '--exit-on-error', '-d', target], owner, dump);
+  const tsx = resolve(ROOT, 'node_modules/.bin', process.platform === 'win32' ? 'tsx.cmd' : 'tsx');
+  const m = spawnSync(tsx, ['--tsconfig', 'apps/api/tsconfig.json', 'apps/api/src/db/cli/migrate.ts'], {
+    cwd: ROOT,
+    env: { ...process.env, SKIP_DOTENV: '1', DATABASE_URL: targetUrl },
+    encoding: 'utf8',
+    shell: process.platform === 'win32',
+  });
+  if (m.status !== 0) throw new Error(`forward upgrade of the restored backup failed: ${m.stderr || m.stdout}`);
+  console.log(`[restore] forward upgrade of the restored schema: ${(m.stdout.trim().split('\n').pop() ?? '').trim()}`);
   const v = spawnSync(
     resolve(ROOT, 'node_modules/.bin', process.platform === 'win32' ? 'tsx.cmd' : 'tsx'),
     ['--tsconfig', 'apps/api/tsconfig.json', 'apps/api/src/db/cli/verify-restore.ts'],

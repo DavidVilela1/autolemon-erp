@@ -8,6 +8,7 @@
  */
 import { type ReactNode, useEffect, useState } from 'react';
 import { Button, Field, Form } from './components/ui';
+import { AccountPage } from './pages/Account';
 import { AdminPage, AuditPage } from './pages/Admin';
 import { EnrollmentPage, LoginPage, ResetPasswordPage } from './pages/Auth';
 import { InboundPage, PutawayPage } from './pages/Inbound';
@@ -43,6 +44,7 @@ const ROUTES: RouteDef[] = [
   { path: '/etiquetas', label: 'Etiquetas', perm: 'wms.view', render: () => <LabelsPage /> },
   { path: '/admin', label: 'Administração', admin: true, render: () => <AdminPage /> },
   { path: '/auditoria', label: 'Auditoria', perm: 'admin.audit.read', render: () => <AuditPage /> },
+  { path: '/conta', label: 'A minha conta', render: () => <AccountPage /> },
 ];
 
 function useHashPath(): string {
@@ -59,6 +61,7 @@ function StepUpDialog() {
   const { stepUpPrompt } = useSession();
   const [code, setCode] = useState('');
   if (!stepUpPrompt) return null;
+  const { resolve, passkeys, totpAllowed } = stepUpPrompt;
   return (
     <div
       role="dialog"
@@ -70,31 +73,47 @@ function StepUpDialog() {
         <h2 id="stepup-title" className="mb-2 text-lg font-semibold">
           Confirmar identidade
         </h2>
-        <p className="mb-3 text-sm text-ink-soft">Esta ação é sensível. Introduza o código atual da aplicação autenticadora.</p>
-        <Form
-          className="space-y-3"
-          onSubmit={() => {
-            stepUpPrompt.resolve(code);
-            setCode('');
-          }}
-        >
-          <Field
-            label="Código de 6 dígitos"
-            value={code}
-            onChange={setCode}
-            required
-            autoFocus
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-          />
-          <div className="flex gap-2">
-            <Button type="submit">Confirmar</Button>
-            <Button variant="secondary" onClick={() => (stepUpPrompt.resolve(null), setCode(''))}>
-              Cancelar
-            </Button>
+        <p className="mb-3 text-sm text-ink-soft">
+          Esta ação é sensível. {totpAllowed ? 'Introduza o código atual da aplicação autenticadora' : 'Confirme com a sua chave de acesso'}
+          {totpAllowed && passkeys > 0 ? ' ou use a sua chave de acesso.' : '.'}
+        </p>
+        {passkeys > 0 && (
+          <div className="mb-3">
+            <Button onClick={() => (resolve({ kind: 'passkey' }), setCode(''))}>Usar chave de acesso</Button>
           </div>
-        </Form>
+        )}
+        {totpAllowed ? (
+          <Form
+            className="space-y-3"
+            onSubmit={() => {
+              resolve({ kind: 'totp', code });
+              setCode('');
+            }}
+          >
+            <Field
+              label="Código de 6 dígitos"
+              value={code}
+              onChange={setCode}
+              required
+              autoFocus={passkeys === 0}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+            />
+            <div className="flex gap-2">
+              <Button type="submit" variant={passkeys > 0 ? 'secondary' : undefined}>
+                Confirmar
+              </Button>
+              <Button variant="secondary" onClick={() => (resolve(null), setCode(''))}>
+                Cancelar
+              </Button>
+            </div>
+          </Form>
+        ) : (
+          <Button variant="secondary" onClick={() => resolve(null)}>
+            Cancelar
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -111,6 +130,16 @@ export function App() {
   if (loading) return <p className="m-8 text-ink-soft">A carregar…</p>;
   if (!session) return <LoginPage />;
   const isAdmin = session.user.role === 'ADMIN';
+  if (session.security.mustRegisterPasskey) {
+    // Admin passkey policy: until a passkey exists, only the account page is reachable
+    // (the API enforces the same rule; this keeps the UI honest about it).
+    return (
+      <main id="main" className="mx-auto max-w-4xl p-5">
+        <AccountPage enforced />
+        <StepUpDialog />
+      </main>
+    );
+  }
   const visible = ROUTES.filter((r) => (r.admin ? isAdmin : !r.perm || can(r.perm)));
   const route = visible.find((r) => r.path === path) ?? visible[0];
   return (
@@ -164,7 +193,7 @@ export function App() {
           </ul>
         </nav>
         <main id="main" className="min-w-0 flex-1 p-5">
-          {activeWh ? route?.render() : <p>Sem armazém atribuído. Contacte o administrador.</p>}
+          {activeWh || route?.path === '/conta' ? route?.render() : <p>Sem armazém atribuído. Contacte o administrador.</p>}
         </main>
       </div>
       <StepUpDialog />

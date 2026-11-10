@@ -52,3 +52,13 @@ body {
     background: white;
   }
 }
+
+/* WCAG 2.2 SC 2.5.8 (target size, minimum 24×24 CSS px) for native checkboxes/radios. */
+@layer base {
+  input[type='checkbox'],
+  input[type='radio'] {
+    width: 1.5rem;
+    height: 1.5rem;
+    accent-color: var(--color-teal, #0f766e);
+  }
+}

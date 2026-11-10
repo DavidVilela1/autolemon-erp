@@ -38,6 +38,22 @@ const EnvSchema = z.object({
   CSRF_SECRET: z.string().refine((v) => Buffer.from(v, 'base64').length === 32, 'CSRF_SECRET must be 32 bytes base64'),
   ARGON2_MEMORY_KIB: z.coerce.number().int().min(19456).max(1048576).default(65536),
   ARGON2_ITERATIONS: z.coerce.number().int().min(2).max(10).default(3),
+  /** Retention windows in days (minimum 7, enforced again inside the database function). */
+  RETENTION_COMMAND_LOG_DAYS: z.coerce.number().int().min(7).max(3650).default(30),
+  RETENTION_SESSION_DAYS: z.coerce.number().int().min(7).max(3650).default(30),
+  RETENTION_TOKEN_DAYS: z.coerce.number().int().min(7).max(3650).default(30),
+  RETENTION_OUTBOX_DAYS: z.coerce.number().int().min(7).max(3650).default(90),
+  /** WebAuthn relying-party id (defaults to the WEB_ORIGIN hostname). */
+  WEBAUTHN_RP_ID: z
+    .string()
+    .regex(/^[a-z0-9.-]{1,253}$/)
+    .optional(),
+  /**
+   * When true, company administrators must use a passkey (phishing-resistant) as their second
+   * factor and for step-up once they have one; until they register one, only account security
+   * routes are reachable. Mandatory in production.
+   */
+  ADMIN_PASSKEY_REQUIRED: Bool.default(false),
   /** Comma-separated optional modules to load. WMS is always on. */
   ENABLED_MODULES: z.string().default('wms'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
@@ -67,6 +83,7 @@ export function loadConfig(source: Record<string, string | undefined> = process.
     if (!cfg.COOKIE_SECURE) problems.push('COOKIE_SECURE must be true in production');
     if (!cfg.WEB_ORIGIN.startsWith('https://')) problems.push('WEB_ORIGIN must be https in production');
     if (!cfg.AUTH_THROTTLE_ENABLED) problems.push('AUTH_THROTTLE_ENABLED must be true in production');
+    if (!cfg.ADMIN_PASSKEY_REQUIRED) problems.push('ADMIN_PASSKEY_REQUIRED must be true in production');
     if (cfg.TRUST_PROXY.trim().toLowerCase() === 'true') problems.push('TRUST_PROXY=true is forbidden; list proxy addresses');
   }
   if (cfg.KEY_PROVIDER === 'local-dev' && !cfg.LOCAL_DEV_KEKS) {
@@ -74,6 +91,11 @@ export function loadConfig(source: Record<string, string | undefined> = process.
   }
   if (problems.length) throw new Error(`Unsafe configuration: ${problems.join('; ')}`);
   return cfg;
+}
+
+/** WebAuthn relying-party id: explicit setting or the hostname of WEB_ORIGIN. */
+export function rpIdOf(cfg: AppConfig): string {
+  return cfg.WEBAUTHN_RP_ID ?? new URL(cfg.WEB_ORIGIN).hostname;
 }
 
 /** Returns a log-safe summary of configuration (no secrets, no connection strings). */

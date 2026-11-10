@@ -1,4 +1,4 @@
-# Operations — AutoLemon ERP v0.5.0
+# Operations — AutoLemon ERP v0.6.0
 
 Owning module: operations. **Production deployment is not configured and not approved.** This
 document describes how the system is configured and operated, and what must exist first.
@@ -7,24 +7,27 @@ document describes how the system is configured and operated, and what must exis
 
 Validated at startup by `apps/api/src/config/env.ts` (invalid ⇒ process exits).
 
-| Variable                                                              | Default               | Production rule                            |
-| --------------------------------------------------------------------- | --------------------- | ------------------------------------------ |
-| `NODE_ENV`                                                            | development           | `production`                               |
-| `APP_DATABASE_URL`                                                    | —                     | `autolemon_app` role, from secrets manager |
-| `DATABASE_URL`                                                        | —                     | owner role, **only** for the migration job |
-| `DB_SSL`, `DB_SSL_CA_FILE`                                            | disable               | must be `verify-full` (enforced)           |
-| `DB_POOL_MAX`                                                         | 10                    | size to DB connection budget               |
-| `API_HOST`, `API_PORT`                                                | 127.0.0.1, 3000       | private interface                          |
-| `WEB_ORIGIN`                                                          | http://localhost:5173 | exact https origin (enforced https)        |
-| `TRUST_PROXY`                                                         | false                 | proxy IPs/CIDRs only; `true` refused       |
-| `COOKIE_SECURE`                                                       | true                  | must be true                               |
-| `SESSION_IDLE_MINUTES` / `SESSION_ABSOLUTE_HOURS` / `STEP_UP_MINUTES` | 30 / 12 / 5           | policy                                     |
-| `KEY_PROVIDER`                                                        | local-dev             | `external-kms` (local-dev refused)         |
-| `LOCAL_DEV_KEKS`, `CSRF_SECRET`                                       | generated in dev      | CSRF secret from vault; no dev keyring     |
-| `ARGON2_MEMORY_KIB` / `ARGON2_ITERATIONS`                             | 65536 / 3             | benchmark on target hardware               |
-| `ENABLED_MODULES`                                                     | wms                   | unknown modules refused                    |
-| `LOG_LEVEL`                                                           | info                  | info                                       |
-| `AUTH_THROTTLE_ENABLED`                                               | true                  | must be true                               |
+| Variable                                                                        | Default               | Production rule                                       |
+| ------------------------------------------------------------------------------- | --------------------- | ----------------------------------------------------- |
+| `NODE_ENV`                                                                      | development           | `production`                                          |
+| `APP_DATABASE_URL`                                                              | —                     | `autolemon_app` role, from secrets manager            |
+| `DATABASE_URL`                                                                  | —                     | owner role, **only** for the migration job            |
+| `DB_SSL`, `DB_SSL_CA_FILE`                                                      | disable               | must be `verify-full` (enforced)                      |
+| `DB_POOL_MAX`                                                                   | 10                    | size to DB connection budget                          |
+| `API_HOST`, `API_PORT`                                                          | 127.0.0.1, 3000       | private interface                                     |
+| `WEB_ORIGIN`                                                                    | http://localhost:5173 | exact https origin (enforced https)                   |
+| `TRUST_PROXY`                                                                   | false                 | proxy IPs/CIDRs only; `true` refused                  |
+| `COOKIE_SECURE`                                                                 | true                  | must be true                                          |
+| `SESSION_IDLE_MINUTES` / `SESSION_ABSOLUTE_HOURS` / `STEP_UP_MINUTES`           | 30 / 12 / 5           | policy                                                |
+| `WEBAUTHN_RP_ID`                                                                | host of WEB_ORIGIN    | registrable domain of WEB_ORIGIN                      |
+| `ADMIN_PASSKEY_REQUIRED`                                                        | false                 | must be true (admins: passkey only)                   |
+| `KEY_PROVIDER`                                                                  | local-dev             | `external-kms` (local-dev refused)                    |
+| `LOCAL_DEV_KEKS`, `CSRF_SECRET`                                                 | generated in dev      | CSRF secret from vault; no dev keyring                |
+| `ARGON2_MEMORY_KIB` / `ARGON2_ITERATIONS`                                       | 65536 / 3             | benchmark on target hardware                          |
+| `ENABLED_MODULES`                                                               | wms                   | unknown modules refused                               |
+| `LOG_LEVEL`                                                                     | info                  | info                                                  |
+| `AUTH_THROTTLE_ENABLED`                                                         | true                  | must be true                                          |
+| `RETENTION_COMMAND_LOG_DAYS` / `_SESSION_DAYS` / `_TOKEN_DAYS` / `_OUTBOX_DAYS` | 30 / 30 / 30 / 90     | ≥ 7 each; align with the records of processing (GDPR) |
 
 ## 2. Deployment outline (when approved)
 
@@ -36,6 +39,16 @@ Validated at startup by `apps/api/src/config/env.ts` (invalid ⇒ process exits)
    (company + warehouses + first admin invitation); deliver the invitation link out of band.
 5. Deploy API image (non-root, read-only) and static web build behind the proxy.
 6. Post-deploy smoke: `/api/health`, login + MFA with a test account, `/stock/reconciliation`.
+
+## 2a. Data retention
+
+The API runs `app_retention_purge` every 6 hours (ADR-0020). It deletes only: idempotency rows
+older than `RETENTION_COMMAND_LOG_DAYS` (the replay window ends there), sessions that ended more
+than `RETENTION_SESSION_DAYS` ago, used/expired one-time tokens older than `RETENTION_TOKEN_DAYS`,
+outbox events **published** more than `RETENTION_OUTBOX_DAYS` ago, and idle throttle rows. It
+never touches inventory history, documents or the security audit log. Each run that deleted rows
+writes `system.retention.purge` to the audit log; failures are logged as `retention purge failed`
+(alert on it once monitoring exists).
 
 ## 3. Monitoring (to implement)
 

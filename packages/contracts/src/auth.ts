@@ -80,3 +80,60 @@ export const UpdateWarehouseAssignmentInput = z.object({ warehouseId: Uuid }).st
 
 /** Admin-only active warehouse switch (UI context; enforcement is per request). */
 export const SwitchWarehouseInput = z.object({ warehouseId: Uuid }).strict();
+
+// ---------------------------------------------------------------- passkeys & account (v0.6)
+
+/** base64url string (WebAuthn binary fields). */
+const B64u = z.string().regex(/^[A-Za-z0-9_-]{1,16000}$/, 'base64url inválido');
+
+/** WebAuthn registration response as produced by @simplewebauthn/browser (strict shape). */
+export const WebAuthnRegistrationResponse = z
+  .object({
+    id: B64u,
+    rawId: B64u,
+    type: z.literal('public-key'),
+    response: z
+      .object({
+        clientDataJSON: B64u,
+        attestationObject: B64u,
+        authenticatorData: B64u.optional(),
+        transports: z
+          .array(z.string().regex(/^[a-z-]{1,20}$/))
+          .max(10)
+          .optional(),
+        publicKeyAlgorithm: z.number().int().optional(),
+        publicKey: B64u.optional(),
+      })
+      .strict(),
+    authenticatorAttachment: z.enum(['platform', 'cross-platform']).optional(),
+    clientExtensionResults: z.record(z.string(), z.unknown()).default({}),
+  })
+  .strict();
+
+/** WebAuthn authentication (assertion) response. */
+export const WebAuthnAuthenticationResponse = z
+  .object({
+    id: B64u,
+    rawId: B64u,
+    type: z.literal('public-key'),
+    response: z
+      .object({
+        clientDataJSON: B64u,
+        authenticatorData: B64u,
+        signature: B64u,
+        userHandle: B64u.optional(),
+      })
+      .strict(),
+    authenticatorAttachment: z.enum(['platform', 'cross-platform']).optional(),
+    clientExtensionResults: z.record(z.string(), z.unknown()).default({}),
+  })
+  .strict();
+
+/** Register a passkey (after step-up). */
+export const PasskeyRegisterInput = z.object({ response: WebAuthnRegistrationResponse, name: SafeLine(60) }).strict();
+
+/** Present a passkey assertion (login second factor or step-up). */
+export const PasskeyAssertInput = z.object({ response: WebAuthnAuthenticationResponse }).strict();
+
+/** Self-service password change. */
+export const ChangePasswordInput = z.object({ currentPassword: z.string().min(1).max(128), newPassword: NewPassword }).strict();

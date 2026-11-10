@@ -22,7 +22,7 @@ import {
   useLoad,
 } from '../components/ui';
 import { useSession } from '../session';
-import { loadNodes, loadSkus, nodeOptions, type Row, wp } from '../wms-data';
+import { holderOptions, holderRef, loadNodes, loadSkus, nodeOptions, type Row, wp } from '../wms-data';
 
 interface OutDoc {
   id: string;
@@ -49,6 +49,8 @@ export function OutboundPage() {
   const [pick, setPick] = useState<{ reservationId: string; qty: string; short: boolean } | null>(null);
   const [pack, setPack] = useState({ packageId: '', lineId: '', qty: '' });
   const [sel, setSel] = useState<string[]>([]);
+  const [unpick, setUnpick] = useState<{ lineId: string; qty: string; to: string } | null>(null);
+  const [unpack, setUnpack] = useState<{ packageId: string; lineId: string; qty: string } | null>(null);
   const a = useAction();
   const refresh = () => (doc.reload(), list.reload());
   const d = doc.data;
@@ -132,8 +134,67 @@ export function OutboundPage() {
                   { h: 'Embalado', c: (r) => fmtQty(r.qtyPacked), num: true },
                   { h: 'Expedido', c: (r) => fmtQty(r.qtyDispatched), num: true },
                   { h: 'Falta', c: (r) => fmtQty(r.qtyShort), num: true },
+                  {
+                    h: '',
+                    c: (r) =>
+                      d.status === 'IN_PROGRESS' &&
+                      can('wms.pick') &&
+                      Number(r.qtyPicked) > Number(r.qtyPacked) && (
+                        <Button
+                          small
+                          variant="secondary"
+                          onClick={() => setUnpick({ lineId: r.id!, qty: String(Number(r.qtyPicked) - Number(r.qtyPacked)), to: '' })}
+                        >
+                          Anular separação
+                        </Button>
+                      ),
+                  },
                 ]}
               />
+              {unpick && (
+                <Form
+                  className="grid gap-2 rounded border border-teal p-3 md:grid-cols-4"
+                  onSubmit={() =>
+                    void a.run(async () => {
+                      await api('POST', `${wp(wh)}/outbound/${d.id}/unpick`, {
+                        lineId: unpick.lineId,
+                        qty: unpick.qty,
+                        fromNodeId: packNode,
+                        to: holderRef(unpick.to),
+                      });
+                      setUnpick(null);
+                      refresh();
+                    }, 'Separação anulada; stock devolvido à armazenagem.')
+                  }
+                >
+                  <p className="text-sm md:col-span-4">
+                    Devolve unidades separadas (fora de volumes) da zona de embalagem selecionada abaixo para uma localização de
+                    armazenagem.
+                  </p>
+                  <Field
+                    label="Quantidade a devolver"
+                    value={unpick.qty}
+                    onChange={(v) => setUnpick({ ...unpick, qty: v })}
+                    required
+                    inputMode="decimal"
+                  />
+                  <Select
+                    label="Devolver para"
+                    value={unpick.to}
+                    onChange={(v) => setUnpick({ ...unpick, to: v })}
+                    options={holderOptions(nodes.data, undefined)}
+                    required
+                  />
+                  <div className="flex items-end gap-2 md:col-span-2">
+                    <Button type="submit" disabled={a.busy || !packNode}>
+                      Confirmar devolução
+                    </Button>
+                    <Button variant="secondary" onClick={() => setUnpick(null)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                </Form>
+              )}
               <div className="no-print flex flex-wrap gap-2">
                 {['DRAFT', 'ALLOCATED', 'IN_PROGRESS'].includes(d.status) && can('wms.outbound.manage') && (
                   <Button
@@ -157,7 +218,7 @@ export function OutboundPage() {
                     Fechar com pendente
                   </Button>
                 )}
-                {['DRAFT', 'ALLOCATED'].includes(d.status) && can('wms.outbound.manage') && (
+                {['DRAFT', 'ALLOCATED', 'IN_PROGRESS'].includes(d.status) && can('wms.outbound.manage') && (
                   <Button
                     variant="danger"
                     onClick={() =>
@@ -251,13 +312,24 @@ export function OutboundPage() {
                         c: (p) =>
                           p.status === 'ACTIVE' &&
                           can('wms.pack') && (
-                            <Button
-                              small
-                              variant="secondary"
-                              onClick={() => setPack({ packageId: p.id, lineId: d.lines[0]?.id ?? '', qty: '' })}
-                            >
-                              Embalar aqui
-                            </Button>
+                            <span className="flex gap-1">
+                              <Button
+                                small
+                                variant="secondary"
+                                onClick={() => setPack({ packageId: p.id, lineId: d.lines[0]?.id ?? '', qty: '' })}
+                              >
+                                Embalar aqui
+                              </Button>
+                              {p.contents.length > 0 && (
+                                <Button
+                                  small
+                                  variant="ghost"
+                                  onClick={() => setUnpack({ packageId: p.id, lineId: p.contents[0]!.lineId, qty: '' })}
+                                >
+                                  Retirar
+                                </Button>
+                              )}
+                            </span>
                           ),
                       },
                     ]}
@@ -300,6 +372,41 @@ export function OutboundPage() {
                       </Button>
                     )}
                   </div>
+                  {unpack && (
+                    <Form
+                      className="grid gap-2 rounded border border-teal p-3 md:grid-cols-4"
+                      onSubmit={() =>
+                        void a.run(async () => {
+                          await api('POST', `${wp(wh)}/outbound/${d.id}/unpack`, unpack);
+                          setUnpack(null);
+                          refresh();
+                        }, 'Unidades retiradas do volume (ficam separadas na zona de embalagem).')
+                      }
+                    >
+                      <Select
+                        label="Linha"
+                        value={unpack.lineId}
+                        onChange={(v) => setUnpack({ ...unpack, lineId: v })}
+                        options={d.lines.map((l) => ({ value: l.id!, label: l.skuCode! }))}
+                        required
+                      />
+                      <Field
+                        label="Quantidade a retirar"
+                        value={unpack.qty}
+                        onChange={(v) => setUnpack({ ...unpack, qty: v })}
+                        required
+                        inputMode="decimal"
+                      />
+                      <div className="flex items-end gap-2 md:col-span-2">
+                        <Button type="submit" disabled={a.busy}>
+                          Retirar do volume
+                        </Button>
+                        <Button variant="secondary" onClick={() => setUnpack(null)}>
+                          Cancelar
+                        </Button>
+                      </div>
+                    </Form>
+                  )}
                   {pack.packageId && (
                     <div className="grid gap-2 rounded border border-teal p-3 md:grid-cols-3">
                       <Select

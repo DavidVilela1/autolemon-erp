@@ -1,4 +1,4 @@
-# Architecture — AutoLemon ERP v0.5.0
+# Architecture — AutoLemon ERP v0.6.0
 
 Owning module: platform. Status: implemented and tested for the scope in `docs/PROJECT_STATE.md`.
 
@@ -49,9 +49,13 @@ flowchart LR
 | WMS (`apps/api/src/wms`)                             | skus, sku_barcodes, storage_nodes, containers, container_movements, stock_positions, inventory_transactions, inventory_ledger, reservations, inbound__, putaway_tasks, outbound__, transfers, transfer_lines, returns, return_lines, count_*, replenishment_rules | platform (authz, audit, crypto), db, common, contracts | be written to by any other module                          |
 | Future modules (Sales, Purchasing, Finance, Catalog) | their own tables                                                                                                                                                                                                                                                  | WMS **application services** + versioned outbox events | write WMS tables, read decrypted secrets, touch auth state |
 
-Rules enforced today: by code review and directory layout; the WMS engine is the only code that
-issues `UPDATE stock_positions` / `INSERT inventory_ledger` (grep-able). A lint-level import
-boundary check is listed in `docs/NEXT_TASKS.md` (T-08).
+Rules enforced today: ESLint `no-restricted-imports` (since v0.6.0, `eslint.config.js`): platform,
+db, common and config code cannot import `wms/` or `http/`; WMS code cannot import `http/` or any
+platform package other than `authz/`, `audit/` and `crypto/`; the web client cannot import API
+code or server-only modules; contracts cannot import applications. `tests/security/module-boundaries.test.ts`
+proves the rules fire. The WMS inventory engine remains the only code that issues
+`UPDATE stock_positions` / `INSERT inventory_ledger` (grep-able; reviewed). Future modules get
+their own boundary block when created.
 
 ## 3. Request lifecycle (every protected call)
 
@@ -66,6 +70,7 @@ sequenceDiagram
   G->>G: Origin / Sec-Fetch-Site / X-Requested-With checks
   G->>P: session by SHA-256(token); idle+absolute expiry; user ACTIVE
   G->>G: CSRF token = HMAC(secret, sessionId) compare (constant time)
+  G->>G: coarse authz: /api/admin/** ⇒ ADMIN; :wh ⇒ staff's own warehouse (before body parsing)
   G->>C: req.actor
   C->>C: Zod strict parse (unknown fields rejected)
   C->>S: pick(actor, wh, id, key, input)

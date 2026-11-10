@@ -12,7 +12,9 @@ disposable restore verification.
 | RTO       | ≤ 8 h for full restore of the ERP                                            | **unproven target** — measure in the quarterly exercise |
 | Retention | daily 35 days, monthly 12 months, immutable (object lock)                    | proposal                                                |
 
-Measured so far (local, synthetic dataset, build VM): `pnpm restore:smoke` end to end ≈ 1.3 s.
+Measured so far (local, synthetic dataset, build VM): `pnpm restore:smoke` end to end ≈ 1.3–2.0 s
+(v0.6.0: 2.0 s for a current-schema backup; 1.9 s for a v0.5.0 backup including the forward
+upgrade). These are smoke timings, not an RTO.
 This is NOT an RTO measurement for production volumes.
 
 ## 2. Production strategy (provider-neutral, NOT DEPLOYED)
@@ -29,10 +31,10 @@ This is NOT an RTO measurement for production volumes.
 
 ## 3. Local demonstration (implemented and tested)
 
-| Command              | What it does                                                                                                                                                                                                                                                                 |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm backup:local`  | `pg_dump -Fc` → AES-256-GCM with `.local/backup.key` (generated, 0600) → `backups/*.dump.enc` + manifest (SHA-256 of plaintext and ciphertext). No network.                                                                                                                  |
-| `pnpm restore:smoke` | Verifies checksum + GCM tag, restores into a NEW `autolemon_restore_smoke_<rand>` database, checks schema version/checksums, ledger and reservation reconciliation, audit chains, decryption of every encrypted field, then drops the database. Never touches the source DB. |
+| Command              | What it does                                                                                                                                                                                                                                                                                                                                                                                       |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm backup:local`  | `pg_dump -Fc` → AES-256-GCM with `.local/backup.key` (generated, 0600) → `backups/*.dump.enc` + manifest (SHA-256 of plaintext and ciphertext). No network.                                                                                                                                                                                                                                        |
+| `pnpm restore:smoke` | Verifies checksum + GCM tag, restores into a NEW `autolemon_restore_smoke_<rand>` database, upgrades a backup from an older build forward with this build's migrations (applied files must keep their checksums), checks schema version/checksums, ledger and reservation reconciliation, audit chains, decryption of every encrypted field, then drops the database. Never touches the source DB. |
 
 Docker users without a local `pg_dump` ≥ server version: scripts automatically use
 `docker compose exec postgres …` (`PG_TOOL_MODE=docker|local` to force).

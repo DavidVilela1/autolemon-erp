@@ -19,7 +19,7 @@ import type { Tx } from '../../db/database.js';
 import { one, row, rows } from '../../db/database.js';
 import { Conflict, InsufficientStock, NotFound } from '../../common/errors.js';
 import type { Actor } from '../../platform/authz/actor.js';
-import { cmp, isPositive, neg, sub, toMilli } from './qty.js';
+import { cmp, isPositive, mul, neg, sub, toMilli } from './qty.js';
 
 /** Operation context: transaction already scoped (RLS) to one company + warehouse. */
 export interface OpCtx {
@@ -69,7 +69,10 @@ export type TxnType =
   | 'COUNT_ADJUST'
   | 'ADJUST'
   | 'REPLENISH'
-  | 'REVERSAL';
+  | 'REVERSAL'
+  | 'STATUS_CHANGE'
+  | 'UNPICK'
+  | 'UNPACK';
 
 /** Node kinds whose AVAILABLE stock may be allocated to outbound orders. */
 export const ALLOCATABLE_NODE_KINDS: readonly NodeKind[] = ['SHELF', 'BIN', 'LOCATION'];
@@ -230,6 +233,31 @@ export async function resolveHolder(
   return holder;
 }
 
+/**
+ * Scan verification of a destination: when the operator scanned a label, it must be the code
+ * of the destination node or container (labels encode exactly those codes). Prevents the
+ * classic wrong-bin putaway. `scan` undefined = not scanned (API compatibility).
+ */
+export async function assertScanMatches(
+  ctx: Pick<OpCtx, 'tx' | 'warehouseId'>,
+  ref: { nodeId?: string; containerId?: string },
+  scan: string | undefined,
+): Promise<void> {
+  if (scan === undefined) return;
+  const r = ref.containerId
+    ? await row<{ code: string }>(
+        ctx.tx,
+        sql`SELECT code FROM containers WHERE id = ${ref.containerId} AND warehouse_id = ${ctx.warehouseId}`,
+      )
+    : await row<{ code: string }>(
+        ctx.tx,
+        sql`SELECT code FROM storage_nodes WHERE id = ${ref.nodeId ?? null} AND warehouse_id = ${ctx.warehouseId}`,
+      );
+  if (!r || r.code !== scan.trim().toUpperCase()) {
+    throw new Conflict('O código lido não corresponde ao destino escolhido', 'SCAN_MISMATCH');
+  }
+}
+
 /** Loads a fixed node of the scoped warehouse requiring one of `kinds`. */
 export async function requireNodeKind(ctx: OpCtx, nodeId: string, kinds: readonly NodeKind[]): Promise<Holder> {
   return resolveHolder(ctx, { nodeId }, { allowedKinds: kinds });
@@ -263,6 +291,35 @@ export async function barcodeMatchesSku(ctx: Pick<OpCtx, 'tx' | 'companyId'>, sk
         ) AS ok`,
   );
   return !!r?.ok;
+}
+
+/**
+ * Units represented by ONE scan of `scanned` for `skuId`: the barcode's qty_per_uom (e.g. a
+ * case barcode = 12 units), 1 for the SKU code itself, or undefined when it does not match.
+ */
+export async function barcodeFactor(ctx: Pick<OpCtx, 'tx' | 'companyId'>, skuId: string, scanned: string): Promise<string | undefined> {
+  const r = await row<{ f: string }>(
+    ctx.tx,
+    sql`SELECT qty_per_uom::text AS f FROM sku_barcodes WHERE sku_id = ${skuId} AND company_id = ${ctx.companyId} AND barcode = ${scanned}
+        UNION ALL
+        SELECT '1' FROM skus WHERE id = ${skuId} AND company_id = ${ctx.companyId} AND code = ${scanned.toUpperCase()}
+        LIMIT 1`,
+  );
+  return r?.f;
+}
+
+/**
+ * Converts a scanned quantity to base units: `qty` counts packs of the scanned barcode's unit
+ * of measure. Throws BARCODE_MISMATCH when the barcode is not the SKU's.
+ */
+export async function scannedBaseQty(ctx: Pick<OpCtx, 'tx' | 'companyId'>, skuId: string, scanned: string, qty: string): Promise<string> {
+  const f = await barcodeFactor(ctx, skuId, scanned);
+  if (!f) throw new Conflict('Artigo lido não corresponde à linha', 'BARCODE_MISMATCH');
+  try {
+    return mul(qty, f);
+  } catch {
+    throw new Conflict('Quantidade resultante com mais de 3 casas decimais', 'QTY_PRECISION');
+  }
 }
 
 /** Resolves a barcode/SKU code to a SKU id, or undefined. */

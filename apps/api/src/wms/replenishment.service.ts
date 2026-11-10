@@ -14,7 +14,7 @@ import type { ExecuteReplenishmentInput, ReplenishmentRuleInput } from '@autolem
 import { Conflict } from '../common/errors.js';
 import { one, rows } from '../db/database.js';
 import type { Actor } from '../platform/authz/actor.js';
-import { assertFree, lockPosition, newTxn, relocate, requireNodeKind, requireSku } from './inventory/engine.js';
+import { assertFree, assertScanMatches, lockPosition, newTxn, relocate, requireNodeKind, requireSku } from './inventory/engine.js';
 import { cmp, fromMilli, sub, toMilli } from './inventory/qty.js';
 import type { WmsRunner } from './runner.js';
 
@@ -56,7 +56,7 @@ export class ReplenishmentService {
         sql`SELECT r.id, r.sku_id, s.code AS sku_code, r.pick_node_id, n.path AS pick_path, r.min_qty::text, r.target_qty::text,
               coalesce((SELECT sum(p.qty_on_hand) FROM stock_positions p WHERE p.holder_node_id = r.pick_node_id
                 AND p.sku_id = r.sku_id AND p.stock_status = 'AVAILABLE'), 0.000)::text AS current
-            FROM replenishment_rules r JOIN skus s ON s.id = r.sku_id JOIN storage_nodes n ON n.id = r.pick_node_id
+            FROM replenishment_rules r JOIN skus s ON s.id = r.sku_id JOIN storage_nodes n ON n.id = r.pick_node_id AND n.active
             WHERE r.warehouse_id = ${warehouseId} ORDER BY s.code`,
       );
       const moves: unknown[] = [];
@@ -115,6 +115,7 @@ export class ReplenishmentService {
       if (src.holder_node_id === rule.pick_node_id) throw new Conflict('Origem já é a localização de picking', 'SAME_POSITION');
       assertFree(src, input.qty);
       const holder = await requireNodeKind(ctx, rule.pick_node_id, ['SHELF', 'BIN', 'LOCATION']);
+      await assertScanMatches(ctx, { nodeId: rule.pick_node_id }, input.scan);
       const txnId = await newTxn(ctx, 'REPLENISH', { referenceType: 'replenishment_rule', referenceId: input.ruleId, idempotencyKey: key });
       const r = await relocate(ctx, txnId, src, input.qty, { holder, status: 'AVAILABLE' });
       return {

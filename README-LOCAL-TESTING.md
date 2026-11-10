@@ -1,7 +1,7 @@
-# Local setup and testing — AutoLemon ERP v0.5.0
+# Local setup and testing — AutoLemon ERP v0.6.0
 
-Owning module: repository. Archive: **`AutoLemon-ERP-v0.5.0-WMS.zip`**, root folder
-**`autolemon-erp/`**. Checksum file: `AutoLemon-ERP-v0.5.0-WMS.zip.sha256`.
+Owning module: repository. Archive: **`AutoLemon-ERP-v0.6.0-WMS.zip`**, root folder
+**`autolemon-erp/`**. Checksum file: `AutoLemon-ERP-v0.6.0-WMS.zip.sha256`.
 
 ## Prerequisites
 
@@ -19,18 +19,18 @@ If port 5432 is busy, change `POSTGRES_PORT` **and** the port in `DATABASE_URL` 
 ## Verify the archive
 
 ```bash
-sha256sum -c AutoLemon-ERP-v0.5.0-WMS.zip.sha256          # Linux
-shasum -a 256 -c AutoLemon-ERP-v0.5.0-WMS.zip.sha256      # macOS
+sha256sum -c AutoLemon-ERP-v0.6.0-WMS.zip.sha256          # Linux
+shasum -a 256 -c AutoLemon-ERP-v0.6.0-WMS.zip.sha256      # macOS
 ```
 
 ```powershell
-(Get-FileHash .\AutoLemon-ERP-v0.5.0-WMS.zip -Algorithm SHA256).Hash   # compare with the .sha256 file
+(Get-FileHash .\AutoLemon-ERP-v0.6.0-WMS.zip -Algorithm SHA256).Hash   # compare with the .sha256 file
 ```
 
 ## macOS / Linux
 
 ```bash
-unzip AutoLemon-ERP-v0.5.0-WMS.zip -d AutoLemon-ERP-extracted
+unzip AutoLemon-ERP-v0.6.0-WMS.zip -d AutoLemon-ERP-extracted
 cd AutoLemon-ERP-extracted/autolemon-erp
 node --version
 npm install --global pnpm@12.18.0
@@ -54,7 +54,7 @@ pnpm dev
 ## Windows PowerShell
 
 ```powershell
-Expand-Archive -Path .\AutoLemon-ERP-v0.5.0-WMS.zip -DestinationPath .\AutoLemon-ERP-extracted
+Expand-Archive -Path .\AutoLemon-ERP-v0.6.0-WMS.zip -DestinationPath .\AutoLemon-ERP-extracted
 Set-Location .\AutoLemon-ERP-extracted\autolemon-erp
 node --version
 npm install --global pnpm@12.18.0
@@ -85,17 +85,24 @@ pnpm dev
 3. Log in with `admin@demo.autolemon.test` + password + TOTP code. Operator links for Porto and
    Lisboa are printed too. All seed data is synthetic.
 4. Lost the links? `pnpm db:reset:dev && pnpm db:seed` (development databases only).
+5. Upgrading an existing v0.5 development database: `pnpm db:migrate` applies migrations
+   0004–0006 (passkeys/account security, WMS completion, retention). No data is rewritten.
+6. Passkeys: open **A minha conta** → _Registar chave de acesso_ (asks for a TOTP step-up first).
+   Browsers allow WebAuthn on `http://localhost`; the relying-party id defaults to the host of
+   `WEB_ORIGIN` (`localhost`). After that, the login screen offers _Usar chave de acesso_. To try
+   the production policy locally set `ADMIN_PASSKEY_REQUIRED=true` in `.env` and restart: an
+   administrator without a passkey can then only reach _A minha conta_ until one is registered.
 
 ## What each test command needs
 
-| Command                                       | Needs                                                                         | Notes                                                                       |
-| --------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `pnpm test:unit`                              | nothing                                                                       | pure unit + property tests                                                  |
-| `pnpm test:integration`, `pnpm test:security` | running Postgres + `.env`                                                     | creates and drops `autolemon_test_<random>`; never touches your dev DB      |
-| `pnpm test:e2e`                               | Postgres + Chromium                                                           | starts API on :3901 and web on :5199 against a disposable DB                |
-| `pnpm test:all`                               | all of the above                                                              | non-interactive, non-zero exit on any failure                               |
-| `pnpm restore:smoke`                          | Postgres; local `pg_dump`/`pg_restore` ≥ server version **or** Docker Compose | creates a backup if none exists; restores into a disposable DB and drops it |
-| `pnpm security:scan`                          | network access to the npm registry for `pnpm audit`                           | lists CI-only scanners separately                                           |
+| Command                                       | Needs                                                                         | Notes                                                                                                                                                                  |
+| --------------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm test:unit`                              | nothing                                                                       | pure unit + property tests                                                                                                                                             |
+| `pnpm test:integration`, `pnpm test:security` | running Postgres + `.env`                                                     | creates and drops `autolemon_test_<random>`; never touches your dev DB                                                                                                 |
+| `pnpm test:e2e`                               | Postgres + Chromium                                                           | API :3901 + web :5199 on a disposable DB; ≈ 2 min (waits for fresh TOTP steps; passkey flow uses a Chrome DevTools virtual authenticator, so it needs Chromium/Chrome) |
+| `pnpm test:all`                               | all of the above                                                              | non-interactive, non-zero exit on any failure                                                                                                                          |
+| `pnpm restore:smoke`                          | Postgres; local `pg_dump`/`pg_restore` ≥ server version **or** Docker Compose | creates a backup if none exists; restores into a disposable DB and drops it                                                                                            |
+| `pnpm security:scan`                          | network access to the npm registry for `pnpm audit`                           | lists CI-only scanners separately                                                                                                                                      |
 
 Long-running/infrastructure checks not in `test:all`: `pnpm restore:smoke`, `pnpm security:scan`,
 `pnpm verify:handover`, `pnpm release:zip` (needs the `zip` CLI).

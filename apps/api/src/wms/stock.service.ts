@@ -4,12 +4,19 @@
  *
  * Corrections policy: posted inventory history is never edited or deleted. Mistakes in posted
  * work are corrected with (a) a new MOVE (e.g. wrong bin), (b) an audited ADJUST requiring
- * step-up MFA, or (c) a REVERSAL that posts the exact opposite ledger lines of an eligible
- * transaction (each transaction can be reversed at most once — unique reversal_of).
+ * step-up MFA, or (c) a REVERSAL (wms.adjust + step-up) that posts the exact opposite ledger
+ * lines of an eligible transaction (each transaction can be reversed at most once — unique
+ * reversal_of).
  */
 import { sql } from 'drizzle-orm';
 import type { z } from 'zod';
-import type { AdjustStockInput, MoveStockInput, OpeningStockInput, ReverseTransactionInput } from '@autolemon/contracts';
+import type {
+  AdjustStockInput,
+  ChangeStockStatusInput,
+  MoveStockInput,
+  OpeningStockInput,
+  ReverseTransactionInput,
+} from '@autolemon/contracts';
 import { Conflict, NotFound } from '../common/errors.js';
 import { one, row, rows } from '../db/database.js';
 import { type Actor, requirePermission, requireStepUp } from '../platform/authz/actor.js';
@@ -17,6 +24,7 @@ import type { AuditService } from '../platform/audit/audit.service.js';
 import {
   ALLOCATABLE_NODE_KINDS,
   applyDelta,
+  assertScanMatches,
   assertFree,
   emitEvent,
   ensurePosition,
@@ -100,8 +108,55 @@ export class StockService {
         allowedKinds:
           src.stock_status === 'AVAILABLE' ? ['SHELF', 'BIN', 'LOCATION'] : ['QUARANTINE', 'INSPECTION', 'SHELF', 'BIN', 'LOCATION'],
       });
+      await assertScanMatches(ctx, input.to, input.scan);
       const txnId = await newTxn(ctx, 'MOVE', { note: input.reason, idempotencyKey: key });
       const r = await relocate(ctx, txnId, src, input.qty, { holder, status: src.stock_status });
+      return { txnId, targetPositionId: r.target.id };
+    });
+  }
+
+  /**
+   * Quality status change of unreserved stock (posts STATUS_CHANGE, lot preserved):
+   *   - block: AVAILABLE/INSPECTION → QUARANTINE/DAMAGED/INSPECTION (wms.adjust);
+   *   - release: QUARANTINE/DAMAGED/INSPECTION → AVAILABLE (wms.adjust + recent step-up),
+   *     only into an allocatable holder (SHELF/BIN/LOCATION), so released stock is never
+   *     stranded in a quarantine area.
+   * Both directions are written to the security audit log. Scrapping blocked stock is an
+   * ADJUST with reason DAMAGE (also step-up).
+   */
+  async changeStatus(actor: Actor, warehouseId: string, key: string, input: z.infer<typeof ChangeStockStatusInput>) {
+    requirePermission(actor, 'wms.adjust');
+    if (input.toStatus === 'AVAILABLE') requireStepUp(actor, 'inventory.adjust.approve', this.stepUpMinutes);
+    return this.runner.command(actor, warehouseId, 'wms.adjust', key, 'stock.status', input, async (ctx) => {
+      const src = await lockPosition(ctx, input.positionId);
+      if (!['AVAILABLE', 'QUARANTINE', 'DAMAGED', 'INSPECTION'].includes(src.stock_status)) {
+        throw new Conflict('Este stock está em processamento (receção/expedição)', 'STATUS_NOT_CHANGEABLE');
+      }
+      if (src.stock_status === input.toStatus) throw new Conflict('O stock já tem este estado', 'SAME_STATUS');
+      assertFree(src, input.qty);
+      const ref = input.to ?? { nodeId: src.holder_node_id ?? undefined, containerId: src.holder_container_id ?? undefined };
+      const holder = await resolveHolder(ctx, ref, {
+        allowedKinds: input.toStatus === 'AVAILABLE' ? ALLOCATABLE_NODE_KINDS : ['QUARANTINE', 'INSPECTION', 'SHELF', 'BIN', 'LOCATION'],
+      });
+      const txnId = await newTxn(ctx, 'STATUS_CHANGE', { note: input.reason, idempotencyKey: key });
+      const r = await relocate(ctx, txnId, src, input.qty, { holder, status: input.toStatus });
+      await this.audit.recordInTx(ctx.tx, {
+        companyId: actor.companyId,
+        actorUserId: actor.userId,
+        action: input.toStatus === 'AVAILABLE' ? 'wms.inventory.release' : 'wms.inventory.block',
+        resourceType: 'stock_position',
+        resourceId: src.id,
+        warehouseId,
+        outcome: 'SUCCESS',
+        requestId: actor.requestId,
+        clientIp: actor.clientIp,
+        details: { from: src.stock_status, to: input.toStatus, qty: input.qty, txnId },
+      });
+      await emitEvent(ctx, 'wms.stock.status_changed', 'stock_position', r.target.id, {
+        from: src.stock_status,
+        to: input.toStatus,
+        qty: input.qty,
+      });
       return { txnId, targetPositionId: r.target.id };
     });
   }
@@ -140,6 +195,9 @@ export class StockService {
    * been consumed/reserved (no negative balances, no reservation breakage).
    */
   async reverse(actor: Actor, warehouseId: string, txnId: string, key: string, input: z.infer<typeof ReverseTransactionInput>) {
+    // A reversal changes balances exactly like an adjustment: same permission AND step-up.
+    requirePermission(actor, 'wms.adjust');
+    requireStepUp(actor, 'inventory.adjust.approve', this.stepUpMinutes);
     return this.runner.command(actor, warehouseId, 'wms.adjust', key, 'txn.reverse', { txnId, ...input }, async (ctx) => {
       const t = await row<{ id: string; txn_type: string; reference_id: string | null }>(
         ctx.tx,

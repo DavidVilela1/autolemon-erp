@@ -19,7 +19,7 @@ import { one, row, rows } from '../db/database.js';
 import type { Actor } from '../platform/authz/actor.js';
 import {
   applyDelta,
-  barcodeMatchesSku,
+  assertScanMatches,
   emitEvent,
   ensurePosition,
   lockPosition,
@@ -28,6 +28,7 @@ import {
   relocate,
   requireNodeKind,
   requireSku,
+  scannedBaseQty,
   resolveHolder,
   skuIdForBarcode,
   warehouseCode,
@@ -158,35 +159,36 @@ export class InboundService {
       const damagedHolder = input.damagedNodeId ? await requireNodeKind(ctx, input.damagedNodeId, ['QUARANTINE', 'INSPECTION']) : undefined;
       const txnId = await newTxn(ctx, 'RECEIPT', { referenceType: 'inbound', referenceId: id, idempotencyKey: key });
       const tasks: string[] = [];
+      const received: Array<{ lineId: string; skuCode: string; qty: string }> = [];
       for (const l of input.lines) {
         const line = await this.resolveLine(ctx, id, l);
         const sku = await requireSku(ctx, line.sku_id);
-        if (l.barcode && !(await barcodeMatchesSku(ctx, line.sku_id, l.barcode))) {
-          throw new Conflict(`Código de barras não corresponde ao artigo ${sku.code}`, 'BARCODE_MISMATCH');
-        }
+        // A scan counts packs of the scanned barcode's unit (e.g. case of 12) → base units.
+        const qty = l.barcode ? await scannedBaseQty(ctx, line.sku_id, l.barcode, l.qty) : l.qty;
+        received.push({ lineId: line.id, skuCode: sku.code, qty });
         if (sku.tracking !== 'NONE' && !l.lot) throw new ValidationFailed([{ path: 'lot', message: `Lote obrigatório para ${sku.code}` }]);
         if (l.condition === 'DAMAGED') {
           if (!damagedHolder) throw new ValidationFailed([{ path: 'damagedNodeId', message: 'Indique a zona de quarentena/inspeção' }]);
           const pos = await ensurePosition(ctx, { skuId: line.sku_id, holder: damagedHolder, status: 'DAMAGED', lot: l.lot });
-          await applyDelta(ctx, txnId, pos, l.qty);
+          await applyDelta(ctx, txnId, pos, qty);
           await ctx.tx.execute(
-            sql`UPDATE inbound_lines SET qty_received = qty_received + ${l.qty}::numeric, qty_damaged = qty_damaged + ${l.qty}::numeric WHERE id = ${line.id}`,
+            sql`UPDATE inbound_lines SET qty_received = qty_received + ${qty}::numeric, qty_damaged = qty_damaged + ${qty}::numeric WHERE id = ${line.id}`,
           );
         } else {
           const pos = await ensurePosition(ctx, { skuId: line.sku_id, holder: staging, status: 'RECEIVED', lot: l.lot });
-          await applyDelta(ctx, txnId, pos, l.qty);
-          await ctx.tx.execute(sql`UPDATE inbound_lines SET qty_received = qty_received + ${l.qty}::numeric WHERE id = ${line.id}`);
+          await applyDelta(ctx, txnId, pos, qty);
+          await ctx.tx.execute(sql`UPDATE inbound_lines SET qty_received = qty_received + ${qty}::numeric WHERE id = ${line.id}`);
           const t = await one<{ id: string }>(
             ctx.tx,
             sql`INSERT INTO putaway_tasks (company_id, warehouse_id, source_type, source_id, sku_id, source_position_id, qty_total)
-                VALUES (${ctx.companyId}, ${warehouseId}, 'INBOUND', ${id}, ${line.sku_id}, ${pos.id}, ${l.qty}::numeric) RETURNING id`,
+                VALUES (${ctx.companyId}, ${warehouseId}, 'INBOUND', ${id}, ${line.sku_id}, ${pos.id}, ${qty}::numeric) RETURNING id`,
           );
           tasks.push(t.id);
         }
       }
       await ctx.tx.execute(sql`UPDATE inbound_orders SET status = 'RECEIVING' WHERE id = ${id}`);
       await emitEvent(ctx, 'wms.inbound.received', 'inbound', id, { txnId, lines: input.lines.length });
-      return { txnId, putawayTaskIds: tasks };
+      return { txnId, putawayTaskIds: tasks, received };
     });
   }
 
@@ -274,6 +276,7 @@ export class InboundService {
       const remaining = sub(t.qty_total, t.qty_done);
       if (cmp(input.qty, remaining) > 0) throw new Conflict(`Quantidade superior ao pendente (${remaining})`, 'QTY_EXCEEDS_TASK');
       const holder = await resolveHolder(ctx, input.to, { allowedKinds: ['SHELF', 'BIN', 'LOCATION'] });
+      await assertScanMatches(ctx, input.to, input.scan);
       const src = await lockPosition(ctx, t.source_position_id);
       const txnId = await newTxn(ctx, 'PUTAWAY', { referenceType: 'putaway_task', referenceId: taskId, idempotencyKey: key });
       const r = await relocate(ctx, txnId, src, input.qty, { holder, status: 'AVAILABLE' });

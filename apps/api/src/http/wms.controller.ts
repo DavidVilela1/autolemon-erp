@@ -13,6 +13,7 @@ import type { FastifyReply } from 'fastify';
 import { z } from 'zod';
 import {
   AdjustStockInput,
+  ChangeStockStatusInput,
   CloseOutboundInput,
   CompletePutawayInput,
   CreateContainerInput,
@@ -37,6 +38,9 @@ import {
   ReceiveInput,
   ReceiveTransferInput,
   RecordCountInput,
+  UnpackInput,
+  UnpickInput,
+  UpdateNodeInput,
   ReplaceInboundLinesInput,
   ReplaceOutboundLinesInput,
   ReplenishmentRuleInput,
@@ -108,6 +112,13 @@ export class WmsCompanyController {
     return this.s.transfers.receive(actorOf(req), uuidParam(id), idemKey(req), parse(ReceiveTransferInput, body));
   }
 
+  /** Source cancel of a DRAFT transfer (nothing shipped). */
+  @Post('transfers/:id/cancel')
+  @HttpCode(200)
+  cancelTransfer(@Req() req: AppRequest, @Param('id') id: string) {
+    return this.s.transfers.cancel(actorOf(req), uuidParam(id), idemKey(req));
+  }
+
   /** Destination close (records in-transit loss). */
   @Post('transfers/:id/close')
   @HttpCode(200)
@@ -136,6 +147,11 @@ export class WmsWarehouseController {
   createNode(@Req() req: AppRequest, @Param('wh') wh: string, @Body() body: unknown) {
     return this.s.topology.createNode(actorOf(req), uuidParam(wh), idemKey(req), parse(CreateNodeInput, body));
   }
+  @Post('nodes/:nodeId')
+  @HttpCode(200)
+  updateNode(@Req() req: AppRequest, @Param('wh') wh: string, @Param('nodeId') nodeId: string, @Body() body: unknown) {
+    return this.s.topology.updateNode(actorOf(req), uuidParam(wh), uuidParam(nodeId), idemKey(req), parse(UpdateNodeInput, body));
+  }
   @Get('containers')
   containers(@Req() req: AppRequest, @Param('wh') wh: string) {
     return this.s.topology.listContainers(actorOf(req), uuidParam(wh));
@@ -148,6 +164,11 @@ export class WmsWarehouseController {
   @HttpCode(200)
   moveContainer(@Req() req: AppRequest, @Param('wh') wh: string, @Param('id') id: string, @Body() body: unknown) {
     return this.s.topology.moveContainer(actorOf(req), uuidParam(wh), uuidParam(id), idemKey(req), parse(MoveContainerInput, body));
+  }
+  @Post('containers/:id/close')
+  @HttpCode(200)
+  closeContainer(@Req() req: AppRequest, @Param('wh') wh: string, @Param('id') id: string) {
+    return this.s.topology.closeContainer(actorOf(req), uuidParam(wh), uuidParam(id), idemKey(req));
   }
   @Get('containers/:id/history')
   containerHistory(@Req() req: AppRequest, @Param('wh') wh: string, @Param('id') id: string) {
@@ -176,6 +197,11 @@ export class WmsWarehouseController {
   @HttpCode(200)
   move(@Req() req: AppRequest, @Param('wh') wh: string, @Body() body: unknown) {
     return this.s.stock.move(actorOf(req), uuidParam(wh), idemKey(req), parse(MoveStockInput, body));
+  }
+  @Post('stock/status')
+  @HttpCode(200)
+  changeStatus(@Req() req: AppRequest, @Param('wh') wh: string, @Body() body: unknown) {
+    return this.s.stock.changeStatus(actorOf(req), uuidParam(wh), idemKey(req), parse(ChangeStockStatusInput, body));
   }
   @Post('stock/adjust')
   @HttpCode(200)
@@ -269,6 +295,16 @@ export class WmsWarehouseController {
   @HttpCode(200)
   pick(@Req() req: AppRequest, @Param('wh') wh: string, @Param('id') id: string, @Body() body: unknown) {
     return this.s.outbound.pick(actorOf(req), uuidParam(wh), uuidParam(id), idemKey(req), parse(PickInput, body));
+  }
+  @Post('outbound/:id/unpick')
+  @HttpCode(200)
+  unpick(@Req() req: AppRequest, @Param('wh') wh: string, @Param('id') id: string, @Body() body: unknown) {
+    return this.s.outbound.unpick(actorOf(req), uuidParam(wh), uuidParam(id), idemKey(req), parse(UnpickInput, body));
+  }
+  @Post('outbound/:id/unpack')
+  @HttpCode(200)
+  unpack(@Req() req: AppRequest, @Param('wh') wh: string, @Param('id') id: string, @Body() body: unknown) {
+    return this.s.outbound.unpack(actorOf(req), uuidParam(wh), uuidParam(id), idemKey(req), parse(UnpackInput, body));
   }
   @Post('outbound/:id/packages')
   createPackage(@Req() req: AppRequest, @Param('wh') wh: string, @Param('id') id: string, @Body() body: unknown) {

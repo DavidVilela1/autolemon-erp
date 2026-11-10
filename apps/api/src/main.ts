@@ -3,7 +3,7 @@
  * @module platform
  *
  * Binds to API_HOST (default 127.0.0.1 — never 0.0.0.0 in development) and starts the outbox
- * dispatcher. In production the API must sit behind the reverse proxy/WAF/ZTNA described in
+ * dispatcher and the data-retention purge (every 6 hours). In production the API must sit behind the reverse proxy/WAF/ZTNA described in
  * docs/security/NETWORK_AND_ZTNA.md.
  */
 import { describeConfig, loadConfig } from './config/env.js';
@@ -12,6 +12,7 @@ import { createApp } from './app.js';
 const cfg = loadConfig();
 const { app, services } = await createApp(cfg);
 services.outbox.start(5000, (e) => app.getHttpAdapter().getInstance().log.error({ err: e }, 'outbox dispatch failed'));
+services.retention.start(undefined, (e) => app.getHttpAdapter().getInstance().log.error({ err: e }, 'retention purge failed'));
 await app.listen({ host: cfg.API_HOST, port: cfg.API_PORT });
 app
   .getHttpAdapter()
@@ -20,6 +21,7 @@ app
 
 const shutdown = async () => {
   services.outbox.stop();
+  services.retention.stop();
   await app.close();
   await services.database.close();
   process.exit(0);

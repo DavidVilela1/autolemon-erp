@@ -17,6 +17,11 @@ export const PUBLIC_ROUTE = 'autolemon:public';
 /** Marks a controller method as public (login, enrolment, health). */
 export const Public = () => SetMetadata(PUBLIC_ROUTE, true);
 
+/** Metadata key marking account-security routes usable before a mandatory passkey exists. */
+export const ACCOUNT_SECURITY_ROUTE = 'autolemon:account-security';
+/** Marks a route as reachable while the admin passkey policy blocks everything else. */
+export const AccountSecurity = () => SetMetadata(ACCOUNT_SECURITY_ROUTE, true);
+
 /** Fastify request augmented with the authenticated actor. */
 export type AppRequest = FastifyRequest & { actor?: Actor };
 

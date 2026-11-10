@@ -17,6 +17,7 @@ export interface NodeRow {
   holdsStock: boolean;
   depth: number;
   path: string;
+  active: boolean;
 }
 
 /** Container. */
@@ -56,7 +57,7 @@ export const loadPositions = (wh: string, skuId?: string) => api<Row[]>('GET', `
 /** Select options for nodes of given kinds. */
 export function nodeOptions(nodes: NodeRow[] | undefined, kinds?: string[]) {
   return (nodes ?? [])
-    .filter((n) => n.holdsStock && (!kinds || kinds.includes(n.kind)))
+    .filter((n) => n.active && n.holdsStock && (!kinds || kinds.includes(n.kind)))
     .map((n) => ({ value: n.id, label: `${n.path} (${n.kind})` }));
 }
 

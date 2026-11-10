@@ -12,11 +12,11 @@
 import { sql } from 'drizzle-orm';
 import type { NodeKind } from '@autolemon/contracts';
 import type { z } from 'zod';
-import type { CreateContainerInput, CreateNodeInput, MoveContainerInput } from '@autolemon/contracts';
+import type { CreateContainerInput, CreateNodeInput, MoveContainerInput, UpdateNodeInput } from '@autolemon/contracts';
 import { Conflict, NotFound } from '../common/errors.js';
 import { one, row, rows } from '../db/database.js';
 import type { Actor } from '../platform/authz/actor.js';
-import { emitEvent, newTxn, resolveHolder } from './inventory/engine.js';
+import { assertScanMatches, emitEvent, newTxn, resolveHolder } from './inventory/engine.js';
 import type { WmsRunner } from './runner.js';
 
 /** Allowed parent kinds per child kind (null = root). Mirrors wms_node_parent_allowed(). */
@@ -70,7 +70,7 @@ export class TopologyService {
       if (input.parentId) {
         parent = await row(
           ctx.tx,
-          sql`SELECT id, kind, depth, path FROM storage_nodes WHERE id = ${input.parentId} AND warehouse_id = ${warehouseId}`,
+          sql`SELECT id, kind, depth, path FROM storage_nodes WHERE id = ${input.parentId} AND warehouse_id = ${warehouseId} AND active`,
         );
         if (!parent) throw new NotFound('Nó pai');
       }
@@ -86,6 +86,69 @@ export class TopologyService {
             RETURNING id`,
       );
       return { id: created.id, path };
+    });
+  }
+
+  /**
+   * Renames and/or (de)activates a node. Deactivating applies to the whole subtree and is
+   * refused while any node in it holds stock or hosts an active container (move them first).
+   * Inactive nodes reject every stock operation (resolveHolder) and are hidden from
+   * replenishment suggestions. Reactivation requires an active parent.
+   */
+  async updateNode(actor: Actor, warehouseId: string, nodeId: string, key: string, input: z.infer<typeof UpdateNodeInput>) {
+    return this.runner.command(actor, warehouseId, 'wms.topology.manage', key, 'node.update', { nodeId, ...input }, async (ctx) => {
+      const n = await row<{ id: string; path: string; active: boolean; parent_id: string | null }>(
+        ctx.tx,
+        sql`SELECT id, path, active, parent_id FROM storage_nodes WHERE id = ${nodeId} AND warehouse_id = ${warehouseId} FOR UPDATE`,
+      );
+      if (!n) throw new NotFound('Localização');
+      // Subtree match without LIKE (codes may contain "_", a LIKE wildcard).
+      const subtree = sql`(path = ${n.path} OR left(path, ${n.path.length + 1}) = ${`${n.path}/`})`;
+      if (input.active === false && n.active) {
+        const busy = await one<{ stock: number; containers: number }>(
+          ctx.tx,
+          sql`SELECT
+                (SELECT count(*)::int FROM stock_positions p
+                   LEFT JOIN containers c ON c.id = p.holder_container_id
+                   WHERE p.warehouse_id = ${warehouseId} AND p.qty_on_hand > 0
+                     AND coalesce(p.holder_node_id, c.current_node_id) IN (SELECT id FROM storage_nodes WHERE warehouse_id = ${warehouseId} AND ${subtree})) AS stock,
+                (SELECT count(*)::int FROM containers c WHERE c.warehouse_id = ${warehouseId} AND c.status = 'ACTIVE'
+                   AND c.current_node_id IN (SELECT id FROM storage_nodes WHERE warehouse_id = ${warehouseId} AND ${subtree})) AS containers`,
+        );
+        if (busy.stock > 0) throw new Conflict('Existe stock nesta localização ou abaixo dela; mova-o primeiro', 'NODE_NOT_EMPTY');
+        if (busy.containers > 0) throw new Conflict('Existem caixas ativas nesta localização ou abaixo dela', 'NODE_HAS_CONTAINERS');
+        await ctx.tx.execute(sql`UPDATE storage_nodes SET active = false WHERE warehouse_id = ${warehouseId} AND ${subtree}`);
+      } else if (input.active === true && !n.active) {
+        if (n.parent_id) {
+          const p = await row<{ active: boolean }>(ctx.tx, sql`SELECT active FROM storage_nodes WHERE id = ${n.parent_id}`);
+          if (!p?.active) throw new Conflict('Reative primeiro a localização acima', 'PARENT_INACTIVE');
+        }
+        await ctx.tx.execute(sql`UPDATE storage_nodes SET active = true WHERE id = ${nodeId}`);
+      }
+      if (input.name !== undefined) await ctx.tx.execute(sql`UPDATE storage_nodes SET name = ${input.name} WHERE id = ${nodeId}`);
+      const after = await one<{ active: boolean; name: string }>(ctx.tx, sql`SELECT active, name FROM storage_nodes WHERE id = ${nodeId}`);
+      await emitEvent(ctx, 'wms.node.updated', 'storage_node', nodeId, { active: after.active });
+      return { id: nodeId, ...after };
+    });
+  }
+
+  /** Closes an empty, non-package container (it can no longer hold stock or be moved). */
+  async closeContainer(actor: Actor, warehouseId: string, containerId: string, key: string) {
+    return this.runner.command(actor, warehouseId, 'wms.topology.manage', key, 'container.close', { containerId }, async (ctx) => {
+      const c = await row<{ id: string; status: string; kind: string }>(
+        ctx.tx,
+        sql`SELECT id, status, kind FROM containers WHERE id = ${containerId} AND warehouse_id = ${warehouseId} FOR UPDATE`,
+      );
+      if (!c) throw new NotFound('Caixa');
+      if (c.kind === 'PACKAGE') throw new Conflict('Volumes de expedição fecham com o pedido', 'PACKAGE_NOT_ALLOWED');
+      if (c.status !== 'ACTIVE') throw new Conflict('A caixa já não está ativa', 'CONTAINER_NOT_ACTIVE');
+      const loaded = await one<{ n: number }>(
+        ctx.tx,
+        sql`SELECT count(*)::int AS n FROM stock_positions WHERE holder_container_id = ${containerId} AND qty_on_hand > 0`,
+      );
+      if (loaded.n > 0) throw new Conflict('A caixa ainda tem stock', 'CONTAINER_NOT_EMPTY');
+      await ctx.tx.execute(sql`UPDATE containers SET status = 'CLOSED', updated_at = now() WHERE id = ${containerId}`);
+      return { id: containerId, status: 'CLOSED' };
     });
   }
 
@@ -130,6 +193,7 @@ export class TopologyService {
       if (c.status !== 'ACTIVE') throw new Conflict('Só caixas ativas podem ser movidas', 'CONTAINER_NOT_ACTIVE');
       if (c.current_node_id === input.toNodeId) throw new Conflict('A caixa já está nessa localização', 'SAME_POSITION');
       await resolveHolder(ctx, { nodeId: input.toNodeId });
+      await assertScanMatches(ctx, { nodeId: input.toNodeId }, input.scan);
       const txnId = await newTxn(ctx, 'CONTAINER_MOVE', { referenceType: 'container', referenceId: containerId, note: input.reason });
       await ctx.tx.execute(sql`UPDATE containers SET current_node_id = ${input.toNodeId}, updated_at = now() WHERE id = ${containerId}`);
       await ctx.tx.execute(

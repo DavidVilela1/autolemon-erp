@@ -29,6 +29,11 @@ export interface Actor {
   stepUpAt: Date | null;
   requestId: string;
   clientIp: string;
+  /**
+   * Admin passkey policy is on and this administrator has no passkey yet: only account-security
+   * routes are allowed until one is registered (enforced by AuthGuard).
+   */
+  mustRegisterPasskey?: boolean;
 }
 
 /** Throws Forbidden unless the actor holds `perm`. */

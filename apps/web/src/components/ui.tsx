@@ -275,7 +275,8 @@ export function Table<T>({
 }) {
   if (!rows.length) return <p className="text-sm text-ink-soft">{empty}</p>;
   return (
-    <div className="overflow-x-auto">
+    // Focusable so keyboard users can scroll wide tables horizontally (WCAG 2.1.1).
+    <div className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-teal" tabIndex={0} role="region" aria-label="Tabela">
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-line text-left text-ink-soft">

@@ -19,7 +19,7 @@ import { ADMIN_ONLY_PERMISSIONS, PERMISSIONS, type Permission, type Role } from 
 import type { AppConfig } from '../../config/env.js';
 import type { Database, Tx } from '../../db/database.js';
 import { asDate, row, rows } from '../../db/database.js';
-import { Conflict, NotFound, Unauthenticated, ValidationFailed } from '../../common/errors.js';
+import { Conflict, DomainError, NotFound, Unauthenticated, ValidationFailed } from '../../common/errors.js';
 import { randomToken, safeEqual, sha256 } from '../../common/crypto-util.js';
 import type { AuditService } from '../audit/audit.service.js';
 import type { FieldCrypto } from '../crypto/field-crypto.js';
@@ -41,7 +41,8 @@ export interface IssuedSession {
   csrfToken: string;
 }
 
-interface SessionRow {
+/** Session row as stored (timestamps normalised to Date). */
+export interface SessionRow {
   id: string;
   user_id: string;
   company_id: string;
@@ -55,7 +56,8 @@ interface SessionRow {
   revoked_at: Date | null;
 }
 
-interface UserRow {
+/** User row (internal; never returned to clients as-is). */
+export interface UserRow {
   id: string;
   company_id: string;
   email: string;
@@ -69,6 +71,13 @@ interface UserRow {
 
 const MFA_PENDING_MINUTES = 5;
 const MAX_MFA_ATTEMPTS = 5;
+
+/** Error raised when policy demands a passkey instead of TOTP. */
+export class PasskeyRequired extends DomainError {
+  constructor() {
+    super(403, 'PASSKEY_REQUIRED', 'Esta conta exige uma chave de acesso (passkey) como segundo fator');
+  }
+}
 
 /** Implements all authentication use cases. Pure service: no HTTP types. */
 export class AuthService {
@@ -145,8 +154,13 @@ export class AuthService {
     const session = await this.loadSession(token);
     if (!session || session.state !== 'MFA_PENDING') throw new Unauthenticated();
     await this.throttle.assertAllowed([`mfa:${session.user_id}`]);
-    const user = await this.database.systemTx((tx) => row<UserRow>(tx, sql`SELECT * FROM users WHERE id = ${session.user_id}`));
+    const user = await this.userById(session.user_id);
     if (!user || user.status !== 'ACTIVE') throw new Unauthenticated();
+    // Admin passkey policy: once an administrator has a passkey, TOTP is no longer accepted as
+    // the login factor (recovery codes stay available as the audited break-glass path).
+    if (factor.code && (await this.passkeyPolicyApplies(user)) && (await this.activePasskeyCount(user.id)) > 0) {
+      throw new PasskeyRequired();
+    }
 
     let ok = false;
     let usedRecovery = false;
@@ -156,34 +170,60 @@ export class AuthService {
       usedRecovery = ok;
     }
     if (!ok) {
-      await this.throttle.recordFailure(`mfa:${user.id}`, 10);
-      const attempts = await this.database.systemTx(async (tx) => {
-        const r = await row<{ mfa_attempts: number }>(
-          tx,
-          sql`UPDATE sessions SET mfa_attempts = mfa_attempts + 1 WHERE id = ${session.id} RETURNING mfa_attempts`,
-        );
-        if ((r?.mfa_attempts ?? 0) >= MAX_MFA_ATTEMPTS) {
-          await tx.execute(sql`UPDATE sessions SET revoked_at = now(), revoke_reason = 'mfa_attempts' WHERE id = ${session.id}`);
-        }
-        return r?.mfa_attempts ?? 0;
-      });
-      await this.audit.record({
-        companyId: user.company_id,
-        actorUserId: user.id,
-        action: 'auth.mfa_verify',
-        outcome: 'FAILURE',
-        requestId: client.requestId,
-        clientIp: client.ip,
-        details: { attempts, method: factor.code ? 'totp' : 'recovery' },
-      });
+      await this.recordMfaFailure(session, user, client, factor.code ? 'totp' : 'recovery');
       throw new Unauthenticated('Código MFA inválido');
     }
+    return this.completeMfa(session.id, user, client, usedRecovery ? 'recovery' : 'totp');
+  }
+
+  /**
+   * Records a failed second-factor attempt: per-user throttle, per-session attempt counter
+   * (revoking the pending session after MAX_MFA_ATTEMPTS) and a FAILURE audit entry.
+   */
+  async recordMfaFailure(session: SessionRow, user: UserRow, client: ClientInfo, method: 'totp' | 'recovery' | 'passkey'): Promise<void> {
+    await this.throttle.recordFailure(`mfa:${user.id}`, 10);
+    const attempts = await this.database.systemTx(async (tx) => {
+      const r = await row<{ mfa_attempts: number }>(
+        tx,
+        sql`UPDATE sessions SET mfa_attempts = mfa_attempts + 1 WHERE id = ${session.id} RETURNING mfa_attempts`,
+      );
+      if ((r?.mfa_attempts ?? 0) >= MAX_MFA_ATTEMPTS) {
+        await tx.execute(sql`UPDATE sessions SET revoked_at = now(), revoke_reason = 'mfa_attempts' WHERE id = ${session.id}`);
+      }
+      return r?.mfa_attempts ?? 0;
+    });
+    await this.audit.record({
+      companyId: user.company_id,
+      actorUserId: user.id,
+      action: 'auth.mfa_verify',
+      outcome: 'FAILURE',
+      requestId: client.requestId,
+      clientIp: client.ip,
+      details: { attempts, method },
+    });
+  }
+
+  /**
+   * Successful second factor: revokes the MFA_PENDING session and issues a NEW active session
+   * (rotation on privilege change). Recovery-code use is audited as an alert.
+   */
+  async completeMfa(
+    pendingSessionId: string,
+    user: UserRow,
+    client: ClientInfo,
+    method: 'totp' | 'recovery' | 'passkey',
+  ): Promise<IssuedSession> {
     await this.throttle.clear(`mfa:${user.id}`);
     return this.database.systemTx(async (tx) => {
-      await tx.execute(sql`UPDATE sessions SET revoked_at = now(), revoke_reason = 'rotated' WHERE id = ${session.id}`);
+      const revoked = await row<{ id: string }>(
+        tx,
+        sql`UPDATE sessions SET revoked_at = now(), revoke_reason = 'rotated' WHERE id = ${pendingSessionId} AND revoked_at IS NULL RETURNING id`,
+      );
+      // A pending session can be upgraded only once (concurrent double submit loses).
+      if (!revoked) throw new Unauthenticated();
       const issued = await this.createSession(tx, user, 'ACTIVE', client);
       let remaining: number | null = null;
-      if (usedRecovery) {
+      if (method === 'recovery') {
         const r = await row<{ n: string }>(
           tx,
           sql`SELECT count(*)::text AS n FROM mfa_recovery_codes WHERE user_id = ${user.id} AND used_at IS NULL`,
@@ -193,14 +233,53 @@ export class AuthService {
       await this.audit.recordInTx(tx, {
         companyId: user.company_id,
         actorUserId: user.id,
-        action: usedRecovery ? 'auth.login.recovery_code_used' : 'auth.login',
+        action: method === 'recovery' ? 'auth.login.recovery_code_used' : 'auth.login',
         outcome: 'SUCCESS',
         requestId: client.requestId,
         clientIp: client.ip,
         // Recovery-code use is an alerting signal (possible lost/stolen authenticator).
-        details: usedRecovery ? { remainingRecoveryCodes: remaining, alert: true } : { method: 'totp' },
+        details: method === 'recovery' ? { remainingRecoveryCodes: remaining, alert: true } : { method },
       });
       return issued;
+    });
+  }
+
+  /** True when the admin passkey policy applies to this user. */
+  async passkeyPolicyApplies(user: Pick<UserRow, 'role'>): Promise<boolean> {
+    return user.role === 'ADMIN' && this.cfg.ADMIN_PASSKEY_REQUIRED;
+  }
+
+  /** Number of non-revoked passkeys of a user. */
+  async activePasskeyCount(userId: string): Promise<number> {
+    const r = await this.database.systemTx((tx) =>
+      row<{ n: number }>(tx, sql`SELECT count(*)::int AS n FROM webauthn_credentials WHERE user_id = ${userId} AND revoked_at IS NULL`),
+    );
+    return r?.n ?? 0;
+  }
+
+  /** Loads a user row by id. */
+  async userById(userId: string): Promise<UserRow | undefined> {
+    return this.database.systemTx((tx) => row<UserRow>(tx, sql`SELECT * FROM users WHERE id = ${userId}`));
+  }
+
+  /** Resolves a live (non-expired, non-revoked) session by its raw token. */
+  async sessionByToken(token: string): Promise<SessionRow | undefined> {
+    return this.loadSession(token);
+  }
+
+  /** Stamps the session with a successful step-up verification (audited). */
+  async markStepUp(actor: Actor, method: 'totp' | 'passkey'): Promise<void> {
+    await this.database.systemTx(async (tx) => {
+      await tx.execute(sql`UPDATE sessions SET step_up_at = now() WHERE id = ${actor.sessionId}`);
+      await this.audit.recordInTx(tx, {
+        companyId: actor.companyId,
+        actorUserId: actor.userId,
+        action: 'auth.step_up',
+        outcome: 'SUCCESS',
+        requestId: actor.requestId,
+        clientIp: actor.clientIp,
+        details: { method },
+      });
     });
   }
 
@@ -221,6 +300,7 @@ export class AuthService {
       );
     }
     const permissions = await this.effectivePermissions(user);
+    const mustRegisterPasskey = (await this.passkeyPolicyApplies(user)) && (await this.activePasskeyCount(user.id)) === 0;
     return {
       csrfHash: s.csrf_hash,
       actor: {
@@ -234,6 +314,7 @@ export class AuthService {
         stepUpAt: s.step_up_at,
         requestId: client.requestId,
         clientIp: client.ip,
+        mustRegisterPasskey,
       },
     };
   }
@@ -250,10 +331,16 @@ export class AuthService {
     return s && s.state === 'MFA_PENDING' ? s.csrf_hash : undefined;
   }
 
-  /** Step-up: re-verify TOTP and stamp the session for high-risk actions. */
+  /**
+   * Step-up with TOTP. Under the admin passkey policy, administrators who already own a passkey
+   * must step up with the passkey instead (phishing resistance for the most sensitive actions).
+   */
   async stepUp(actor: Actor, code: string): Promise<void> {
     await this.throttle.assertAllowed([`mfa:${actor.userId}`]);
-    const user = await this.database.systemTx((tx) => row<UserRow>(tx, sql`SELECT * FROM users WHERE id = ${actor.userId}`));
+    const user = await this.userById(actor.userId);
+    if (user && (await this.passkeyPolicyApplies(user)) && (await this.activePasskeyCount(user.id)) > 0) {
+      throw new PasskeyRequired();
+    }
     if (!user || !(await this.consumeTotp(user, code))) {
       await this.throttle.recordFailure(`mfa:${actor.userId}`, 10);
       await this.audit.record({
@@ -266,17 +353,7 @@ export class AuthService {
       });
       throw new Unauthenticated('Código MFA inválido');
     }
-    await this.database.systemTx(async (tx) => {
-      await tx.execute(sql`UPDATE sessions SET step_up_at = now() WHERE id = ${actor.sessionId}`);
-      await this.audit.recordInTx(tx, {
-        companyId: actor.companyId,
-        actorUserId: actor.userId,
-        action: 'auth.step_up',
-        outcome: 'SUCCESS',
-        requestId: actor.requestId,
-        clientIp: actor.clientIp,
-      });
-    });
+    await this.markStepUp(actor, 'totp');
   }
 
   /** Revokes the session presented by the token (logout). Idempotent. */

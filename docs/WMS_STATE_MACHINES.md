@@ -1,4 +1,4 @@
-# WMS state machines and invariants — v0.5.0
+# WMS state machines and invariants — v0.6.0
 
 Owning module: WMS. Each transition below is implemented in the named service and covered by
 the tests listed in `docs/security/SECURITY_TEST_MATRIX.md`.
@@ -59,13 +59,21 @@ stateDiagram-v2
   IN_PROGRESS --> CLOSED: close [+backorder] (refused if picked > dispatched)
   DRAFT --> CANCELLED: cancel
   ALLOCATED --> CANCELLED: cancel (releases reservations)
+  IN_PROGRESS --> IN_PROGRESS: unpick / unpack
+  IN_PROGRESS --> CANCELLED: cancel (only when nothing is picked or dispatched)
 ```
 
 Line counters: `requested ≥ allocated + picked + short`; `picked ≥ packed ≥ dispatched`.
 Pick: barcode verified; AVAILABLE(reserved) → PICKED at a DISPATCH node, consuming the
 reservation; `closeShort` releases the rest and records it as short. Pack: PICKED at the
 package's node → PICKED inside the PACKAGE container (+package line). Dispatch: package contents
-leave stock (DISPATCH ledger), package → DISPATCHED. Internal dispatch note is **not** a fiscal
+leave stock (DISPATCH ledger), package → DISPATCHED. Scans count packs of the scanned barcode's
+`qty_per_uom` (case of 12 → 12 base units). Un-pick (`UNPICK`): picked units not in a package go
+from a DISPATCH node back to SHELF/BIN/LOCATION as AVAILABLE, lot preserved, `picked` decreases.
+Un-pack (`UNPACK`): packed, undispatched units leave the package back to its DISPATCH node as
+PICKED; `packed` decreases and `outbound_package_lines.qty_unpacked` records it. Cancel and close
+mark the order's empty ACTIVE packages CLOSED (refused if a package still holds stock). Internal
+dispatch note is **not** a fiscal
 transport document (DL 147/2003 / AT communication is out of scope).
 
 ## Transfer (`transfer.service.ts`)
@@ -80,11 +88,14 @@ stateDiagram-v2
   IN_TRANSIT --> CLOSED: destination close (remaining in transit → lost, audited)
   PARTIALLY_RECEIVED --> CLOSED: close
   RECEIVED --> CLOSED: close
-  DRAFT --> CANCELLED: close before shipping
+  DRAFT --> CANCELLED: close before shipping (destination) or cancel (source)
 ```
 
-Each side acts only inside its own warehouse scope; documents expose warehouse codes and SKU
-quantities only.
+Each side acts only inside its own warehouse scope; documents expose warehouse codes, SKU
+quantities and lot codes only. Lots: dispatch records the source position's lot in
+`transfer_line_lots`; receipt takes the requested lot, or else lots in ascending lot-code order,
+creating one RECEIVED position and putaway task per lot; close records the remaining in-transit
+quantity as lost per lot.
 
 ## Returns (`returns.service.ts`)
 
@@ -108,6 +119,21 @@ stateDiagram-v2
 Policy: no freeze; optimistic version check. Approval posts `COUNT_ADJUST` deltas
 (counted − current), refuses stale lines and adjustments below reserved quantity.
 
+## Stock quality status (`stock.service.ts changeStatus`)
+
+AVAILABLE ⇄ QUARANTINE / DAMAGED / INSPECTION for **free** (unreserved) quantity only, posted as
+`STATUS_CHANGE` (lot preserved, optional move). Blocking needs `wms.adjust`; releasing to
+AVAILABLE also needs step-up and an allocatable destination (SHELF/BIN/LOCATION) so released stock
+is never stranded in a quarantine area. Both directions are written to the security audit log.
+RECEIVED and PICKED stock are in process and cannot change status here.
+
+## Topology lifecycle
+
+Nodes: rename (code immutable — printed on labels); deactivate applies to the whole subtree and is
+refused while any node in it holds stock or an ACTIVE container; inactive nodes reject every
+stock operation and child creation; reactivation is top-down. Containers: ACTIVE → CLOSED when
+empty (packages close with their order); CLOSED containers cannot hold stock or move.
+
 ## Reservations
 
 ACTIVE (`qty_open > 0`) → CLOSED (picked fully, short-closed, order cancelled/closed).
@@ -115,8 +141,9 @@ ACTIVE (`qty_open > 0`) → CLOSED (picked fully, short-closed, order cancelled/
 ## Corrections
 
 - Drafts (inbound/outbound) can be edited/cancelled.
-- Posted work: `REVERSAL` for OPENING, MOVE, ADJUST, REPLENISH, CONTAINER_MOVE (once, audited);
-  `ADJUST` with reason + step-up; otherwise a compensating move/return. History is never deleted.
+- Posted work: `REVERSAL` for OPENING, MOVE, ADJUST, REPLENISH, CONTAINER_MOVE (once, audited,
+  `wms.adjust` + step-up, refused if it would drive a position negative); `ADJUST` with reason +
+  step-up; otherwise a compensating move/return/un-pick. History is never deleted.
 
 ## Replenishment
 

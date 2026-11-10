@@ -48,8 +48,20 @@ describe('loadConfig', () => {
         KEY_PROVIDER: 'external-kms',
         DB_SSL: 'verify-full',
         WEB_ORIGIN: 'https://erp.example',
+        ADMIN_PASSKEY_REQUIRED: 'true',
       }).NODE_ENV,
     ).toBe('production');
+  });
+  it('requires the admin passkey policy in production', () => {
+    expect(() =>
+      loadConfig({
+        ...base,
+        NODE_ENV: 'production',
+        KEY_PROVIDER: 'external-kms',
+        DB_SSL: 'verify-full',
+        WEB_ORIGIN: 'https://erp.example',
+      }),
+    ).toThrow(/ADMIN_PASSKEY_REQUIRED/);
   });
   it('parses trusted proxy lists', () => {
     expect(trustProxySetting(loadConfig(base))).toBe(false);

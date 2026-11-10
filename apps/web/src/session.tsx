@@ -4,6 +4,7 @@
  * @module web
  */
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { startAuthentication } from '@simplewebauthn/browser';
 import { api, ApiError, setCsrf } from './api';
 
 /** Warehouse visible to the user. */
@@ -18,6 +19,17 @@ export interface SessionInfo {
   user: { id: string; displayName: string; role: 'ADMIN' | 'STAFF'; warehouseId: string | null; permissions: string[] };
   warehouses: Warehouse[];
   csrfToken: string;
+  security: { passkeys: number; mustRegisterPasskey: boolean; adminPasskeyPolicy: boolean };
+}
+
+/** Answer to a step-up prompt: a TOTP code, a passkey ceremony, or cancel (null). */
+export type StepUpAnswer = { kind: 'totp'; code: string } | { kind: 'passkey' } | null;
+
+/** Runs the passkey (WebAuthn) step-up ceremony against the API. */
+export async function passkeyStepUp(): Promise<void> {
+  const optionsJSON = await api<Parameters<typeof startAuthentication>[0]['optionsJSON']>('POST', '/api/auth/step-up/passkey/options');
+  const response = await startAuthentication({ optionsJSON });
+  await api('POST', '/api/auth/step-up/passkey', { response });
 }
 
 interface Ctx {
@@ -30,7 +42,7 @@ interface Ctx {
   logout: () => Promise<void>;
   /** Runs an action; when the API demands step-up MFA, asks for a code and retries once. */
   withStepUp: <T>(fn: () => Promise<T>) => Promise<T>;
-  stepUpPrompt: { resolve: (code: string | null) => void } | null;
+  stepUpPrompt: { resolve: (answer: StepUpAnswer) => void; passkeys: number; totpAllowed: boolean } | null;
 }
 
 const SessionContext = createContext<Ctx | null>(null);
@@ -42,8 +54,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [stepUpPrompt, setStepUpPrompt] = useState<Ctx['stepUpPrompt']>(null);
 
+  // `loading` is only true for the initial fetch: a background refresh must not unmount the
+  // screen (which would drop its local state, e.g. a success message or new recovery codes).
   const reload = useCallback(async () => {
-    setLoading(true);
     try {
       const s = await api<SessionInfo>('GET', '/api/auth/session');
       setCsrf(s.csrfToken);
@@ -77,18 +90,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     window.location.hash = '#/entrar';
   }, []);
 
-  const withStepUp = useCallback(async <T,>(fn: () => Promise<T>): Promise<T> => {
-    try {
-      return await fn();
-    } catch (e) {
-      if (!(e instanceof ApiError) || e.code !== 'STEP_UP_REQUIRED') throw e;
-      const code = await new Promise<string | null>((resolve) => setStepUpPrompt({ resolve }));
-      setStepUpPrompt(null);
-      if (!code) throw new ApiError(403, 'STEP_UP_CANCELLED', 'Confirmação MFA cancelada');
-      await api('POST', '/api/auth/step-up', { code });
-      return fn();
-    }
-  }, []);
+  const withStepUp = useCallback(
+    async <T,>(fn: () => Promise<T>): Promise<T> => {
+      try {
+        return await fn();
+      } catch (e) {
+        if (!(e instanceof ApiError) || e.code !== 'STEP_UP_REQUIRED') throw e;
+        const sec = session?.security;
+        const passkeys = sec?.passkeys ?? 0;
+        // Under the admin passkey policy, an admin who owns a passkey must use it.
+        const totpAllowed = !(sec?.adminPasskeyPolicy && session?.user.role === 'ADMIN' && passkeys > 0);
+        const answer = await new Promise<StepUpAnswer>((resolve) => setStepUpPrompt({ resolve, passkeys, totpAllowed }));
+        setStepUpPrompt(null);
+        if (!answer) throw new ApiError(403, 'STEP_UP_CANCELLED', 'Confirmação MFA cancelada');
+        if (answer.kind === 'passkey') await passkeyStepUp();
+        else await api('POST', '/api/auth/step-up', { code: answer.code });
+        return fn();
+      }
+    },
+    [session],
+  );
 
   const value = useMemo<Ctx>(
     () => ({

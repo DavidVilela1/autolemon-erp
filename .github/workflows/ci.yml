@@ -49,6 +49,8 @@ jobs:
       - run: pnpm format:check
       - run: pnpm lint # includes documentation gate
       - run: pnpm typecheck
+      - run: pnpm api:check # OpenAPI matches code (the route-inventory test reads it)
+      - run: pnpm gate:check # WMS release-gate state machine (fail-closed)
       - run: pnpm test:unit
       - name: Migrations from empty DB (twice → idempotent) and checksum tamper detection
         run: SKIP_DOTENV=1 pnpm db:migrate && SKIP_DOTENV=1 pnpm db:migrate

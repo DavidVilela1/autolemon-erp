@@ -24,6 +24,8 @@ import type {
   PackInput,
   PickInput,
   ReplaceOutboundLinesInput,
+  UnpackInput,
+  UnpickInput,
 } from '@autolemon/contracts';
 import { Conflict, InsufficientStock, NotFound } from '../common/errors.js';
 import { one, row, rows } from '../db/database.js';
@@ -32,7 +34,6 @@ import type { FieldCrypto } from '../platform/crypto/field-crypto.js';
 import {
   ALLOCATABLE_NODE_KINDS,
   applyDelta,
-  barcodeMatchesSku,
   emitEvent,
   lockPosition,
   newTxn,
@@ -41,6 +42,8 @@ import {
   relocate,
   requireNodeKind,
   requireSku,
+  resolveHolder,
+  scannedBaseQty,
   warehouseCode,
   type OpCtx,
 } from './inventory/engine.js';
@@ -127,8 +130,8 @@ export class OutboundService {
       const packages = await rows(
         ctx.tx,
         sql`SELECT c.id, c.code, c.status, n.path AS "nodePath",
-              coalesce((SELECT json_agg(json_build_object('lineId', pl.outbound_line_id, 'qty', pl.qty::text))
-                FROM outbound_package_lines pl WHERE pl.package_id = c.id), '[]') AS contents
+              coalesce((SELECT json_agg(json_build_object('lineId', pl.outbound_line_id, 'qty', (pl.qty - pl.qty_unpacked)::text))
+                FROM outbound_package_lines pl WHERE pl.package_id = c.id AND pl.qty > pl.qty_unpacked), '[]') AS contents
             FROM containers c JOIN storage_nodes n ON n.id = c.current_node_id
             WHERE c.outbound_id = ${id} ORDER BY c.code`,
       );
@@ -254,21 +257,21 @@ export class OutboundService {
             WHERE r.id = ${input.reservationId} AND l.outbound_id = ${id} AND r.warehouse_id = ${warehouseId} FOR UPDATE OF r`,
       );
       if (!r || r.status !== 'ACTIVE') throw new NotFound('Reserva');
-      if (!(await barcodeMatchesSku(ctx, r.sku_id, input.barcode)))
-        throw new Conflict('Artigo lido não corresponde à linha', 'BARCODE_MISMATCH');
-      if (cmp(input.qty, r.qty_open) > 0) throw new Conflict(`Quantidade superior à reservada (${r.qty_open})`, 'QTY_EXCEEDS_RESERVATION');
-      if (!isPositive(input.qty) && !input.closeShort) throw new Conflict('Quantidade nula', 'ZERO_QTY');
+      // A scan counts packs of the scanned barcode's unit → base units.
+      const qty = await scannedBaseQty(ctx, r.sku_id, input.barcode, input.qty);
+      if (cmp(qty, r.qty_open) > 0) throw new Conflict(`Quantidade superior à reservada (${r.qty_open})`, 'QTY_EXCEEDS_RESERVATION');
+      if (!isPositive(qty) && !input.closeShort) throw new Conflict('Quantidade nula', 'ZERO_QTY');
       await ctx.tx.execute(sql`SELECT id FROM outbound_lines WHERE id = ${r.outbound_line_id} FOR UPDATE`);
       const packing = await requireNodeKind(ctx, input.packingNodeId, ['DISPATCH']);
       let txnId: string | null = null;
-      if (isPositive(input.qty)) {
+      if (isPositive(qty)) {
         const pos = await lockPosition(ctx, r.position_id);
         txnId = await newTxn(ctx, 'PICK', { referenceType: 'outbound', referenceId: id, idempotencyKey: key });
-        await relocate(ctx, txnId, pos, input.qty, { holder: packing, status: 'PICKED' }, { consumeReserved: input.qty });
-        await ctx.tx.execute(sql`UPDATE outbound_lines SET qty_allocated = qty_allocated - ${input.qty}::numeric,
-            qty_picked = qty_picked + ${input.qty}::numeric WHERE id = ${r.outbound_line_id}`);
+        await relocate(ctx, txnId, pos, qty, { holder: packing, status: 'PICKED' }, { consumeReserved: qty });
+        await ctx.tx.execute(sql`UPDATE outbound_lines SET qty_allocated = qty_allocated - ${qty}::numeric,
+            qty_picked = qty_picked + ${qty}::numeric WHERE id = ${r.outbound_line_id}`);
       }
-      let open = sub(r.qty_open, input.qty);
+      let open = sub(r.qty_open, qty);
       let shortQty = '0';
       if (input.closeShort && isPositive(open)) {
         shortQty = open;
@@ -282,7 +285,7 @@ export class OutboundService {
       await ctx.tx.execute(sql`UPDATE reservations SET qty_open = ${open}::numeric, status = ${isPositive(open) ? 'ACTIVE' : 'CLOSED'},
           updated_at = now() WHERE id = ${r.id}`);
       await ctx.tx.execute(sql`UPDATE outbound_orders SET status = 'IN_PROGRESS' WHERE id = ${id}`);
-      return { txnId, reservationOpen: open, shortRecorded: shortQty };
+      return { txnId, qtyPicked: qty, reservationOpen: open, shortRecorded: shortQty };
     });
   }
 
@@ -317,17 +320,16 @@ export class OutboundService {
         sql`SELECT * FROM outbound_lines WHERE id = ${input.lineId} AND outbound_id = ${id} FOR UPDATE`,
       );
       if (!line) throw new NotFound('Linha');
-      if (!(await barcodeMatchesSku(ctx, line.sku_id, input.barcode)))
-        throw new Conflict('Artigo lido não corresponde à linha', 'BARCODE_MISMATCH');
+      const qty = await scannedBaseQty(ctx, line.sku_id, input.barcode, input.qty);
       const packable = sub(line.qty_picked, line.qty_packed);
-      if (cmp(input.qty, packable) > 0) throw new Conflict(`Só há ${packable} unidades separadas por embalar`, 'QTY_EXCEEDS_PICKED');
+      if (cmp(qty, packable) > 0) throw new Conflict(`Só há ${packable} unidades separadas por embalar`, 'QTY_EXCEEDS_PICKED');
       const sources = await rows<PositionRow>(
         ctx.tx,
         sql`SELECT * FROM stock_positions WHERE warehouse_id = ${warehouseId} AND sku_id = ${line.sku_id}
             AND holder_node_id = ${pkg.current_node_id} AND stock_status = 'PICKED' AND qty_on_hand > 0 ORDER BY id FOR UPDATE`,
       );
       const txnId = await newTxn(ctx, 'PACK', { referenceType: 'outbound', referenceId: id, idempotencyKey: key });
-      let remaining = toMilli(input.qty);
+      let remaining = toMilli(qty);
       for (const s of sources) {
         if (remaining <= 0n) break;
         const take = min(s.qty_on_hand, fromMilli(remaining));
@@ -336,8 +338,101 @@ export class OutboundService {
       }
       if (remaining > 0n) throw new InsufficientStock('Stock separado insuficiente na zona de embalagem do volume');
       await ctx.tx.execute(sql`INSERT INTO outbound_package_lines (company_id, warehouse_id, package_id, outbound_line_id, qty)
-          VALUES (${ctx.companyId}, ${warehouseId}, ${pkg.id}, ${line.id}, ${input.qty}::numeric)`);
-      await ctx.tx.execute(sql`UPDATE outbound_lines SET qty_packed = qty_packed + ${input.qty}::numeric WHERE id = ${line.id}`);
+          VALUES (${ctx.companyId}, ${warehouseId}, ${pkg.id}, ${line.id}, ${qty}::numeric)`);
+      await ctx.tx.execute(sql`UPDATE outbound_lines SET qty_packed = qty_packed + ${qty}::numeric WHERE id = ${line.id}`);
+      return { txnId, qtyPacked: qty };
+    });
+  }
+
+  /**
+   * Un-pick: returns picked units of a line that are NOT in a package from a packing (DISPATCH)
+   * node back to storage as AVAILABLE (posts UNPICK). Lots are preserved. The line's picked
+   * quantity drops, so the order can be re-allocated, closed or cancelled afterwards.
+   */
+  async unpick(actor: Actor, warehouseId: string, id: string, key: string, input: z.infer<typeof UnpickInput>) {
+    return this.runner.command(actor, warehouseId, 'wms.pick', key, 'outbound.unpick', { id, ...input }, async (ctx) => {
+      const o = await this.lockOrder(ctx, id);
+      if (o.status !== 'IN_PROGRESS') throw new Conflict('Pedido não está em preparação', 'INVALID_STATE');
+      const line = await row<LineRow>(
+        ctx.tx,
+        sql`SELECT * FROM outbound_lines WHERE id = ${input.lineId} AND outbound_id = ${id} FOR UPDATE`,
+      );
+      if (!line) throw new NotFound('Linha');
+      const loose = sub(line.qty_picked, line.qty_packed);
+      if (cmp(input.qty, loose) > 0) throw new Conflict(`Só há ${loose} unidades separadas fora de volumes`, 'QTY_EXCEEDS_UNPACKED');
+      await requireNodeKind(ctx, input.fromNodeId, ['DISPATCH']);
+      const target = await resolveHolder(ctx, input.to, { allowedKinds: ALLOCATABLE_NODE_KINDS });
+      const sources = await rows<PositionRow>(
+        ctx.tx,
+        sql`SELECT * FROM stock_positions WHERE warehouse_id = ${warehouseId} AND sku_id = ${line.sku_id}
+            AND holder_node_id = ${input.fromNodeId} AND stock_status = 'PICKED' AND qty_on_hand > 0 ORDER BY id FOR UPDATE`,
+      );
+      const txnId = await newTxn(ctx, 'UNPICK', { referenceType: 'outbound', referenceId: id, note: input.reason, idempotencyKey: key });
+      let remaining = toMilli(input.qty);
+      for (const src of sources) {
+        if (remaining <= 0n) break;
+        const take = min(src.qty_on_hand, fromMilli(remaining));
+        await relocate(ctx, txnId, src, take, { holder: target, status: 'AVAILABLE' });
+        remaining -= toMilli(take);
+      }
+      if (remaining > 0n) throw new InsufficientStock('Não há unidades separadas suficientes nesta zona de embalagem');
+      await ctx.tx.execute(sql`UPDATE outbound_lines SET qty_picked = qty_picked - ${input.qty}::numeric WHERE id = ${line.id}`);
+      await emitEvent(ctx, 'wms.outbound.unpicked', 'outbound', id, { txnId, lineId: line.id, qty: input.qty });
+      return { txnId };
+    });
+  }
+
+  /**
+   * Unpack: takes packed (not yet dispatched) units of a line out of a package back to the
+   * package's packing node as PICKED (posts UNPACK). Package lines are never edited away:
+   * `qty_unpacked` records what was removed.
+   */
+  async unpack(actor: Actor, warehouseId: string, id: string, key: string, input: z.infer<typeof UnpackInput>) {
+    return this.runner.command(actor, warehouseId, 'wms.pack', key, 'outbound.unpack', { id, ...input }, async (ctx) => {
+      const o = await this.lockOrder(ctx, id);
+      if (o.status !== 'IN_PROGRESS') throw new Conflict('Pedido não está em preparação', 'INVALID_STATE');
+      const pkg = await row<{ id: string; current_node_id: string; status: string }>(
+        ctx.tx,
+        sql`SELECT id, current_node_id, status FROM containers WHERE id = ${input.packageId} AND outbound_id = ${id}
+            AND kind = 'PACKAGE' AND warehouse_id = ${warehouseId} FOR UPDATE`,
+      );
+      if (!pkg) throw new NotFound('Volume');
+      if (pkg.status !== 'ACTIVE') throw new Conflict('Volume já expedido ou fechado', 'INVALID_STATE');
+      const line = await row<LineRow>(
+        ctx.tx,
+        sql`SELECT * FROM outbound_lines WHERE id = ${input.lineId} AND outbound_id = ${id} FOR UPDATE`,
+      );
+      if (!line) throw new NotFound('Linha');
+      const pls = await rows<{ id: string; left: string }>(
+        ctx.tx,
+        sql`SELECT id, (qty - qty_unpacked)::text AS left FROM outbound_package_lines
+            WHERE package_id = ${pkg.id} AND outbound_line_id = ${line.id} AND qty > qty_unpacked ORDER BY created_at DESC, id FOR UPDATE`,
+      );
+      const inPkg = pls.reduce((a, p) => a + toMilli(p.left), 0n);
+      if (toMilli(input.qty) > inPkg) throw new Conflict(`Só há ${fromMilli(inPkg)} unidades desta linha no volume`, 'QTY_EXCEEDS_PACKED');
+      const contents = await rows<PositionRow>(
+        ctx.tx,
+        sql`SELECT * FROM stock_positions WHERE holder_container_id = ${pkg.id} AND sku_id = ${line.sku_id} AND qty_on_hand > 0 ORDER BY id FOR UPDATE`,
+      );
+      const txnId = await newTxn(ctx, 'UNPACK', { referenceType: 'outbound', referenceId: id, idempotencyKey: key });
+      let remaining = toMilli(input.qty);
+      for (const src of contents) {
+        if (remaining <= 0n) break;
+        const take = min(src.qty_on_hand, fromMilli(remaining));
+        await relocate(ctx, txnId, src, take, { holder: { nodeId: pkg.current_node_id, nodeKind: 'DISPATCH' }, status: 'PICKED' });
+        remaining -= toMilli(take);
+      }
+      if (remaining > 0n) throw new InsufficientStock('Conteúdo do volume inconsistente');
+      let toRecord = toMilli(input.qty);
+      for (const pl of pls) {
+        if (toRecord <= 0n) break;
+        const take = toMilli(pl.left) < toRecord ? toMilli(pl.left) : toRecord;
+        await ctx.tx.execute(
+          sql`UPDATE outbound_package_lines SET qty_unpacked = qty_unpacked + ${fromMilli(take)}::numeric WHERE id = ${pl.id}`,
+        );
+        toRecord -= take;
+      }
+      await ctx.tx.execute(sql`UPDATE outbound_lines SET qty_packed = qty_packed - ${input.qty}::numeric WHERE id = ${line.id}`);
       return { txnId };
     });
   }
@@ -372,7 +467,7 @@ export class OutboundService {
         for (const p of contents) await applyDelta(ctx, txnId, p, `-${p.qty_on_hand}`);
         await ctx.tx.execute(sql`UPDATE containers SET status = 'DISPATCHED', updated_at = now() WHERE id = ${pkgId}`);
         await ctx.tx.execute(sql`UPDATE outbound_lines l SET qty_dispatched = l.qty_dispatched + x.q
-            FROM (SELECT outbound_line_id, sum(qty) AS q FROM outbound_package_lines WHERE package_id = ${pkgId} GROUP BY outbound_line_id) x
+            FROM (SELECT outbound_line_id, sum(qty - qty_unpacked) AS q FROM outbound_package_lines WHERE package_id = ${pkgId} GROUP BY outbound_line_id) x
             WHERE l.id = x.outbound_line_id`);
       }
       const done = await one<{ open: number }>(
@@ -413,18 +508,29 @@ export class OutboundService {
             FROM outbound_orders WHERE id = ${id}`);
         await this.writeLines(ctx, backorderId, remaining);
       }
+      await this.closeEmptyPackages(ctx, id);
       await ctx.tx.execute(sql`UPDATE outbound_orders SET status = 'CLOSED', closed_at = now() WHERE id = ${id}`);
       await emitEvent(ctx, 'wms.outbound.closed', 'outbound', id, { backorderId });
       return { id, status: 'CLOSED', backorderId };
     });
   }
 
-  /** Cancels a DRAFT/ALLOCATED order with nothing picked, releasing reservations. */
+  /**
+   * Cancels an order with nothing currently picked or dispatched (DRAFT/ALLOCATED, or
+   * IN_PROGRESS after every picked unit was un-picked), releasing reservations and closing its
+   * empty packages.
+   */
   async cancel(actor: Actor, warehouseId: string, id: string, key: string) {
     return this.runner.command(actor, warehouseId, 'wms.outbound.manage', key, 'outbound.cancel', { id }, async (ctx) => {
       const o = await this.lockOrder(ctx, id);
-      if (!['DRAFT', 'ALLOCATED'].includes(o.status)) throw new Conflict('Pedido já em preparação; use fechar', 'INVALID_STATE');
+      if (!['DRAFT', 'ALLOCATED', 'IN_PROGRESS'].includes(o.status)) throw new Conflict('Pedido já fechado', 'INVALID_STATE');
+      const busy = await one<{ n: number }>(
+        ctx.tx,
+        sql`SELECT count(*)::int AS n FROM outbound_lines WHERE outbound_id = ${id} AND (qty_picked > 0 OR qty_dispatched > 0)`,
+      );
+      if (busy.n > 0) throw new Conflict('Existem unidades separadas ou expedidas; anule a separação ou feche o pedido', 'PICKED_EXISTS');
       await this.releaseReservations(ctx, id);
+      await this.closeEmptyPackages(ctx, id);
       await ctx.tx.execute(sql`UPDATE outbound_orders SET status = 'CANCELLED', closed_at = now() WHERE id = ${id}`);
       return { id, status: 'CANCELLED' };
     });
@@ -461,6 +567,19 @@ export class OutboundService {
           VALUES (${ctx.companyId}, ${ctx.warehouseId}, ${outboundId},
             (SELECT coalesce(max(line_no), 0) + 1 FROM outbound_lines WHERE outbound_id = ${outboundId}), ${l.skuId}, ${l.qty}::numeric)`);
     }
+  }
+
+  /** Marks the order's still-ACTIVE packages CLOSED; refuses if any still holds stock. */
+  private async closeEmptyPackages(ctx: OpCtx, outboundId: string) {
+    const loaded = await one<{ n: number }>(
+      ctx.tx,
+      sql`SELECT count(*)::int AS n FROM containers c JOIN stock_positions p ON p.holder_container_id = c.id
+          WHERE c.outbound_id = ${outboundId} AND c.status = 'ACTIVE' AND p.qty_on_hand > 0`,
+    );
+    if (loaded.n > 0) throw new Conflict('Existem volumes com conteúdo por expedir', 'PACKAGE_NOT_EMPTY');
+    await ctx.tx.execute(
+      sql`UPDATE containers SET status = 'CLOSED', updated_at = now() WHERE outbound_id = ${outboundId} AND status = 'ACTIVE'`,
+    );
   }
 
   private async releaseReservations(ctx: OpCtx, outboundId: string) {

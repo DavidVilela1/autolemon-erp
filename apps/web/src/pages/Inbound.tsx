@@ -214,7 +214,7 @@ export function PutawayPage() {
     () => (task ? api<Row[]>('GET', `${wp(wh)}/putaway/${task.id}/suggestions`) : Promise.resolve([] as Row[])),
     [wh, task?.id],
   );
-  const [f, setF] = useState({ to: '', qty: '' });
+  const [f, setF] = useState({ to: '', qty: '', scan: '' });
   const [key, setKey] = useState(newIdempotencyKey());
   const a = useAction();
   return (
@@ -235,7 +235,7 @@ export function PutawayPage() {
               {
                 h: '',
                 c: (r) => (
-                  <Button small onClick={() => (setTask(r), setF({ to: '', qty: r.qtyRemaining! }), setKey(newIdempotencyKey()))}>
+                  <Button small onClick={() => (setTask(r), setF({ to: '', qty: r.qtyRemaining!, scan: '' }), setKey(newIdempotencyKey()))}>
                     Arrumar
                   </Button>
                 ),
@@ -261,7 +261,12 @@ export function PutawayPage() {
               className="grid grid-cols-2 gap-2"
               onSubmit={() =>
                 void a.run(async () => {
-                  await api('POST', `${wp(wh)}/putaway/${task.id}/complete`, { qty: f.qty, to: holderRef(f.to) }, { idempotencyKey: key });
+                  await api(
+                    'POST',
+                    `${wp(wh)}/putaway/${task.id}/complete`,
+                    { qty: f.qty, to: holderRef(f.to), scan: f.scan },
+                    { idempotencyKey: key },
+                  );
                   setTask(undefined);
                   tasks.reload();
                 }, 'Arrumação registada.')
@@ -275,6 +280,14 @@ export function PutawayPage() {
                 required
               />
               <Field label="Quantidade" value={f.qty} onChange={(v) => setF({ ...f, qty: v })} required inputMode="decimal" />
+              <Field
+                label="Ler etiqueta do destino"
+                value={f.scan}
+                onChange={(v) => setF({ ...f, scan: v })}
+                required
+                autoComplete="off"
+                maxLength={64}
+              />
               <Button type="submit" disabled={a.busy}>
                 Confirmar
               </Button>

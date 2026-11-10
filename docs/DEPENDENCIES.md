@@ -1,4 +1,4 @@
-# Dependencies — verified 2026-11-09
+# Dependencies — verified 2026-11-09, updated 2026-11-10 (v0.6.0)
 
 Owning module: repository tooling. Versions were checked on **2026-11-09** against the npm
 registry (`npm view <pkg> version|dist-tags|engines|peerDependencies|time|license`) and GitHub
@@ -17,18 +17,20 @@ installs use `--frozen-lockfile`. Registry: https://registry.npmjs.org/<package>
 
 ## Runtime (production) dependencies
 
-| Package                                                | Version       | License                 | Published  | Notes                                                                                               |
-| ------------------------------------------------------ | ------------- | ----------------------- | ---------- | --------------------------------------------------------------------------------------------------- |
-| @nestjs/core, @nestjs/common, @nestjs/platform-fastify | 12.4.2        | MIT                     | 2026-11-09 | same-day patch across 11.x/12.x lines (likely fixes) → excluded from min-release-age (SEC-OPEN-011) |
-| fastify                                                | 5.12.8        | MIT                     | 2026-11-02 | peer of platform-fastify                                                                            |
-| @fastify/cookie                                        | 11.1.5        | MIT                     | 2026-10-27 |                                                                                                     |
-| reflect-metadata / rxjs                                | 0.2.2 / 7.8.2 | Apache-2.0 / Apache-2.0 |            | Nest peers                                                                                          |
-| drizzle-orm                                            | 0.45.4        | Apache-2.0              | 2026-10-08 | `latest` (1.0 is still RC)                                                                          |
-| pg                                                     | 8.23.1        | MIT                     | 2026-09-30 | node-postgres driver                                                                                |
-| zod                                                    | 4.6.7         | MIT                     | 2026-10-12 |                                                                                                     |
-| @node-rs/argon2                                        | 2.2.2         | MIT                     | 2026-10-06 | prebuilt N-API binaries, no install scripts                                                         |
-| react / react-dom                                      | 19.3.1        | MIT                     | 2026-10-14 |                                                                                                     |
-| jsbarcode                                              | 3.12.3        | MIT                     | 2026-01-07 | used only as an encoder (no DOM)                                                                    |
+| Package                                                | Version       | License                 | Published  | Notes                                                                                                              |
+| ------------------------------------------------------ | ------------- | ----------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------ |
+| @nestjs/core, @nestjs/common, @nestjs/platform-fastify | 12.4.2        | MIT                     | 2026-11-09 | same-day patch across 11.x/12.x lines (likely fixes) → excluded from min-release-age (SEC-OPEN-011)                |
+| fastify                                                | 5.12.8        | MIT                     | 2026-11-02 | peer of platform-fastify                                                                                           |
+| @fastify/cookie                                        | 11.1.5        | MIT                     | 2026-10-27 |                                                                                                                    |
+| reflect-metadata / rxjs                                | 0.2.2 / 7.8.2 | Apache-2.0 / Apache-2.0 |            | Nest peers                                                                                                         |
+| drizzle-orm                                            | 0.45.4        | Apache-2.0              | 2026-10-08 | `latest` (1.0 is still RC)                                                                                         |
+| pg                                                     | 8.23.1        | MIT                     | 2026-09-30 | node-postgres driver                                                                                               |
+| zod                                                    | 4.6.7         | MIT                     | 2026-10-12 |                                                                                                                    |
+| @node-rs/argon2                                        | 2.2.2         | MIT                     | 2026-10-06 | prebuilt N-API binaries, no install scripts                                                                        |
+| react / react-dom                                      | 19.3.1        | MIT                     | 2026-10-14 |                                                                                                                    |
+| jsbarcode                                              | 3.12.3        | MIT                     | 2026-01-07 | used only as an encoder (no DOM)                                                                                   |
+| @simplewebauthn/server                                 | 14.1.0        | MIT                     | 2026-11-06 | WebAuthn verification (API); transitive: `@levischuck/tiny-cbor`, `@peculiar/asn1-*`, `@hexagon/base64` (see SBOM) |
+| @simplewebauthn/browser                                | 14.0.0        | MIT                     | 2026-09-02 | WebAuthn ceremonies in the SPA; no runtime dependencies                                                            |
 
 ## Development dependencies
 
@@ -50,7 +52,6 @@ installs use `--frozen-lockfile`. Registry: https://registry.npmjs.org/<package>
 - **drizzle-kit** — migrations are hand-written SQL (composite FKs, triggers, RLS, grants) and
   checksummed by our runner (ADR-0004). Re-introduce only for introspection/diff tooling.
 - **otplib** — TOTP implemented on `node:crypto` HMAC and verified against RFC 4226/6238 vectors.
-- **@simplewebauthn/server** 14.1.0 — selected for T-01 (WebAuthn), not yet installed.
 - **class-validator/class-transformer, @nestjs/swagger** — replaced by Zod contracts and our own
   OpenAPI generator (no decorator metadata reflection).
 - **react-router** — tiny hash router suffices (ADR-0007).

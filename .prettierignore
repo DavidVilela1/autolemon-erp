@@ -9,3 +9,5 @@ playwright-report
 test-results
 .env
 docs/sbom
+docs/WMS_RELEASE_GATE.md
+docs/WMS_RELEASE_STATUS.json

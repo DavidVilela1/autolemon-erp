@@ -47,6 +47,9 @@ export function CorrectionsPage() {
             'ADJUST',
             'REPLENISH',
             'REVERSAL',
+            'STATUS_CHANGE',
+            'UNPICK',
+            'UNPACK',
           ].map((t) => ({ value: t, label: t }))}
         />
         <Table
@@ -71,7 +74,10 @@ export function CorrectionsPage() {
                       const reason = window.prompt('Motivo da reversão (obrigatório):');
                       if (reason)
                         void a.run(
-                          async () => (await api('POST', `${wp(wh)}/transactions/${r.txnId}/reverse`, { reason }), ledger.reload()),
+                          async () => (
+                            await withStepUp(() => api('POST', `${wp(wh)}/transactions/${r.txnId}/reverse`, { reason })),
+                            ledger.reload()
+                          ),
                           'Reversão registada.',
                         );
                     }}

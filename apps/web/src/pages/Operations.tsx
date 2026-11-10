@@ -16,7 +16,7 @@ interface TransferDoc {
   destWarehouseId: string;
   sourceCode: string;
   destCode: string;
-  lines: Row[];
+  lines: Array<Row & { lots?: Array<{ lot: string; qtyInTransit: string; qtyReceived: string }> }>;
 }
 
 /** Inter-warehouse transfers. Each side only acts in its own warehouse. */
@@ -109,8 +109,25 @@ export function TransfersPage() {
                   { h: 'Recebido', c: (r) => fmtQty(r.qtyReceived), num: true },
                   { h: 'Em trânsito', c: (r) => fmtQty(r.qtyInTransit), num: true },
                   { h: 'Perdido', c: (r) => fmtQty(r.qtyLost), num: true },
+                  {
+                    h: 'Lotes (em trânsito)',
+                    c: (r) =>
+                      (r.lots ?? []).filter((x) => x.lot).length
+                        ? (r.lots ?? []).map((x) => `${x.lot}: ${fmtQty(x.qtyInTransit)}`).join(' · ')
+                        : '—',
+                  },
                 ]}
               />
+              {d.sourceWarehouseId === wh && d.status === 'DRAFT' && can('wms.transfer.dispatch') && (
+                <Button
+                  variant="danger"
+                  onClick={() =>
+                    void a.run(async () => (await api('POST', `/api/wms/transfers/${d.id}/cancel`), refresh()), 'Transferência anulada.')
+                  }
+                >
+                  Anular transferência
+                </Button>
+              )}
               {d.sourceWarehouseId === wh &&
                 ['DRAFT', 'IN_TRANSIT', 'PARTIALLY_RECEIVED'].includes(d.status) &&
                 can('wms.transfer.dispatch') && (
@@ -137,7 +154,7 @@ export function TransfersPage() {
                             .filter((p) => p.skuId === l.skuId && p.status === 'AVAILABLE')
                             .map((p) => ({
                               value: p.id!,
-                              label: `${p.nodePath}${p.containerCode ? ` / ${p.containerCode}` : ''} (livre ${fmtQty(p.free)})`,
+                              label: `${p.nodePath}${p.containerCode ? ` / ${p.containerCode}` : ''}${p.lot ? ` · lote ${p.lot}` : ''} (livre ${fmtQty(p.free)})`,
                             }))}
                         />
                         <Field

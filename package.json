@@ -1,8 +1,8 @@
 {
   "name": "autolemon-erp",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
-  "description": "AutoLemon ERP \u2014 modular monolith foundation with an autonomous Warehouse Management System (WMS). Not production-ready: see docs/PROJECT_STATE.md.",
+  "description": "AutoLemon ERP — modular monolith foundation with an autonomous Warehouse Management System (WMS). Not production-ready: see docs/PROJECT_STATE.md.",
   "license": "UNLICENSED",
   "type": "module",
   "packageManager": "pnpm@12.18.0",
@@ -25,13 +25,15 @@
     "test:integration": "node scripts/with-test-db.mjs vitest run --project integration",
     "test:security": "node scripts/with-test-db.mjs vitest run --project security",
     "test:e2e": "node scripts/run-e2e.mjs",
-    "test:all": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm api:check && pnpm test:unit && pnpm test:integration && pnpm test:security && pnpm test:e2e",
+    "test:all": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm api:check && pnpm gate:check && pnpm test:unit && pnpm test:integration && pnpm test:security && pnpm test:e2e",
     "security:scan": "node scripts/security-scan.mjs",
     "backup:local": "node scripts/backup-local.mjs",
     "restore:smoke": "node scripts/restore-smoke.mjs",
     "verify:handover": "node scripts/verify-handover.mjs",
     "release:zip": "node scripts/package-release.mjs",
-    "api:check": "pnpm --filter @autolemon/api exec tsx src/openapi/generate.ts --check"
+    "api:check": "pnpm --filter @autolemon/api exec tsx src/openapi/generate.ts --check",
+    "gate:check": "node scripts/wms-gate.mjs",
+    "gate:render": "node scripts/wms-gate.mjs --render"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",

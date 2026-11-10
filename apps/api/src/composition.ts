@@ -10,12 +10,15 @@ import type { AppConfig } from './config/env.js';
 import { Database } from './db/database.js';
 import { AdminService } from './platform/admin/admin.service.js';
 import { AuditService } from './platform/audit/audit.service.js';
+import { AccountService } from './platform/auth/account.service.js';
 import { AuthService } from './platform/auth/auth.service.js';
+import { PasskeyService } from './platform/auth/passkey.service.js';
 import { ThrottleService } from './platform/auth/throttle.service.js';
 import { FieldCrypto } from './platform/crypto/field-crypto.js';
 import { ExternalKmsProvider, type KeyProvider, LocalDevKeyProvider } from './platform/crypto/key-provider.js';
 import { type ModuleDescriptor, resolveModules } from './platform/modules/registry.js';
 import { OutboxDispatcher } from './platform/outbox/outbox.dispatcher.js';
+import { RetentionService } from './platform/retention/retention.service.js';
 import { CountService } from './wms/count.service.js';
 import { InboundService } from './wms/inbound.service.js';
 import { OutboundService } from './wms/outbound.service.js';
@@ -39,8 +42,11 @@ export interface Services {
   audit: AuditService;
   crypto: FieldCrypto;
   auth: AuthService;
+  passkeys: PasskeyService;
+  account: AccountService;
   admin: AdminService;
   outbox: OutboxDispatcher;
+  retention: RetentionService;
   topology: TopologyService;
   skus: SkuService;
   stock: StockService;
@@ -76,8 +82,11 @@ export function buildServices(cfg: AppConfig): Services {
     audit,
     crypto,
     auth,
+    passkeys: new PasskeyService(database, cfg, audit, auth, throttle),
+    account: new AccountService(database, cfg, audit, auth, throttle),
     admin: new AdminService(database, audit, auth, crypto, step),
     outbox: new OutboxDispatcher(database),
+    retention: new RetentionService(database, cfg, audit),
     topology: new TopologyService(runner),
     skus: new SkuService(database, audit),
     stock: new StockService(runner, audit, step),

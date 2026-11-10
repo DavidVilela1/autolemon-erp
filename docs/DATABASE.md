@@ -1,4 +1,4 @@
-# Database — AutoLemon ERP v0.5.0
+# Database — AutoLemon ERP v0.6.0
 
 Owning module: platform/db. Engine: PostgreSQL 18 (target; Docker Compose) — the automated test
 evidence in this build was produced on PostgreSQL **16.15** because the build environment could
@@ -6,15 +6,36 @@ not pull the 18 image (see `docs/PROJECT_STATE.md`). No 17/18-only features are 
 
 ## 1. Migrations
 
-| File                      | Content                                                                                                                                                                                                                                                               |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `0001_platform.sql`       | runtime role, helper functions, companies, warehouses, users, permissions, sessions, MFA, one-time tokens, throttle, tenant DEKs, security audit log, idempotency log, outbox, document sequences                                                                     |
-| `0002_wms.sql`            | SKUs, barcodes, storage nodes (+ nesting trigger), containers (+ placement trigger), inventory transactions/ledger (append-only), stock positions (+ identity trigger), inbound, putaway, outbound, reservations, packages, transfers, returns, counts, replenishment |
-| `0003_rls_and_grants.sql` | least-privilege grants for `autolemon_app`, RLS policies                                                                                                                                                                                                              |
+| File                            | Content                                                                                                                                                                                                                                                                         |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0001_platform.sql`             | runtime role, helper functions, companies, warehouses, users, permissions, sessions, MFA, one-time tokens, throttle, tenant DEKs, security audit log, idempotency log, outbox, document sequences                                                                               |
+| `0002_wms.sql`                  | SKUs, barcodes, storage nodes (+ nesting trigger), containers (+ placement trigger), inventory transactions/ledger (append-only), stock positions (+ identity trigger), inbound, putaway, outbound, reservations, packages, transfers, returns, counts, replenishment           |
+| `0003_rls_and_grants.sql`       | least-privilege grants for `autolemon_app`, RLS policies                                                                                                                                                                                                                        |
+| `0004_passkeys_and_account.sql` | `webauthn_credentials` (per-user passkeys, revocable, composite FK to users); single-use WebAuthn challenge columns on `sessions` (purpose-bound, 5-minute expiry)                                                                                                              |
+| `0005_wms_completion.sql`       | inventory transaction types `STATUS_CHANGE`, `UNPICK`, `UNPACK`; `transfer_line_lots` (in-transit quantities per lot, RLS = visible with its transfer line; existing shipments back-filled as lot `''`); `outbound_package_lines.qty_unpacked` (un-packing never edits history) |
+| `0006_retention.sql`            | `app_retention_purge(...)` SECURITY DEFINER purge of expired operational data (≥ 7-day windows); runtime role gets EXECUTE only, still no DELETE (ADR-0020)                                                                                                                     |
 
 Runner: `apps/api/src/db/migrator.ts` — forward-only, one transaction per file, advisory lock,
 SHA-256 checksum per applied file (edited applied migration ⇒ abort). Migrations run with the
 **owner** role (`DATABASE_URL`); the app uses `autolemon_app` (`APP_DATABASE_URL`).
+
+## 1a. Upgrades, rollback and forward recovery
+
+- **Upgrade:** `pnpm db:migrate` (owner role) applies pending files in order, each in its own
+  transaction; a failing file rolls back completely and the run stops (nothing half-applied).
+  Rehearsed automatically: `tests/integration/reliability.test.ts` builds a database with the
+  v0.5.0 migrations (0001–0003), inserts v0.5-shaped data (an in-transit transfer), upgrades to the
+  current set and checks the back-fill (`transfer_line_lots`) and idempotent re-runs.
+- **No down migrations (forward-only, ADR-0004).** Rollback strategy, in order of preference:
+  1. _Application rollback without schema rollback_ — every migration so far is additive
+     (new tables/columns with defaults, widened CHECK constraints, new functions), so the previous
+     application version keeps working on the newer schema; redeploy the previous image.
+  2. _Forward fix_ — write a new corrective migration; never edit an applied one (checksums).
+  3. _Restore_ — for a destructive mistake, restore the pre-upgrade backup (take one immediately
+     before every production migration: `pnpm backup:local` locally, pgBackRest in production) and
+     replay WAL to just before the migration (PITR), then re-run the corrected upgrade.
+- **Before each production upgrade:** backup + verified restore of that backup in a disposable
+  database (`pnpm restore:smoke` locally), migration run against a staging copy, then production.
 
 ## 2. Entity relationships (core)
 

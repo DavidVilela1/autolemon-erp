@@ -2,8 +2,9 @@
  * @file Login (password + MFA), invitation/MFA-reset enrolment and password reset screens.
  * @module web/pages
  */
+import { browserSupportsWebAuthn, startAuthentication } from '@simplewebauthn/browser';
 import { useEffect, useState } from 'react';
-import { api, setCsrf } from '../api';
+import { api, ApiError, setCsrf } from '../api';
 import { Button, ErrorNotice, Field, Form, Notice, Panel, useAction } from '../components/ui';
 import { useSession } from '../session';
 
@@ -19,7 +20,7 @@ function Shell({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
-/** Two-step login: password, then TOTP or recovery code. */
+/** Two-step login: password, then a passkey, TOTP or recovery code. */
 export function LoginPage() {
   const { reload } = useSession();
   const [step, setStep] = useState<'password' | 'mfa'>('password');
@@ -28,6 +29,19 @@ export function LoginPage() {
   const [code, setCode] = useState('');
   const [useRecovery, setUseRecovery] = useState(false);
   const a = useAction();
+  const passkeySupported = browserSupportsWebAuthn();
+  const finish = async (csrfToken: string) => {
+    setCsrf(csrfToken);
+    await reload();
+    window.location.hash = '#/';
+  };
+  const usePasskey = () =>
+    void a.run(async () => {
+      const optionsJSON = await api<Parameters<typeof startAuthentication>[0]['optionsJSON']>('POST', '/api/auth/mfa/passkey/options');
+      const response = await startAuthentication({ optionsJSON });
+      await finish((await api<{ csrfToken: string }>('POST', '/api/auth/mfa/passkey/verify', { response })).csrfToken);
+    });
+  const passkeyRequired = a.error instanceof ApiError && a.error.code === 'PASSKEY_REQUIRED';
   return (
     <Shell title={step === 'password' ? 'Entrar' : 'Verificação em dois passos'}>
       {step === 'password' ? (
@@ -61,14 +75,23 @@ export function LoginPage() {
         <Form
           className="space-y-3"
           onSubmit={() =>
-            void a.run(async () => {
-              const r = await api<{ csrfToken: string }>('POST', '/api/auth/mfa/verify', useRecovery ? { recoveryCode: code } : { code });
-              setCsrf(r.csrfToken);
-              await reload();
-              window.location.hash = '#/';
-            })
+            void a.run(async () =>
+              finish(
+                (await api<{ csrfToken: string }>('POST', '/api/auth/mfa/verify', useRecovery ? { recoveryCode: code } : { code }))
+                  .csrfToken,
+              ),
+            )
           }
         >
+          {passkeySupported && (
+            <div className="space-y-2 border-b border-line pb-3">
+              <Button onClick={usePasskey} disabled={a.busy}>
+                Usar chave de acesso
+              </Button>
+              {passkeyRequired && <p className="text-sm text-ink-soft">A sua conta de administrador exige a chave de acesso registada.</p>}
+              <p className="text-xs text-ink-soft">Ou introduza um código:</p>
+            </div>
+          )}
           <Field
             label={useRecovery ? 'Código de recuperação' : 'Código da aplicação autenticadora (6 dígitos)'}
             value={code}
