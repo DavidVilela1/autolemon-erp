@@ -9,6 +9,7 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import { Button, Field, Form } from './components/ui';
 import { AccountPage } from './pages/Account';
+import { SearchPage } from './pages/Search';
 import { AdminPage, AuditPage } from './pages/Admin';
 import { EnrollmentPage, LoginPage, ResetPasswordPage } from './pages/Auth';
 import { InboundPage, PutawayPage } from './pages/Inbound';
@@ -30,6 +31,7 @@ interface RouteDef {
 
 const ROUTES: RouteDef[] = [
   { path: '/', label: 'Stock', perm: 'wms.view', render: () => <StockPage /> },
+  { path: '/pesquisa', label: 'Pesquisa', perm: 'wms.view', render: () => <SearchPage /> },
   { path: '/rececao', label: 'Receção', perm: 'wms.receive', render: () => <InboundPage /> },
   { path: '/arrumacao', label: 'Arrumação', perm: 'wms.putaway', render: () => <PutawayPage /> },
   { path: '/saidas', label: 'Saídas', perm: 'wms.pick', render: () => <OutboundPage /> },

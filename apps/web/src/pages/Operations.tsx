@@ -540,6 +540,7 @@ export function ReplenishmentPage() {
     () => api<{ moves: Row[]; purchaseSuggestions: Row[]; note: string }>('GET', `${wp(wh)}/replenishment/suggestions`),
     [wh],
   );
+  const [exec, setExec] = useState<{ move: Row; scan: string } | null>(null);
   const [r, setR] = useState({ skuId: '', pickNodeId: '', minQty: '', targetQty: '' });
   const a = useAction();
   return (
@@ -587,22 +588,7 @@ export function ReplenishmentPage() {
               {
                 h: '',
                 c: (m) => (
-                  <Button
-                    small
-                    onClick={() =>
-                      void a.run(
-                        async () => (
-                          await api('POST', `${wp(wh)}/replenishment/execute`, {
-                            ruleId: m.ruleId,
-                            fromPositionId: m.fromPositionId,
-                            qty: m.qty,
-                          }),
-                          sug.reload()
-                        ),
-                        'Reposição executada.',
-                      )
-                    }
-                  >
+                  <Button small onClick={() => setExec({ move: m, scan: '' })}>
                     Executar
                   </Button>
                 ),
@@ -621,6 +607,41 @@ export function ReplenishmentPage() {
             ]}
             empty="Sem sugestões."
           />
+          {exec && (
+            <Form
+              className="mt-3 flex flex-wrap items-end gap-2 rounded border border-teal p-3"
+              onSubmit={() =>
+                void a.run(async () => {
+                  await api('POST', `${wp(wh)}/replenishment/execute`, {
+                    ruleId: exec.move.ruleId,
+                    fromPositionId: exec.move.fromPositionId,
+                    qty: exec.move.qty,
+                    scan: exec.scan,
+                  });
+                  setExec(null);
+                  sug.reload();
+                }, 'Reposição executada.')
+              }
+            >
+              <p className="w-full text-sm">
+                Leve {fmtQty(exec.move.qty)} × {exec.move.skuCode} para {exec.move.toPath} e leia a etiqueta dessa localização.
+              </p>
+              <Field
+                label="Ler etiqueta do destino"
+                value={exec.scan}
+                onChange={(v) => setExec({ ...exec, scan: v })}
+                required
+                autoComplete="off"
+                maxLength={64}
+              />
+              <Button type="submit" disabled={a.busy}>
+                Confirmar reposição
+              </Button>
+              <Button variant="secondary" onClick={() => setExec(null)}>
+                Cancelar
+              </Button>
+            </Form>
+          )}
         </Panel>
       </div>
       <ErrorNotice error={a.error ?? sug.error} />

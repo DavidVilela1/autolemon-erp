@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "AutoLemon ERP API (platform + autonomous WMS)",
-    "version": "0.6.0",
+    "version": "0.6.1",
     "description": "Cookie-session API. All writes require X-Requested-With: autolemon and X-CSRF-Token; WMS commands require Idempotency-Key. Generated from code — see docs/API.md."
   },
   "servers": [
@@ -6566,6 +6566,53 @@
         }
       }
     },
+    "/api/wms/w/{wh}/reports/ledger.csv": {
+      "get": {
+        "operationId": "WmsWarehouseController.ledgerCsv",
+        "tags": [
+          "WmsWarehouse"
+        ],
+        "parameters": [
+          {
+            "name": "wh",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "2XX": {
+            "description": "Success (JSON; CSV for reports/stock.csv)"
+          }
+        }
+      }
+    },
     "/api/wms/w/{wh}/reports/stock": {
       "get": {
         "operationId": "WmsWarehouseController.stockReport",
@@ -6918,6 +6965,53 @@
           {
             "sessionCookie": [],
             "csrfToken": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "2XX": {
+            "description": "Success (JSON; CSV for reports/stock.csv)"
+          }
+        }
+      }
+    },
+    "/api/wms/w/{wh}/search": {
+      "get": {
+        "operationId": "WmsWarehouseController.search",
+        "tags": [
+          "WmsWarehouse"
+        ],
+        "parameters": [
+          {
+            "name": "wh",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
           }
         ],
         "responses": {

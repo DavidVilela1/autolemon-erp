@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "product": "AutoLemon ERP — WMS",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "updatedAt": "2026-11-10",
   "state": "WMS_IN_PROGRESS",
   "allowedStates": [
@@ -11,7 +11,7 @@
     "AWAITING_NEXT_MODULE_SELECTION",
     "NEXT_MODULE_AUTHORIZED"
   ],
-  "stateReason": "Code-level criteria still FAIL (F-12, E-05, S-03, S-05, S-06, O-02) and infrastructure/independent criteria are BLOCKED; see openAction per criterion.",
+  "stateReason": "Code-level criteria still FAIL (S-03 external KMS, S-05 monitoring, S-06 ASVS open items, O-02 signed artifacts/gated deployment) and infrastructure/independent criteria are BLOCKED; see openAction per criterion.",
   "gateSource": "WMS Production Readiness Gate v0.6 (product owner, 2026-11-10) + Reusable Continuation Prompt v0.6 §0",
   "releaseOwnerApproval": null,
   "independentSecurityReview": null,
@@ -74,7 +74,7 @@
     {
       "id": "F-05",
       "requiredResult": "Putaway and location/container moves with scan verification",
-      "verificationMethod": "Server rejects a scanned label ≠ destination (SCAN_MISMATCH) for putaway, stock move, container move; e2e scans wrong then right label",
+      "verificationMethod": "Server rejects a scanned label ≠ destination (SCAN_MISMATCH) for putaway, stock move, container move; e2e scans wrong then right label; replenishment UI now also requires the scan",
       "evidence": [
         "tests/integration/reliability.test.ts (scan verification)",
         "tests/e2e/warehouse.spec.ts"
@@ -82,7 +82,7 @@
       "verifiedAt": "2026-11-10",
       "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
       "status": "PASS",
-      "openAction": "Field test with real scanners (O-06); replenishment UI does not yet ask for the scan (API supports it)"
+      "openAction": "Field test with real scanners (O-06)"
     },
     {
       "id": "F-06",
@@ -167,15 +167,16 @@
     {
       "id": "F-12",
       "requiredResult": "Operational reports, search/filter/export, barcode/print labels and pt-PT operator UX",
-      "verificationMethod": "Ledger filter, stock CSV export (step-up), labels, axe on every screen",
+      "verificationMethod": "Activity CSV export (bounded period, wms.export + step-up + audit, formula-safe), cross-document search (numbers, external refs, SKU/barcode, locations, containers; warehouse-scoped, literal matching), stock export, labels, axe on every screen",
       "evidence": [
+        "tests/integration/reports-search.test.ts",
         "tests/security/isolation.test.ts (export)",
-        "tests/e2e/warehouse.spec.ts (axe sweep)"
+        "tests/e2e/warehouse.spec.ts (search + axe sweep)"
       ],
       "verifiedAt": "2026-11-10",
       "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
-      "status": "FAIL",
-      "openAction": "Activity/ledger export and cross-document search missing (R-09/T-27); operator UX needs pilot sign-off (O-06)"
+      "status": "PASS",
+      "openAction": "Operator sign-off of pt-PT UX in the pilot (O-06)"
     },
     {
       "id": "F-13",
@@ -241,8 +242,10 @@
     {
       "id": "E-05",
       "requiredResult": "Full API docs, ERD, ADRs, comments, onboarding, maintenance and incident runbooks",
-      "verificationMethod": "Documentation gate (headers + TSDoc), generated OpenAPI, ADRs 0001–0020",
+      "verificationMethod": "Documentation gate (headers + TSDoc) in lint; generated OpenAPI; ADRs; incident/maintenance runbooks and pt-PT operator/admin manual cross-checked against UI labels and tested commands",
       "evidence": [
+        "docs/runbooks/RUNBOOKS.md",
+        "docs/MANUAL_OPERADOR_E_ADMIN.md",
         "docs/API.md",
         "docs/api/openapi.json",
         "docs/DATABASE.md",
@@ -252,8 +255,8 @@
       ],
       "verifiedAt": "2026-11-10",
       "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
-      "status": "FAIL",
-      "openAction": "Incident and maintenance runbooks are outlines; operator/admin training manual missing (T-31)"
+      "status": "PASS",
+      "openAction": "Rehearse runbooks (O-04) and have warehouse staff review the manual (O-06)"
     },
     {
       "id": "E-06",
@@ -270,7 +273,7 @@
     {
       "id": "S-01",
       "requiredResult": "Authentication/session/MFA flows verified; default-deny tenant/warehouse permissions",
-      "verificationMethod": "Automated: passkeys (real WebAuthn verification), TOTP, recovery, sessions, CSRF, throttling, step-up, route inventory",
+      "verificationMethod": "Automated: passkeys (real WebAuthn verification), TOTP, recovery, sessions, CSRF, throttling, step-up, route inventory; MFA reset revokes passkeys",
       "evidence": [
         "tests/security/passkeys-account.test.ts",
         "tests/security/attacks.test.ts",
@@ -447,9 +450,9 @@
     }
   ],
   "summary": {
-    "PASS": 18,
-    "FAIL": 6,
+    "PASS": 20,
     "BLOCKED": 9,
+    "FAIL": 4,
     "NOT_RUN": 1
   }
 }

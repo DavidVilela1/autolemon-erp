@@ -49,7 +49,7 @@ export class Forbidden extends DomainError {
 /** 403 — a recent step-up MFA verification is required. */
 export class StepUpRequired extends DomainError {
   constructor(readonly action: string) {
-    super(403, 'STEP_UP_REQUIRED', 'Confirme a sua identidade com um código MFA para continuar');
+    super(403, 'STEP_UP_REQUIRED', 'Confirme a sua identidade (chave de acesso ou código MFA) para continuar');
   }
 }
 /**

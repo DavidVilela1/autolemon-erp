@@ -6,6 +6,10 @@
  *
  * Local checks:
  *  1. Secret scan (high-signal regexes over all authored files; .env never scanned/packaged).
+ *  1b. gitleaks (same default rules as the CI job) over exactly the authored files, when a
+ *      gitleaks binary is available (`GITLEAKS_BIN` or `gitleaks` on PATH). Missing binary →
+ *      WARN (reported, not passed); `SECURITY_SCAN_REQUIRE_GITLEAKS=1` makes it blocking.
+ *      Added in v0.6.1 after a CI-only gitleaks finding (a test variable named like a key).
  *  2. SAST-lite: forbidden sinks (eval, new Function, innerHTML, dangerouslySetInnerHTML,
  *     child_process with shell input) in application code.
  *  3. Raw SQL review gate: every `sql.raw(` must be in the reviewed allowlist.
@@ -14,8 +18,9 @@
  *  6. License policy over the SBOM: copyleft (GPL/AGPL/SSPL) in production deps blocks.
  */
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, relative, resolve } from 'node:path';
 import { authoredFiles, scanSecrets } from './lib.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -27,6 +32,44 @@ const files = authoredFiles();
 // 1. Secrets
 const secrets = scanSecrets(files);
 record('Secret scan', secrets.length === 0, secrets.join('\n'));
+
+// 1b. gitleaks over the authored files only (a staged copy, so node_modules/build output are excluded)
+{
+  const bin = process.env.GITLEAKS_BIN ?? 'gitleaks';
+  const probe = spawnSync(bin, ['version'], { encoding: 'utf8', shell: process.platform === 'win32' });
+  if (probe.status !== 0) {
+    record(
+      'gitleaks (CI rules) over authored files',
+      false,
+      'gitleaks not installed — NOT RUN locally (CI runs it). Install: https://github.com/gitleaks/gitleaks/releases or set GITLEAKS_BIN.',
+      process.env.SECURITY_SCAN_REQUIRE_GITLEAKS === '1',
+    );
+  } else {
+    const stage = mkdtempSync(join(tmpdir(), 'al-gitleaks-'));
+    try {
+      for (const f of files) {
+        const rel = relative(ROOT, f);
+        mkdirSync(dirname(join(stage, 'src', rel)), { recursive: true });
+        copyFileSync(f, join(stage, 'src', rel));
+      }
+      const report = join(stage, 'report.json');
+      const r = spawnSync(
+        bin,
+        ['dir', join(stage, 'src'), '--redact', '--no-banner', '--exit-code', '3', '--report-format', 'json', '--report-path', report],
+        { encoding: 'utf8', shell: process.platform === 'win32' },
+      );
+      const findings = existsSync(report) ? JSON.parse(readFileSync(report, 'utf8')) : [];
+      const where = findings.map((x) => `${relative(join(stage, 'src'), x.File)}:${x.StartLine} ${x.RuleID}`);
+      record(
+        `gitleaks ${probe.stdout.trim()} (CI rules) over authored files`,
+        r.status === 0 && findings.length === 0,
+        r.status === 0 || r.status === 3 ? where.join('\n') : `gitleaks error: ${r.stderr.trim()}`,
+      );
+    } finally {
+      rmSync(stage, { recursive: true, force: true });
+    }
+  }
+}
 
 // 2. SAST-lite forbidden sinks in application code
 const sinks = [
@@ -109,7 +152,7 @@ for (const r of results) {
 }
 console.log(`
 CI-only checks (not executed locally; see .github/workflows/ci.yml and docs/security/CI-CD-SECURITY.md):
-  - CodeQL SAST (javascript-typescript)        - gitleaks full-history secret scan
+  - CodeQL SAST (javascript-typescript)        - gitleaks full-history (all commits) secret scan
   - Trivy filesystem/IaC/container scanning     - container image build + vulnerability scan
   - OWASP ZAP baseline DAST (staging only)      - dependency review on pull requests
 `);

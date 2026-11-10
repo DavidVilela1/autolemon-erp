@@ -124,6 +124,19 @@ describe('Passkeys (WebAuthn)', () => {
     expect((await A.admin.post('/api/auth/step-up/passkey', { response: key.assert(opts) })).status).toBe(200);
   });
 
+  it("an administrator's MFA reset (lost device) also revokes the user's passkeys", async () => {
+    const victim = await staff(t, A, A.wh.W1!, ['wms.view']);
+    const lost = new SoftAuthenticator();
+    await registerPasskey(victim, lost, 'Telemóvel perdido');
+    await A.admin.stepUp();
+    ok(await A.admin.post(`/api/admin/users/${victim.userId}/mfa-reset`));
+    const pk = await t.owner.query('SELECT count(*)::int AS n FROM webauthn_credentials WHERE user_id = $1 AND revoked_at IS NULL', [
+      victim.userId,
+    ]);
+    expect(pk.rows[0].n).toBe(0);
+    expect((await victim.get('/api/auth/session')).status).toBe(401);
+  });
+
   it('revokes a passkey (step-up) and the revoked key no longer logs in', async () => {
     const extra = new SoftAuthenticator();
     const reg = await registerPasskey(A.admin, extra, 'Chave USB');

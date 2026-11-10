@@ -1,4 +1,4 @@
-# Security test matrix — v0.6.0
+# Security test matrix — v0.6.1
 
 Owning module: security. "Automated" = runs in `pnpm test:all` against real PostgreSQL (no mocks
 for DB, concurrency or isolation). File abbreviations: **ACC** `tests/integration/acceptance.test.ts`,
@@ -68,3 +68,12 @@ for DB, concurrency or isolation). File abbreviations: **ACC** `tests/integratio
 
 Abbreviations: PKY = `tests/security/passkeys-account.test.ts`; WMS =
 `tests/integration/wms-completion.test.ts`.
+
+## Added in v0.6.1
+
+| Area            | Threat / requirement                                                                                                                                          | Test                                                                           | Type                                | Result (last run) |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ----------------------------------- | ----------------- |
+| Export          | Activity export needs wms.export + step-up; bounded period; formula injection neutralised; audited                                                            | `tests/integration/reports-search.test.ts`                                     | Automated                           | PASS              |
+| Search          | Warehouse-scoped (other warehouse's documents invisible; cross-warehouse 404); LIKE wildcards literal; injection strings harmless; control characters refused | `reports-search.test.ts`                                                       | Automated                           | PASS              |
+| MFA reset       | Lost/stolen device: reset revokes TOTP, recovery codes **and passkeys**, ends sessions                                                                        | PKY "an administrator's MFA reset …"                                           | Automated                           | PASS              |
+| Secrets (local) | gitleaks with CI rules over authored files; a planted key-like test variable is detected                                                                      | `pnpm security:scan` (manual probe recorded in `docs/WMS_RELEASE_EVIDENCE.md`) | Automated (when gitleaks installed) | PASS              |

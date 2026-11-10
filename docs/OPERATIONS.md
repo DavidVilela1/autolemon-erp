@@ -1,4 +1,4 @@
-# Operations — AutoLemon ERP v0.6.0
+# Operations — AutoLemon ERP v0.6.1
 
 Owning module: operations. **Production deployment is not configured and not approved.** This
 document describes how the system is configured and operated, and what must exist first.

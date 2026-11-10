@@ -143,6 +143,12 @@ test('invitation enrolment, MFA login and accessible login page', async ({ page 
   await expect(quarantined).toHaveCount(1);
   await expect(quarantined).toContainText('1');
 
+  // --- cross-document search finds the SKU by its barcode
+  await go(page, 'Pesquisa', 'Pesquisa');
+  await page.getByRole('textbox', { name: 'Texto, número ou código de barras' }).fill('5600000009999');
+  await page.getByRole('button', { name: 'Pesquisar' }).click();
+  await expect(page.getByRole('cell', { name: 'BRK-E2E' })).toBeVisible();
+
   // --- logout ends the server session
   await page.getByRole('button', { name: 'Sair' }).click();
   await expect(page.getByRole('heading', { name: 'Entrar' })).toBeVisible();

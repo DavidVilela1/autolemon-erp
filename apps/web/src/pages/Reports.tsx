@@ -10,6 +10,19 @@ import { loadPositions, type Row, STATUS_PT, wp } from '../wms-data';
 
 const REVERSIBLE = ['OPENING', 'MOVE', 'ADJUST', 'REPLENISH', 'CONTAINER_MOVE'];
 
+/** Saves a CSV string returned by the API as a file download. */
+function saveCsv(csv: string, name: string) {
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+/** yyyy-mm-dd of a date `days` ago (local time), for date inputs. */
+const dayInput = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+
 /** Activity history + corrections. */
 export function CorrectionsPage() {
   const { activeWh, can, withStepUp } = useSession();
@@ -18,7 +31,17 @@ export function CorrectionsPage() {
   const ledger = useLoad(() => api<Row[]>('GET', `${wp(wh)}/reports/ledger${type ? `?type=${type}` : ''}`), [wh, type]);
   const positions = useLoad(() => loadPositions(wh), [wh]);
   const [adj, setAdj] = useState({ positionId: '', qtyDelta: '', reasonCode: 'DAMAGE', note: '' });
+  const [period, setPeriod] = useState({ from: dayInput(30), to: dayInput(0) });
   const a = useAction();
+  const exportLedger = () =>
+    void a.run(async () => {
+      // Whole days in local time; the API refuses periods longer than 366 days.
+      const from = new Date(`${period.from}T00:00:00`).toISOString();
+      const to = new Date(`${period.to}T23:59:59`).toISOString();
+      const qs = new URLSearchParams({ from, to, ...(type ? { type } : {}) });
+      const csv = await withStepUp(() => api<string>('GET', `${wp(wh)}/reports/ledger.csv?${qs.toString()}`, undefined, { asText: true }));
+      saveCsv(csv, `movimentos-${activeWh!.code}-${period.from}-${period.to}.csv`);
+    }, 'Exportação de movimentos gerada (registada na auditoria).');
   return (
     <Page
       title="Histórico e correções"
@@ -52,6 +75,15 @@ export function CorrectionsPage() {
             'UNPACK',
           ].map((t) => ({ value: t, label: t }))}
         />
+        {can('wms.export') && (
+          <Form className="my-3 flex flex-wrap items-end gap-2" onSubmit={exportLedger}>
+            <Field label="De" type="date" value={period.from} onChange={(v) => setPeriod({ ...period, from: v })} required />
+            <Field label="Até" type="date" value={period.to} onChange={(v) => setPeriod({ ...period, to: v })} required />
+            <Button type="submit" variant="secondary" disabled={a.busy}>
+              Exportar movimentos do período (CSV, requer MFA)
+            </Button>
+          </Form>
+        )}
         <Table
           rows={ledger.data ?? []}
           rowKey={(r) => r.id!}
@@ -163,12 +195,7 @@ export function ReportsPage() {
               onClick={() =>
                 void a.run(async () => {
                   const csv = await withStepUp(() => api<string>('GET', `${wp(wh)}/reports/stock.csv`, undefined, { asText: true }));
-                  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-                  const link = document.createElement('a');
-                  link.href = url;
-                  link.download = `stock-${activeWh!.code}.csv`;
-                  link.click();
-                  URL.revokeObjectURL(url);
+                  saveCsv(csv, `stock-${activeWh!.code}.csv`);
                 }, 'Exportação gerada (registada na auditoria).')
               }
             >

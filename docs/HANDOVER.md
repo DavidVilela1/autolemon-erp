@@ -25,6 +25,8 @@ Owning module: repository. A continuation developer should be able to start from
   `WMS_RELEASE_GATE.md` at each milestone; regenerate OpenAPI
   (`pnpm --filter @autolemon/api openapi`) — the route-inventory security test reads it, so a new
   route is automatically checked for authentication, CSRF and warehouse/admin scope.
+- Operator/admin manual: `docs/MANUAL_OPERADOR_E_ADMIN.md`; incident and maintenance runbooks:
+  `docs/runbooks/RUNBOOKS.md` — keep both in sync with UI labels when screens change.
 - New account-security routes that must stay reachable for an admin without a passkey need
   `@AccountSecurity()`; everything else is blocked for them under `ADMIN_PASSKEY_REQUIRED`.
 - **Product-owner rule:** no Sales/Purchasing/CRM/Accounting/other ERP module until the WMS is

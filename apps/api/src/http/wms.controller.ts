@@ -29,6 +29,7 @@ import {
   DispatchTransferInput,
   ExecuteReplenishmentInput,
   FoundStockInput,
+  LedgerExportQuery,
   LedgerQuery,
   MoveContainerInput,
   MoveStockInput,
@@ -38,6 +39,7 @@ import {
   ReceiveInput,
   ReceiveTransferInput,
   RecordCountInput,
+  SearchQuery,
   UnpackInput,
   UnpickInput,
   UpdateNodeInput,
@@ -422,6 +424,16 @@ export class WmsWarehouseController {
   @Get('reports/stock')
   stockReport(@Req() req: AppRequest, @Param('wh') wh: string) {
     return this.s.reports.stock(actorOf(req), uuidParam(wh));
+  }
+  @Get('reports/ledger.csv')
+  async ledgerCsv(@Req() req: AppRequest, @Param('wh') wh: string, @Query() q: unknown, @Res({ passthrough: true }) reply: FastifyReply) {
+    const csv = await this.s.reports.exportLedgerCsv(actorOf(req), uuidParam(wh), parse(LedgerExportQuery, q));
+    void reply.header('Content-Type', 'text/csv; charset=utf-8').header('Content-Disposition', 'attachment; filename="movimentos.csv"');
+    return csv;
+  }
+  @Get('search')
+  search(@Req() req: AppRequest, @Param('wh') wh: string, @Query() q: unknown) {
+    return this.s.reports.search(actorOf(req), uuidParam(wh), parse(SearchQuery, q));
   }
   @Get('reports/stock.csv')
   async stockCsv(@Req() req: AppRequest, @Param('wh') wh: string, @Res({ passthrough: true }) reply: FastifyReply) {

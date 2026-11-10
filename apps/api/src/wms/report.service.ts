@@ -8,14 +8,18 @@
  */
 import { sql } from 'drizzle-orm';
 import type { z } from 'zod';
-import type { LedgerQuery } from '@autolemon/contracts';
+import type { LedgerExportQuery, LedgerQuery, SearchQuery } from '@autolemon/contracts';
 import { toCsv } from '../common/csv.js';
 import type { Database } from '../db/database.js';
 import { rows } from '../db/database.js';
+import { Conflict } from '../common/errors.js';
 import { type Actor, companyScope, requirePermission, requireStepUp } from '../platform/authz/actor.js';
 import type { AuditService } from '../platform/audit/audit.service.js';
 import { stockSummary } from './stock.service.js';
 import type { WmsRunner } from './runner.js';
+
+/** Row cap for CSV exports (refused, never truncated, beyond it). */
+export const EXPORT_MAX_ROWS = 100_000;
 
 /** Reporting use cases. */
 export class ReportService {
@@ -115,6 +119,115 @@ export class ReportService {
         ['artigo', 'descricao', 'localizacao', 'caixa', 'estado', 'lote', 'existencia', 'reservado'],
         ...data.map((r) => [r.code, r.description, r.path, r.container, r.status, r.lot, r.on_hand, r.reserved]),
       ]);
+    });
+  }
+
+  /**
+   * CSV export of the activity history (ledger) for a bounded period (wms.export + step-up +
+   * security audit, CSV-injection safe). Refuses more than EXPORT_MAX_ROWS rows instead of
+   * silently truncating, so an export is always complete for the period it names.
+   */
+  async exportLedgerCsv(actor: Actor, warehouseId: string, q: z.infer<typeof LedgerExportQuery>): Promise<string> {
+    requirePermission(actor, 'wms.export');
+    requireStepUp(actor, 'report.export', this.stepUpMinutes);
+    return this.runner.read(actor, warehouseId, 'wms.export', async (ctx) => {
+      const to = q.to ?? new Date().toISOString();
+      const data = await rows<Record<string, string | null>>(
+        ctx.tx,
+        sql`SELECT to_char(l.created_at AT TIME ZONE 'Europe/Lisbon', 'YYYY-MM-DD HH24:MI:SS') AS at, t.txn_type AS type,
+              t.id::text AS txn, coalesce(io.number, oo.number, tr.number, rt.number, cs.number) AS document,
+              s.code AS sku, coalesce(n.path, cn.path) AS path, c.code AS container, l.stock_status AS status, l.lot_code AS lot,
+              l.qty_delta::text AS delta, u.display_name AS actor, t.note
+            FROM inventory_ledger l JOIN inventory_transactions t ON t.id = l.txn_id JOIN skus s ON s.id = l.sku_id
+            JOIN users u ON u.id = t.actor_user_id
+            LEFT JOIN storage_nodes n ON n.id = l.holder_node_id
+            LEFT JOIN containers c ON c.id = l.holder_container_id LEFT JOIN storage_nodes cn ON cn.id = c.current_node_id
+            LEFT JOIN inbound_orders io ON t.reference_type = 'inbound' AND io.id = t.reference_id
+            LEFT JOIN outbound_orders oo ON t.reference_type = 'outbound' AND oo.id = t.reference_id
+            LEFT JOIN transfers tr ON t.reference_type = 'transfer' AND tr.id = t.reference_id
+            LEFT JOIN returns rt ON t.reference_type = 'return' AND rt.id = t.reference_id
+            LEFT JOIN count_sessions cs ON t.reference_type = 'count' AND cs.id = t.reference_id
+            WHERE l.warehouse_id = ${warehouseId}
+              AND l.created_at >= ${q.from}::timestamptz AND l.created_at <= ${to}::timestamptz
+              AND (${q.skuId ?? null}::uuid IS NULL OR l.sku_id = ${q.skuId ?? null}::uuid)
+              AND (${q.type ?? null}::text IS NULL OR t.txn_type = ${q.type ?? null}::text)
+            ORDER BY l.id LIMIT ${EXPORT_MAX_ROWS + 1}`,
+      );
+      if (data.length > EXPORT_MAX_ROWS) {
+        throw new Conflict(`Mais de ${EXPORT_MAX_ROWS} movimentos no período; reduza o intervalo`, 'EXPORT_TOO_LARGE');
+      }
+      await this.audit.recordInTx(ctx.tx, {
+        companyId: actor.companyId,
+        actorUserId: actor.userId,
+        action: 'wms.export.ledger_csv',
+        resourceType: 'warehouse',
+        resourceId: warehouseId,
+        warehouseId,
+        outcome: 'SUCCESS',
+        requestId: actor.requestId,
+        clientIp: actor.clientIp,
+        details: { rows: data.length, from: q.from, to, type: q.type ?? null, skuId: q.skuId ?? null },
+      });
+      return toCsv([
+        [
+          'data_hora',
+          'tipo',
+          'transacao',
+          'documento',
+          'artigo',
+          'localizacao',
+          'caixa',
+          'estado',
+          'lote',
+          'quantidade',
+          'utilizador',
+          'nota',
+        ],
+        ...data.map((r) => [r.at, r.type, r.txn, r.document, r.sku, r.path, r.container, r.status, r.lot, r.delta, r.actor, r.note]),
+      ]);
+    });
+  }
+
+  /**
+   * Cross-document search inside one warehouse (wms.view). Matches document numbers and
+   * external references, SKU code/description/barcode, location code/path and container code.
+   * Transfers are found from either side. At most 10 hits per kind; never returns PII
+   * (recipient contacts stay encrypted and are not searched).
+   */
+  async search(actor: Actor, warehouseId: string, q: z.infer<typeof SearchQuery>) {
+    // Escape LIKE metacharacters so user text is matched literally (the value is still a bound parameter).
+    const like = `%${q.q.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
+    return this.runner.read(actor, warehouseId, 'wms.view', async (ctx) => {
+      const hits = await rows<{ kind: string; id: string; label: string; detail: string | null; status: string | null }>(
+        ctx.tx,
+        sql`(SELECT 'inbound' AS kind, id::text, number AS label, external_ref AS detail, status FROM inbound_orders
+              WHERE warehouse_id = ${warehouseId} AND (number ILIKE ${like} OR external_ref ILIKE ${like}) ORDER BY created_at DESC LIMIT 10)
+            UNION ALL
+            (SELECT 'outbound', id::text, number, external_ref, status FROM outbound_orders
+              WHERE warehouse_id = ${warehouseId} AND (number ILIKE ${like} OR external_ref ILIKE ${like}) ORDER BY created_at DESC LIMIT 10)
+            UNION ALL
+            (SELECT 'transfer', id::text, number, NULL, status FROM transfers
+              WHERE (source_warehouse_id = ${warehouseId} OR dest_warehouse_id = ${warehouseId}) AND number ILIKE ${like}
+              ORDER BY created_at DESC LIMIT 10)
+            UNION ALL
+            (SELECT 'return', id::text, number, external_ref, status FROM returns
+              WHERE warehouse_id = ${warehouseId} AND (number ILIKE ${like} OR external_ref ILIKE ${like}) ORDER BY created_at DESC LIMIT 10)
+            UNION ALL
+            (SELECT 'count', id::text, number, kind, status FROM count_sessions
+              WHERE warehouse_id = ${warehouseId} AND number ILIKE ${like} ORDER BY created_at DESC LIMIT 10)
+            UNION ALL
+            (SELECT 'sku', s.id::text, s.code, s.description, NULL FROM skus s
+              WHERE s.company_id = ${ctx.companyId} AND (s.code ILIKE ${like} OR s.description ILIKE ${like}
+                OR EXISTS (SELECT 1 FROM sku_barcodes b WHERE b.sku_id = s.id AND b.barcode ILIKE ${like}))
+              ORDER BY s.code LIMIT 10)
+            UNION ALL
+            (SELECT 'location', id::text, path, kind, CASE WHEN active THEN 'ACTIVE' ELSE 'INACTIVE' END FROM storage_nodes
+              WHERE warehouse_id = ${warehouseId} AND (code ILIKE ${like} OR path ILIKE ${like} OR name ILIKE ${like}) ORDER BY path LIMIT 10)
+            UNION ALL
+            (SELECT 'container', id::text, code, kind, status FROM containers
+              WHERE warehouse_id = ${warehouseId} AND code ILIKE ${like} ORDER BY code LIMIT 10)`,
+      );
+      return { q: q.q, hits };
     });
   }
 

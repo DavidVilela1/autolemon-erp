@@ -29,7 +29,7 @@ export function authoredFiles(root = ROOT) {
       if (skip.has(e.name)) continue;
       const p = join(d, e.name);
       if (e.isDirectory()) walk(p);
-      else if (e.name !== '.env' && !e.name.endsWith('.zip')) out.push(p);
+      else if (e.name !== '.env' && e.name !== 'invitations-dev.txt' && !e.name.endsWith('.zip')) out.push(p);
     }
   };
   walk(root);

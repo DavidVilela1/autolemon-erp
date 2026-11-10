@@ -135,8 +135,9 @@ export class AdminService {
   }
 
   /**
-   * MFA reset (lost authenticator): removes the factor and recovery codes, revokes sessions and
-   * returns a one-time MFA_RESET token (24 h) that the user redeems with their password.
+   * MFA reset (lost authenticator or device): removes TOTP, recovery codes AND every passkey,
+   * revokes sessions and returns a one-time MFA_RESET token (24 h) that the user redeems with
+   * their password to enrol again.
    */
   async resetMfa(actor: Actor, userId: string) {
     requirePermission(actor, 'admin.security');
@@ -146,9 +147,11 @@ export class AdminService {
       await tx.execute(sql`UPDATE users SET mfa_enrolled_at = NULL, updated_at = now() WHERE id = ${userId}`);
       await tx.execute(sql`UPDATE mfa_totp SET confirmed_at = NULL WHERE user_id = ${userId}`);
       await tx.execute(sql`UPDATE mfa_recovery_codes SET used_at = now() WHERE user_id = ${userId} AND used_at IS NULL`);
+      // A reset is the "lost/stolen device" path: every passkey must stop working too (v0.6.1).
+      const pk = await tx.execute(sql`UPDATE webauthn_credentials SET revoked_at = now() WHERE user_id = ${userId} AND revoked_at IS NULL`);
       await this.auth.revokeAllSessionsInTx(tx, userId, 'mfa_reset');
       const token = await this.auth.issueToken(tx, userId, actor.companyId, 'MFA_RESET', actor.userId);
-      await this.auditTx(tx, actor, 'admin.user.mfa_reset', 'user', userId, { alert: true });
+      await this.auditTx(tx, actor, 'admin.user.mfa_reset', 'user', userId, { alert: true, passkeysRevoked: pk.rowCount ?? 0 });
       return { id: userId, mfaResetToken: token, expiresInHours: 24 };
     });
   }

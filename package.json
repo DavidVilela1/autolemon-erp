@@ -1,6 +1,6 @@
 {
   "name": "autolemon-erp",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "private": true,
   "description": "AutoLemon ERP — modular monolith foundation with an autonomous Warehouse Management System (WMS). Not production-ready: see docs/PROJECT_STATE.md.",
   "license": "UNLICENSED",

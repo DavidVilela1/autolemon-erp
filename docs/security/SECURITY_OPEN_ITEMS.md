@@ -1,4 +1,4 @@
-# Security open items — v0.6.0
+# Security open items — v0.6.1
 
 Owning module: security. Production release is **BLOCKED** until every item marked _Release
 blocker_ is closed with evidence and an independent human review signs it off.
@@ -33,3 +33,6 @@ blocker_ is closed with evidence and an independent human review signs it off.
 Closed in v0.6.0 without a previous id: unbounded retention of sessions/tokens/idempotency rows
 (R-15, ADR-0020); missing route-inventory authorization test (R-18/R-21); coarse authorization now
 precedes body parsing; transaction reversal now requires step-up like adjustments.
+
+Closed in v0.6.1: MFA reset left passkeys valid (fixed, tested); gitleaks rules only ran in CI
+(now also in `pnpm security:scan` when the binary is present).

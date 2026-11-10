@@ -1,4 +1,4 @@
-# Threat model — AutoLemon ERP v0.6.0 (WMS)
+# Threat model — AutoLemon ERP v0.6.1 (WMS)
 
 Owning module: security. Method: STRIDE per trust boundary + abuse cases. Owner column names the
 role accountable for the residual risk (to be assigned to people before any production rollout).
@@ -83,3 +83,14 @@ flowchart LR
 | Local dev key provider                         | Low (refused in production config)              | Platform lead     | External KMS provider implementation (T-03)                                      |
 | Performance/DoS under load untested            | Medium                                          | Engineering       | Load tests (T-11)                                                                |
 | Breached-password corpus is a small local list | Medium                                          | Security lead     | HIBP k-anonymity via egress proxy or offline corpus (SEC-OPEN-004)               |
+
+## v0.6.1 changes to the attack surface
+
+- **Search** (`…/search`): new read path over documents/SKUs/locations. Threats: cross-warehouse
+  enumeration (mitigated: route guard + warehouse predicates in every branch, tested), wildcard
+  abuse/expensive scans (literal matching, 2–64 chars, 10 rows per kind), injection (bound
+  parameters). PII is not searchable.
+- **Activity export**: bulk exfiltration (wms.export + step-up + audit with filters and row
+  count, ≤ 366 days, 100 000-row cap), CSV formula injection (cell neutralisation; plain numbers
+  only are left numeric).
+- **MFA reset** now revokes passkeys — closes the "stolen passkey survives reset" path.

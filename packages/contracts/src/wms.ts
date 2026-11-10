@@ -385,3 +385,41 @@ export const LedgerQuery = z
     limit: z.coerce.number().int().min(1).max(500).default(100),
   })
   .strict();
+
+/**
+ * Activity (ledger) CSV export: same filters as LedgerQuery, but a bounded period is required
+ * (`from` mandatory, at most 366 days) instead of a row limit, so exports are complete for the
+ * period and cannot become an unbounded dump. Hard cap: 100 000 rows (refused beyond).
+ */
+export const LedgerExportQuery = z
+  .object({
+    skuId: Uuid.optional(),
+    type: z
+      .string()
+      .regex(/^[A-Z_]{1,40}$/)
+      .optional(),
+    from: z.iso.datetime(),
+    to: z.iso.datetime().optional(),
+  })
+  .strict()
+  .refine((v) => {
+    const to = v.to ? Date.parse(v.to) : Date.now();
+    const from = Date.parse(v.from);
+    return to >= from && to - from <= 366 * 24 * 3600_000;
+  }, 'Período inválido (máximo 366 dias)');
+
+/**
+ * Cross-document search inside one warehouse: document numbers and external references
+ * (inbound, outbound, transfers touching the warehouse, returns, counts), SKUs (code,
+ * description, barcode), locations and containers. Plain text; LIKE wildcards are escaped.
+ */
+export const SearchQuery = z
+  .object({
+    q: z
+      .string()
+      .trim()
+      .min(2)
+      .max(64)
+      .regex(/^\P{Cc}*$/u, 'Caracteres inválidos'),
+  })
+  .strict();

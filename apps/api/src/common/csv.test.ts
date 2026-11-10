@@ -10,7 +10,9 @@ describe('CSV export', () => {
   it('neutralises formula-leading cells and escapes quotes', () => {
     expect(csvCell('=1+1')).toBe(`"'=1+1"`);
     expect(csvCell('+SUM(A1)')).toBe(`"'+SUM(A1)"`);
-    expect(csvCell('-2')).toBe(`"'-2"`);
+    expect(csvCell('-2+3')).toBe(`"'-2+3"`); // Excel would evaluate this
+    expect(csvCell('-2.000')).toBe(`"-2.000"`); // a plain number cannot be a formula: stays numeric
+    expect(csvCell('-1e5')).toBe(`"'-1e5"`);
     expect(csvCell('@cmd')).toBe(`"'@cmd"`);
     expect(csvCell('a"b')).toBe(`"a""b"`);
     expect(csvCell(null)).toBe('""');

@@ -15,10 +15,13 @@ const BOM = String.fromCharCode(0xfeff);
 /** Characters that make spreadsheet software interpret a cell as a formula. */
 const FORMULA_START = /^[=+\-@\t\r]/;
 
+/** A plain signed decimal ("-2.000") cannot be a formula, so it is left numeric for spreadsheets. */
+const PLAIN_NUMBER = /^[-+]?\d+(\.\d+)?$/;
+
 /** Encodes one CSV cell safely. */
 export function csvCell(value: unknown): string {
   let s = value === null || value === undefined ? '' : String(value);
-  if (FORMULA_START.test(s)) s = `'${s}`;
+  if (FORMULA_START.test(s) && !PLAIN_NUMBER.test(s)) s = `'${s}`;
   return `"${s.replace(/"/g, '""')}"`;
 }
 

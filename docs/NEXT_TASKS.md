@@ -11,18 +11,22 @@ manual screen-reader pass still open), T-12 (retention), T-21 (units of measure)
 un-pack), T-24 (rename/deactivate; moving subtrees still unsupported), lots through transfers
 (part of T-20).
 
-## Next three WMS tasks (gate order)
+## Next three WMS tasks (gate order) — after v0.6.1
 
-1. **F-12 / T-27** — activity (ledger) CSV export with step-up + audit, cross-document search
-   (inbound/outbound/transfer/return/count numbers and external references), saved filters;
-   replenishment UI scan prompt (F-05 follow-up).
-2. **E-05 / T-31** — operator and administrator manual (pt-PT), incident and maintenance runbooks
-   (lost admin passkey, stuck order, audit-chain alert, failed purge, restore), with a tabletop
-   exercise record; then **T-20** FEFO allocation and serial uniqueness.
-3. **E-04 / T-11** — agree load targets with the product owner, then a reproducible load harness
-   (concurrent pickers, allocation contention, ledger growth) with results in the evidence file;
-   in parallel the owner-side items: KMS choice (S-03), staging environment (S-04/O-01), pentest
-   (S-07).
+1. **O-02** — CI: build provenance/signature for the release archive and container image
+   (GitHub artifact attestations or cosign), Node 26 in the matrix, and a documented protected
+   branch + required-review setup (the owner applies the GitHub settings).
+2. **T-20** — lot-aware allocation (FEFO/FIFO, explicit lot choice) and serial-number uniqueness,
+   with negative and concurrency tests; then **T-26** transfer reservations at the source.
+3. **E-04** — once the owner agrees targets: reproducible load harness (concurrent pickers,
+   allocation contention, ledger growth) and results in the evidence file; **S-05/S-06** code
+   parts (structured security-event metrics/alert hooks; breached-password corpus check).
+
+Owner-side, in parallel: KMS choice (S-03), staging environment (S-04/O-01/O-03…O-05),
+penetration test (S-07), warehouse pilot (O-06).
+
+Done in v0.6.1: F-12 (T-27 activity export + search), E-05 (runbooks, operator/admin manual),
+F-05 replenishment scan prompt, local gitleaks.
 
 ## A. Security and production-readiness (release blockers)
 
@@ -53,7 +57,7 @@ un-pack), T-24 (rename/deactivate; moving subtrees still unsupported), lots thro
 | T-24     | 🟡 rename/deactivate done in v0.6.0 — Topology editing: deactivate nodes, rename, move empty subtrees safely          | Tests: cannot deactivate with stock      |
 | T-25     | Printing: ZPL/PDF label templates, scanner-mode full-screen picking UI for tablets                                    | Field test on a real scanner             |
 | T-26     | Transfer pick lists with reservations at source (allocation before dispatch)                                          | Concurrency test with outbound           |
-| T-27     | Activity search across documents; saved reports; CSV export of ledger                                                 | Tests                                    |
+| ~~T-27~~ | ✅ v0.6.1 (saved reports still open) — Activity search across documents; saved reports; CSV export of ledger          | Tests                                    |
 | T-28     | Event consumers SDK (typed event schemas, versioning policy, replay tool)                                             | Contract tests                           |
 
 ## B2. Added by the v0.6.0 session

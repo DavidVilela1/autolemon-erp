@@ -2,6 +2,36 @@
 
 All notable changes. Owning module: repository. Format: Keep a Changelog; versioning: SemVer.
 
+## [0.6.1-WMS] — 2026-11-10
+
+Continuation (Reusable Continuation Prompt v0.6). Gate state stays **`WMS_IN_PROGRESS`**
+(PASS 20 · FAIL 4 · BLOCKED 9 · NOT_RUN 1).
+
+### Added
+
+- **Pesquisa** screen and `GET …/search`: documents by number or external reference (transfers
+  from either side), SKUs by code/description/barcode, locations, containers (ADR-0023).
+- **Activity CSV export** for a period (`GET …/reports/ledger.csv`, step-up + audit, ≤ 366 days,
+  refused above 100 000 rows) with the document number on each line; export form in Histórico.
+- Replenishment screen asks for the destination label scan (F-05 complete in the UI).
+- `pnpm security:scan` runs **gitleaks 8.24.3 with the CI rules** over the authored files when
+  the binary is available (`GITLEAKS_BIN`/PATH); otherwise reports `WARN … NOT RUN`.
+- `docs/runbooks/RUNBOOKS.md` (incident response, lost device, break-glass, audit-chain failure,
+  reconciliation mismatch, stuck documents, jobs, maintenance) and
+  `docs/MANUAL_OPERADOR_E_ADMIN.md` (pt-PT operator and administrator manual).
+- README-LOCAL-TESTING: running without Docker on a native PostgreSQL (Windows and macOS/Linux).
+- Tests: `reports-search` (5), MFA-reset-revokes-passkeys, e2e search step.
+
+### Fixed
+
+- **Security:** an administrator's MFA reset now also revokes the user's passkeys (previously a
+  lost/stolen passkey stayed valid after the reset).
+- CI gitleaks false positive in `tests/integration/reliability.test.ts` (variable renamed).
+- CSV export: plain negative quantities are no longer prefixed with `'` (they stayed text in
+  spreadsheets); formula-like cells are still neutralised.
+- Step-up message mentions passkeys; `invitations-dev.txt` is git-ignored and can never be
+  packaged.
+
 ## [0.6.0-WMS] — 2026-11-10
 
 Continuation of v0.5.0 (no restart). Priority rule from the product owner: complete the

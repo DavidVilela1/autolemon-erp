@@ -1,18 +1,22 @@
-# Project state — AutoLemon ERP v0.6.0-WMS
+# Project state — AutoLemon ERP v0.6.1-WMS
 
 Owning module: repository. Last updated: 2026-11-10 (Europe/Lisbon). Archive:
-`AutoLemon-ERP-v0.6.0-WMS.zip` (root `autolemon-erp/`); its SHA-256 is in the adjacent
-`AutoLemon-ERP-v0.6.0-WMS.zip.sha256` (a file cannot contain its own hash).
+`AutoLemon-ERP-v0.6.1-WMS.zip` (root `autolemon-erp/`); its SHA-256 is in the adjacent
+`AutoLemon-ERP-v0.6.1-WMS.zip.sha256` (a file cannot contain its own hash).
 
 ## 1. Summary
 
 Continuation of v0.5.0 (nothing restarted). Governing instructions: the product owner's
 Development Priority Update (WMS first), **Reusable Continuation Prompt v0.6** and **WMS
 Production Readiness Gate v0.6**. WMS release gate state: **`WMS_IN_PROGRESS`**
-(`docs/WMS_RELEASE_GATE.md`: PASS 18 · FAIL 6 · BLOCKED 9 · NOT_RUN 1). **Not production-ready.**
+(`docs/WMS_RELEASE_GATE.md`: PASS 20 · FAIL 4 · BLOCKED 9 · NOT_RUN 1). **Not production-ready.**
 No other ERP business module has been started.
 
-This session: review of v0.5 (`docs/reviews/REVIEW-2026-11-10-v0.5.md`), passkeys and account
+v0.6.1 session (continuation): activity export + cross-document search (F-12), operator/admin
+manual and runbooks (E-05), replenishment scan prompt, gitleaks in the local security scan, and
+a security fix — MFA reset now revokes passkeys.
+
+v0.6.0 session: review of v0.5 (`docs/reviews/REVIEW-2026-11-10-v0.5.md`), passkeys and account
 security, the missing WMS operations (quality status, units of measure, lots in transit,
 un-pick/un-pack, topology lifecycle, transfer cancel), scan-verified destinations, retention,
 module boundaries, route-inventory authorization, failure-injection and migration-upgrade tests,
@@ -37,6 +41,9 @@ accessibility sweep, and the release gate as code.
 
 ## 3. Migrations and rollback plan
 
+v0.6.1 adds **no migration** (schema unchanged since v0.6.0); rollback to v0.6.0 is a plain
+redeploy.
+
 New: `0004_passkeys_and_account.sql`, `0005_wms_completion.sql`, `0006_retention.sql` — all
 additive (new tables/columns with defaults, widened CHECK, back-fill of lots in transit, a
 SECURITY DEFINER purge function). Upgrade: `pnpm db:migrate`. Rehearsed by
@@ -51,52 +58,46 @@ Environment: Ubuntu 24.04, Node **22.23.4**, pnpm **12.18.0**, PostgreSQL **16.1
 local cluster), Google Chrome for Testing for Playwright. Docker, PostgreSQL 18 and Node 26 were not
 available here.
 
-| Command                 | Result                                                                                          |
-| ----------------------- | ----------------------------------------------------------------------------------------------- |
-| `pnpm format:check`     | all files formatted                                                                             |
-| `pnpm lint`             | 0 problems; documentation gate 117 files, 329 exported symbols                                  |
-| `pnpm typecheck`        | 0 errors                                                                                        |
-| `pnpm api:check`        | OpenAPI matches code (98 paths / 108 operations)                                                |
-| `pnpm gate:check`       | `WMS_IN_PROGRESS`; PASS 18 · FAIL 6 · BLOCKED 9 · NOT_RUN 1                                     |
-| `pnpm test:unit`        | 7 files, **37 passed**                                                                          |
-| `pnpm test:integration` | 4 files, **34 passed**                                                                          |
-| `pnpm test:security`    | 8 files, **73 passed**                                                                          |
-| `pnpm test:e2e`         | **2 passed** (≈ 1.5 min; axe WCAG 2.2 AA clean on all 16 navigation screens, login and account) |
-| `pnpm test:all`         | exit 0                                                                                          |
-| `pnpm security:scan`    | all PASS; audit 0 critical / 0 high / 1 moderate (dev-only, SEC-OPEN-009); SBOM 122 components  |
-| `pnpm backup:local`     | encrypted backup written; off-site copy NOT CONFIGURED                                          |
-| `pnpm restore:smoke`    | PASSED (current-schema backup 2.0 s; v0.5 backup + forward upgrade 1.9 s)                       |
-| `pnpm build`            | contracts + API + web (378 kB JS / 106 kB gzip)                                                 |
+| Command                 | Result                                                                                                                              |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm format:check`     | all files formatted                                                                                                                 |
+| `pnpm lint`             | 0 problems; documentation gate 119 files, 333 exported symbols                                                                      |
+| `pnpm typecheck`        | 0 errors                                                                                                                            |
+| `pnpm api:check`        | OpenAPI matches code (100 paths / 110 operations)                                                                                   |
+| `pnpm gate:check`       | `WMS_IN_PROGRESS`; PASS 20 · FAIL 4 · BLOCKED 9 · NOT_RUN 1                                                                         |
+| `pnpm test:unit`        | 7 files, **37 passed**                                                                                                              |
+| `pnpm test:integration` | 5 files, **39 passed**                                                                                                              |
+| `pnpm test:security`    | 8 files, **74 passed**                                                                                                              |
+| `pnpm test:e2e`         | **2 passed** (≈ 1.5 min; axe WCAG 2.2 AA clean on all 17 navigation screens, login and account)                                     |
+| `pnpm test:all`         | exit 0                                                                                                                              |
+| `pnpm security:scan`    | all PASS incl. **gitleaks 8.24.3** (CI rules); audit 0 critical / 0 high / 1 moderate (dev-only, SEC-OPEN-009); SBOM 122 components |
+| `pnpm backup:local`     | encrypted backup written; off-site copy NOT CONFIGURED                                                                              |
+| `pnpm restore:smoke`    | PASSED (2.0 s)                                                                                                                      |
+| `pnpm build`            | contracts + API + web (382 kB JS / 107 kB gzip)                                                                                     |
 
 Not run here: Docker Compose stack, PostgreSQL 18, Node 26, CodeQL/gitleaks/Trivy (CI only), DAST,
 load tests, screen-reader testing, any production control.
 
-## 5. Clean-room verification from the ZIP (2026-11-10)
+## 5. Clean-room verification from the ZIP
 
-Procedure: copied only `AutoLemon-ERP-v0.6.0-WMS.zip` + `.sha256` into an empty `/tmp/cleanroom6`
-and followed `README-LOCAL-TESTING.md` (macOS/Linux). Deviations forced by the build environment:
-PostgreSQL ran as the local 16.15 cluster instead of `docker compose up -d` (`.env` pointed at a
-fresh database `autolemon_cleanroom6`), and Playwright used `PLAYWRIGHT_CHROME_PATH` instead of
-`pnpm exec playwright install chromium`. The pnpm store on the machine served as package cache
-(lockfile-verified).
+Run 2026-11-10 on the v0.6.1 archive: copied only the ZIP + `.sha256` into an empty directory and
+followed `README-LOCAL-TESTING.md` "Without Docker (native PostgreSQL)" (local PostgreSQL 16.15,
+fresh database; Playwright via `PLAYWRIGHT_CHROME_PATH`).
 
-| Step                                                    | Result                                                                      |
-| ------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `sha256sum -c AutoLemon-ERP-v0.6.0-WMS.zip.sha256`      | OK                                                                          |
-| `unzip … -d AutoLemon-ERP-extracted` → `autolemon-erp/` | OK (no `.env`, `node_modules`, `.git`, backups or artifacts inside)         |
-| `node --version` / `pnpm --version`                     | v22.23.4 / 12.18.0                                                          |
-| `pnpm install --frozen-lockfile`                        | OK                                                                          |
-| `cp .env.example .env` → `pnpm db:migrate`              | dev secrets generated; 6 migrations applied                                 |
-| `pnpm db:seed`                                          | OK, 3 development invitation links printed                                  |
-| `pnpm typecheck` / `pnpm lint`                          | exit 0 / exit 0                                                             |
-| `pnpm test:all`                                         | **exit 0** (unit 37, integration 34, security 73, e2e 2; gate check OK)     |
-| `pnpm security:scan`                                    | exit 0 (0 critical/high, 1 moderate dev-only)                               |
-| `pnpm restore:smoke`                                    | PASSED (2.3 s)                                                              |
-| `pnpm build`                                            | exit 0                                                                      |
-| `pnpm dev`                                              | web :5173 → 200; `/api/health` → 200; `/api/auth/session` (no cookie) → 401 |
+| Step                                                        | Result                                                                                     |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `sha256sum -c`                                              | OK                                                                                         |
+| extract → `autolemon-erp/`                                  | OK — no `.env`, `node_modules`, `.git`, `invitations-dev.txt`, backups or artifacts inside |
+| `pnpm install --frozen-lockfile`                            | OK (Node 22.23.4, pnpm 12.18.0)                                                            |
+| `cp .env.example .env` → `pnpm db:migrate` → `pnpm db:seed` | 6 migrations applied; seed OK                                                              |
+| `pnpm typecheck` / `pnpm lint`                              | exit 0 / exit 0                                                                            |
+| `pnpm test:all`                                             | **exit 0** — unit 37, integration 39, security 74, e2e 2; gate check OK                    |
+| `pnpm security:scan` (with `GITLEAKS_BIN`)                  | exit 0                                                                                     |
+| `pnpm restore:smoke`                                        | PASSED (2.6 s)                                                                             |
+| `pnpm build`                                                | exit 0                                                                                     |
+| `pnpm dev`                                                  | web :5173 → 200; `/api/health` → 200; `/api/auth/session` without cookie → 401             |
 
-The final archive differs from the clean-room archive only in this section of
-`docs/PROJECT_STATE.md` (compare the manifests).
+The final archive differs from the clean-room archive only in this section.
 
 ## 6. Known vulnerabilities and residual risks
 
@@ -108,6 +109,7 @@ The final archive differs from the clean-room archive only in this section of
 
 ## 7. Next three WMS tasks
 
-1. Activity export + cross-document search (F-12), replenishment scan prompt.
-2. Operator/admin manual and incident/maintenance runbooks (E-05); FEFO and serial uniqueness.
-3. Agree load targets and build the load harness (E-04); owner-side: KMS, staging, pentest.
+1. O-02: signed/attested release artifacts, Node 26 in CI, protected-branch documentation.
+2. T-20 FEFO allocation + serial uniqueness, then T-26 transfer reservations.
+3. E-04 load harness once targets are agreed; S-05/S-06 code parts. Owner-side: KMS, staging,
+   penetration test, warehouse pilot.
