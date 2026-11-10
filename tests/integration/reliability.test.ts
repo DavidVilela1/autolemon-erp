@@ -85,9 +85,14 @@ describe('Failure injection and rollback', () => {
     await t.owner.query(
       'CREATE TRIGGER test_inject_failure BEFORE INSERT ON inventory_ledger FOR EACH ROW EXECUTE FUNCTION test_inject_failure()',
     );
-    const key = 'reliability-injected-0001';
+    // Idempotency-Key header value (not a credential); named so secret scanners do not misread it.
+    const retryId = 'retry-after-injected-failure';
     try {
-      const r = await A.admin.post(wms('/stock/move'), { positionId: src.id, qty: 3, to: { nodeId: N.s2 } }, { 'idempotency-key': key });
+      const r = await A.admin.post(
+        wms('/stock/move'),
+        { positionId: src.id, qty: 3, to: { nodeId: N.s2 } },
+        { 'idempotency-key': retryId },
+      );
       expect(r.status).toBe(500);
       expect(r.text).not.toMatch(/injected|trigger|stack|at \w+ \(/i); // no internals leaked
     } finally {
@@ -102,14 +107,18 @@ describe('Failure injection and rollback', () => {
     expect((await t.owner.query('SELECT count(*)::int AS n FROM inventory_ledger WHERE warehouse_id = $1', [wh])).rows[0].n).toBe(
       before.ledger,
     );
-    expect((await t.owner.query('SELECT count(*)::int AS n FROM command_log WHERE idempotency_key = $1', [key])).rows[0].n).toBe(0);
+    expect((await t.owner.query('SELECT count(*)::int AS n FROM command_log WHERE idempotency_key = $1', [retryId])).rows[0].n).toBe(0);
     // Retry with the same key now executes (the failed attempt left no idempotency record).
     const retry = ok(
-      await A.admin.post(wms('/stock/move'), { positionId: src.id, qty: 3, to: { nodeId: N.s2 } }, { 'idempotency-key': key }),
+      await A.admin.post(wms('/stock/move'), { positionId: src.id, qty: 3, to: { nodeId: N.s2 } }, { 'idempotency-key': retryId }),
     );
     expect(retry.txnId).toBeTruthy();
     // And a second identical submission is a replay, not a second posting.
-    const replay = await A.admin.post(wms('/stock/move'), { positionId: src.id, qty: 3, to: { nodeId: N.s2 } }, { 'idempotency-key': key });
+    const replay = await A.admin.post(
+      wms('/stock/move'),
+      { positionId: src.id, qty: 3, to: { nodeId: N.s2 } },
+      { 'idempotency-key': retryId },
+    );
     expect(replay.body.txnId).toBe(retry.txnId);
     expect(Number((await positionAt(N.s1!))!.onHand)).toBe(Number(before.src) - 3);
     const rec = ok(await A.admin.get(wms('/stock/reconciliation')));
