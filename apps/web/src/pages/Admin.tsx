@@ -336,3 +336,171 @@ export function AuditPage() {
     </Page>
   );
 }
+
+/** pt-PT labels for the security counters returned by /api/admin/security/overview. */
+const COUNTER_LABELS: Record<string, string> = {
+  loginSuccess: 'Entradas com sucesso',
+  loginFailure: 'Entradas falhadas',
+  mfaFailure: 'Códigos de verificação errados',
+  recoveryCodeUsed: 'Códigos de recuperação usados',
+  accessDenied: 'Acessos recusados',
+  mfaReset: 'Reposições de autenticação',
+  passwordChange: 'Alterações de palavra-passe',
+  passkeyChange: 'Chaves de acesso adicionadas/removidas',
+  piiRead: 'Consultas de dados pessoais',
+  export: 'Exportações',
+  keyRotation: 'Rotações de chaves',
+  privilegeChange: 'Alterações de utilizadores/permissões',
+};
+
+/** pt-PT descriptions of alert rules (rule id → text). Unknown ids are shown as-is. */
+const RULE_LABELS: Record<string, string> = {
+  'auth.login_failures': 'Muitas entradas falhadas',
+  'auth.mfa_failures': 'Muitos códigos de verificação errados',
+  'authz.denied_spike': 'Muitos acessos recusados',
+  'auth.recovery_code_used': 'Código de recuperação usado',
+  'auth.mfa_reset': 'Autenticação de um utilizador reposta',
+  'admin.pii_read_burst': 'Muitas consultas de dados pessoais',
+  'admin.key_rotation': 'Chaves de cifra rodadas',
+  'wms.export_burst': 'Muitas exportações',
+  'audit.chain_broken': 'Cadeia de auditoria quebrada — iniciar incidente',
+  'system.outbox_stuck': 'Eventos por publicar há demasiado tempo',
+};
+
+const SEVERITY_LABEL: Record<string, { text: string; tone: 'neutral' | 'warn' | 'danger' }> = {
+  CRITICAL: { text: 'Crítico', tone: 'danger' },
+  HIGH: { text: 'Alto', tone: 'danger' },
+  MEDIUM: { text: 'Médio', tone: 'warn' },
+  LOW: { text: 'Baixo', tone: 'neutral' },
+};
+
+interface SecurityOverview {
+  windowMinutes: number;
+  counters: Record<string, number>;
+  openAlerts: Record<string, number>;
+  auditChain: { verifiedSeq: string; verifiedAt: string; result: string; brokenAtSeq: string | null } | null;
+  outbox: { pending: number; oldestPendingAt: string | null };
+  monitor: { intervalSeconds: number; channels: string[] };
+}
+
+/** Security monitoring for administrators: counters, alerts and acknowledgement (ADR-0026). */
+export function SecurityPage() {
+  const { withStepUp } = useSession();
+  const [windowMinutes, setWindowMinutes] = useState('60');
+  const [status, setStatus] = useState('OPEN');
+  const overview = useLoad(
+    () => api<SecurityOverview>('GET', `/api/admin/security/overview?windowMinutes=${windowMinutes}`),
+    [windowMinutes],
+  );
+  const alerts = useLoad(() => api<Row[]>('GET', `/api/admin/security/alerts?status=${status}`), [status]);
+  const a = useAction();
+  const o = overview.data;
+  return (
+    <Page
+      title="Segurança"
+      purpose="Alertas e contadores de segurança calculados a partir do registo de auditoria. Não substitui a monitorização da infraestrutura."
+    >
+      <div className="flex flex-wrap gap-4">
+        <Select
+          label="Período"
+          value={windowMinutes}
+          onChange={(v) => setWindowMinutes(v || '60')}
+          options={[
+            { value: '60', label: 'Última hora' },
+            { value: '1440', label: 'Últimas 24 horas' },
+            { value: '10080', label: 'Últimos 7 dias' },
+          ]}
+        />
+        <Select
+          label="Alertas"
+          value={status}
+          onChange={(v) => setStatus(v || 'OPEN')}
+          options={[
+            { value: 'OPEN', label: 'Por ver' },
+            { value: 'ACKNOWLEDGED', label: 'Vistos' },
+            { value: 'ALL', label: 'Todos' },
+          ]}
+        />
+      </div>
+      {o && (
+        <>
+          {o.auditChain?.result === 'BROKEN' && (
+            <Notice kind="error">
+              Cadeia de auditoria quebrada na entrada {o.auditChain.brokenAtSeq}. Inicie o procedimento de incidente.
+            </Notice>
+          )}
+          <Panel title="Estado">
+            <ul className="grid gap-1 text-sm sm:grid-cols-2">
+              <li>
+                Alertas por ver: <strong>{Object.values(o.openAlerts).reduce((s, n) => s + n, 0)}</strong> (críticos {o.openAlerts.CRITICAL}
+                , altos {o.openAlerts.HIGH})
+              </li>
+              <li>
+                Cadeia de auditoria:{' '}
+                {o.auditChain
+                  ? `${o.auditChain.result === 'OK' ? 'íntegra' : 'QUEBRADA'} até à entrada ${o.auditChain.verifiedSeq} (${fmtDate(o.auditChain.verifiedAt)})`
+                  : 'ainda não verificada pelo monitor'}
+              </li>
+              <li>
+                Eventos por publicar: {o.outbox.pending}
+                {o.outbox.oldestPendingAt ? ` (mais antigo ${fmtDate(o.outbox.oldestPendingAt)})` : ''}
+              </li>
+              <li>
+                Monitor: a cada {Math.round(o.monitor.intervalSeconds / 60)} min · canais {o.monitor.channels.join(', ')}
+              </li>
+            </ul>
+          </Panel>
+          <Panel title="Contadores do período">
+            <Table
+              rows={Object.entries(o.counters).map(([key, n]) => ({ key, n }))}
+              rowKey={(r) => r.key}
+              cols={[
+                { h: 'Evento', c: (r) => COUNTER_LABELS[r.key] ?? r.key },
+                { h: 'Total', c: (r) => r.n, num: true },
+              ]}
+            />
+          </Panel>
+        </>
+      )}
+      <Panel title="Alertas">
+        <Table
+          rows={alerts.data ?? []}
+          rowKey={(r) => r.id!}
+          cols={[
+            {
+              h: 'Gravidade',
+              c: (r) => (
+                <Pill tone={SEVERITY_LABEL[r.severity!]?.tone ?? 'neutral'}>{SEVERITY_LABEL[r.severity!]?.text ?? r.severity}</Pill>
+              ),
+            },
+            { h: 'Alerta', c: (r) => RULE_LABELS[r.rule!] ?? r.rule },
+            { h: 'Ocorrências', c: (r) => r.occurrences, num: true },
+            { h: 'Primeiro', c: (r) => fmtDate(r.firstSeenAt) },
+            { h: 'Último', c: (r) => fmtDate(r.lastSeenAt) },
+            {
+              h: 'Estado',
+              c: (r) =>
+                r.status === 'OPEN' ? (
+                  <Button
+                    onClick={() =>
+                      void a.run(async () => {
+                        await withStepUp(() => api('POST', `/api/admin/security/alerts/${r.id}/ack`, {}));
+                        alerts.reload();
+                        overview.reload();
+                      }, 'Alerta marcado como visto.')
+                    }
+                  >
+                    Marcar como visto
+                  </Button>
+                ) : (
+                  `Visto por ${r.acknowledgedBy ?? '—'} (${fmtDate(r.acknowledgedAt)})`
+                ),
+            },
+          ]}
+        />
+      </Panel>
+      <ErrorNotice error={a.error ?? overview.error ?? alerts.error} />
+      {a.message && <Notice kind="ok">{a.message}</Notice>}
+    </Page>
+  );
+}

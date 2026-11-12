@@ -1,4 +1,4 @@
-# Operations — AutoLemon ERP v0.6.3
+# Operations — AutoLemon ERP v0.6.4
 
 Owning module: operations. **Production deployment is not configured and not approved.** This
 document describes how the system is configured and operated, and what must exist first.
@@ -29,6 +29,8 @@ Validated at startup by `apps/api/src/config/env.ts` (invalid ⇒ process exits)
 | `AUTH_THROTTLE_ENABLED`                                                         | true                       | must be true                                                                                                                                  |
 | `RETENTION_COMMAND_LOG_DAYS` / `_SESSION_DAYS` / `_TOKEN_DAYS` / `_OUTBOX_DAYS` | 30 / 30 / 30 / 90          | ≥ 7 each; align with the records of processing (GDPR)                                                                                         |
 | `BREACHED_PASSWORD_CORPUS`                                                      | unset (built-in list only) | path to the offline SHA-1 corpus built with `scripts/prepare-breached-corpus.mjs` (ADR-0025); read-only to the API user; refresh periodically |
+| `SECURITY_MONITOR_INTERVAL_SECONDS`                                             | 300                        | 60–300; security rules, audit-chain checkpoints and alert delivery (ADR-0026)                                                                 |
+| `ALERT_WEBHOOK_URL`, `ALERT_WEBHOOK_SECRET`                                     | unset (log sink only)      | https endpoint of the SIEM/pager bridge (no credentials in the URL); secret ≥ 32 chars from the secrets manager; allow this egress only       |
 
 ## 2. Deployment outline (when approved)
 
@@ -51,7 +53,15 @@ never touches inventory history, documents or the security audit log. Each run t
 writes `system.retention.purge` to the audit log; failures are logged as `retention purge failed`
 (alert on it once monitoring exists).
 
-## 3. Monitoring (to implement)
+## 3. Monitoring
+
+**In the application (v0.6.4, ADR-0026):** the security monitor raises alerts from the audit log
+(login/MFA failure bursts, access-denied spikes, recovery-code use, MFA resets, PII-read and
+export bursts, key rotation, broken audit chain, stuck outbox, failed retention/outbox jobs). Every
+new alert is one `warn` log line with `securityAlert: true` — route that to paging — and,
+optionally, a signed webhook. Administrators see and acknowledge alerts in **Segurança**.
+
+**Still to deploy (owner-side, gate O-05):** the items below, log shipping, paging/on-call.
 
 Metrics: request rate/latency/error by route, 401/403/429 rates, DB pool saturation, outbox
 backlog (`SELECT count(*) FROM domain_outbox WHERE published_at IS NULL`), last backup age, WAL

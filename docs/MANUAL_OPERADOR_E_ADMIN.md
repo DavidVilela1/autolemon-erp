@@ -1,4 +1,4 @@
-# Manual do operador e do administrador — AutoLemon WMS v0.6.3
+# Manual do operador e do administrador — AutoLemon WMS v0.6.4
 
 Módulo responsável: WMS / formação. Público: operadores de armazém, chefes de armazém e
 administradores da empresa. Este manual descreve o que a aplicação faz **hoje**; não substitui a
@@ -74,6 +74,11 @@ chefe de armazém.
   acesso**; entregue o novo link por um canal verificado), _Repor palavra-passe_.
 - **Auditoria**: consulta e _Verificar cadeia_ (deve dar OK). Uma falha é um incidente grave —
   ver `docs/runbooks/RUNBOOKS.md` §4.
+- **Segurança**: alertas calculados automaticamente (muitas entradas falhadas, códigos de
+  recuperação usados, autenticação reposta, muitas exportações ou consultas de dados pessoais,
+  cadeia de auditoria quebrada…) e contadores do período. Investigue cada alerta e use _Marcar
+  como visto_ (pede confirmação de identidade; fica registado e não se pode desfazer). Um alerta
+  **Crítico** é um incidente — `RUNBOOKS.md` §4.
 - **Chaves de cifra**: _Rodar chaves_ anualmente ou em caso de suspeita.
 - **A minha conta**: mantenha pelo menos duas chaves de acesso (ex.: portátil + chave USB) e os
   códigos de recuperação guardados fora do computador. Se perder tudo, siga o procedimento de

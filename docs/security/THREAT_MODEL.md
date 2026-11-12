@@ -103,3 +103,24 @@ flowchart LR
 - `sku_lots`: company-scoped RLS; runtime role can only insert and fill a missing expiry.
 - CI release job gets `id-token: write` + `attestations: write` only in that job, only on `main`,
   only after every other job passed; no deployment credentials exist.
+
+## v0.6.3 changes
+
+- Transfer reservations (`POST …/transfers/{id}/allocate`): source-warehouse only; the
+  destination sees reserved quantities but not source positions (RLS); concurrent allocations are
+  serialised by row locks in id order (no over-reservation; tested).
+- Offline breached-password corpus: local file, no network; malformed files refuse start-up.
+
+## v0.6.4 changes (security monitoring, ADR-0026)
+
+- New egress (optional): alert webhook. Threats: SSRF (URL from configuration only, never from a
+  request), credential leakage (credentials in the URL refused; stored errors are URL-free),
+  spoofed alerts at the receiver (HMAC signature + timestamp), data leakage (payload has no
+  PII), slow receiver (5 s timeout, no redirects, bounded retries).
+- Alert tampering by a compromised admin session: acknowledging needs `admin.security` + step-up,
+  is audited, one-way (trigger) and cannot delete alerts; the raise itself is in the audit chain.
+- Alert flooding / audit flooding: one open alert per (company, rule); job failures at most one
+  new alert and one audit entry per job per hour.
+- Detection gap for old tampered entries: closed by the daily full pass from the genesis.
+- Residual: a database superuser can still rewrite the chain consistently and the checkpoints
+  (SEC-OPEN-008 — off-site digests).

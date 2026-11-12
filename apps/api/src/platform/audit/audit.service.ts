@@ -50,7 +50,9 @@ export function redactDetails(d: AuditEvent['details'] = {}): Record<string, str
   return out;
 }
 
-const ZERO = Buffer.alloc(32);
+/** prev_hash of the first entry of every chain (32 zero bytes). */
+export const AUDIT_GENESIS_HASH: Buffer = Buffer.alloc(32);
+const ZERO = AUDIT_GENESIS_HASH;
 
 /** Records and verifies audit entries. */
 export class AuditService {
@@ -104,54 +106,89 @@ export class AuditService {
   }
 
   /**
-   * Recomputes a chain and reports the first broken sequence number, if any.
+   * Recomputes a whole chain and reports the first broken sequence number, if any. Reads the
+   * chain in pages so memory stays bounded however long it grows.
    * @returns `{ ok, checked, brokenAtSeq? }`
    */
   async verifyChain(chainKey: string): Promise<{ ok: boolean; checked: number; brokenAtSeq?: string }> {
+    let after: { seq: bigint; hash: Buffer } = { seq: 0n, hash: ZERO };
+    let checked = 0;
+    for (;;) {
+      const r = await this.verifyRange(chainKey, after, 5000);
+      checked += r.checked;
+      if (!r.ok) return { ok: false, checked, brokenAtSeq: r.brokenAtSeq };
+      if (r.checked < 5000) return { ok: true, checked };
+      after = { seq: r.lastSeq, hash: r.lastHash };
+    }
+  }
+
+  /**
+   * Verifies at most `limit` entries that follow a trusted point (`after.seq`, `after.hash`) —
+   * seq 0 with the zero hash means "from the start". Used by the security monitor to check only
+   * new entries on each run (ADR-0026). A gap in sequence numbers, a wrong prev_hash or a
+   * recomputed hash that differs from the stored one all count as a break.
+   * @returns the last verified point (unchanged when nothing new) or the first broken seq.
+   */
+  async verifyRange(
+    chainKey: string,
+    after: { seq: bigint; hash: Buffer },
+    limit: number,
+  ): Promise<{ ok: boolean; checked: number; lastSeq: bigint; lastHash: Buffer; brokenAtSeq?: string }> {
     const entries = await this.database.systemTx((tx) =>
-      rows<{
-        chain_key: string;
-        seq: string;
-        company_id: string | null;
-        occurred_at: Date | string;
-        actor_user_id: string | null;
-        action: string;
-        resource_type: string | null;
-        resource_id: string | null;
-        warehouse_id: string | null;
-        outcome: string;
-        request_id: string | null;
-        client_ip: string | null;
-        details: Record<string, unknown>;
-        prev_hash: Buffer;
-        hash: Buffer;
-      }>(tx, sql`SELECT * FROM security_audit_log WHERE chain_key = ${chainKey} ORDER BY seq`),
+      rows<AuditRow>(
+        tx,
+        sql`SELECT * FROM security_audit_log WHERE chain_key = ${chainKey} AND seq > ${after.seq.toString()}
+            ORDER BY seq LIMIT ${Math.max(1, Math.min(limit, 50_000))}`,
+      ),
     );
-    let prev: Buffer = ZERO;
-    let expectedSeq = 1n;
+    let prev: Buffer = after.hash;
+    let expectedSeq = after.seq + 1n;
     for (const e of entries) {
-      const entry = {
-        chainKey: e.chain_key,
-        seq: e.seq,
-        companyId: e.company_id,
-        occurredAt: asDate(e.occurred_at)!.toISOString(),
-        actorUserId: e.actor_user_id,
-        action: e.action,
-        resourceType: e.resource_type,
-        resourceId: e.resource_id,
-        warehouseId: e.warehouse_id,
-        outcome: e.outcome,
-        requestId: e.request_id,
-        clientIp: e.client_ip,
-        details: e.details,
-      };
-      const h = sha256(Buffer.concat([prev, Buffer.from(canonicalJson(entry), 'utf8')]));
+      const h = sha256(Buffer.concat([prev, Buffer.from(canonicalJson(entryOf(e)), 'utf8')]));
       if (BigInt(e.seq) !== expectedSeq || !safeEqual(prev, e.prev_hash) || !safeEqual(h, e.hash)) {
-        return { ok: false, checked: entries.length, brokenAtSeq: e.seq };
+        return { ok: false, checked: entries.length, lastSeq: expectedSeq - 1n, lastHash: prev, brokenAtSeq: e.seq };
       }
       prev = e.hash;
       expectedSeq++;
     }
-    return { ok: true, checked: entries.length };
+    return { ok: true, checked: entries.length, lastSeq: expectedSeq - 1n, lastHash: prev };
   }
+}
+
+/** A stored audit row as read back for verification. */
+interface AuditRow {
+  chain_key: string;
+  seq: string;
+  company_id: string | null;
+  occurred_at: Date | string;
+  actor_user_id: string | null;
+  action: string;
+  resource_type: string | null;
+  resource_id: string | null;
+  warehouse_id: string | null;
+  outcome: string;
+  request_id: string | null;
+  client_ip: string | null;
+  details: Record<string, unknown>;
+  prev_hash: Buffer;
+  hash: Buffer;
+}
+
+/** Rebuilds the exact object that was hashed when the row was appended (see recordInTx). */
+function entryOf(e: AuditRow) {
+  return {
+    chainKey: e.chain_key,
+    seq: e.seq,
+    companyId: e.company_id,
+    occurredAt: asDate(e.occurred_at)!.toISOString(),
+    actorUserId: e.actor_user_id,
+    action: e.action,
+    resourceType: e.resource_type,
+    resourceId: e.resource_id,
+    warehouseId: e.warehouse_id,
+    outcome: e.outcome,
+    requestId: e.request_id,
+    clientIp: e.client_ip,
+    details: e.details,
+  };
 }

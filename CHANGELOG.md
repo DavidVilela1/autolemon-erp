@@ -2,6 +2,31 @@
 
 All notable changes. Owning module: repository. Format: Keep a Changelog; versioning: SemVer.
 
+## [0.6.4-WMS] — 2026-11-12
+
+Continuation (Reusable Continuation Prompt v0.6). Gate state stays **`WMS_IN_PROGRESS`**
+(PASS 20 · FAIL 4 · BLOCKED 9 · NOT_RUN 1); S-05 code part done (deployment still open).
+
+### Added
+
+- **Security monitoring** (ADR-0026, migration 0009): rules over the audit log (login/MFA failure
+  bursts, unknown-account spraying, access-denied spikes, recovery-code use, MFA resets, PII-read
+  and export bursts, key rotation), event alerts (broken audit chain, stuck outbox, failed
+  retention/outbox jobs), one open alert per company and rule, incremental audit-chain
+  verification with a daily full pass, delivery to the log (`securityAlert: true`) and an
+  optional HMAC-signed webhook with bounded retries.
+- Admin API `GET /api/admin/security/overview`, `GET /api/admin/security/alerts`,
+  `POST /api/admin/security/alerts/{id}/ack` (step-up, audited, one-way) and the **Segurança**
+  page.
+- Configuration `SECURITY_MONITOR_INTERVAL_SECONDS`, `ALERT_WEBHOOK_URL`, `ALERT_WEBHOOK_SECRET`
+  (unsafe webhook settings refused at start-up).
+- Tests: `security-monitoring` (12).
+
+### Changed
+
+- Audit-chain verification reads in pages (`verifyRange`), so memory stays bounded.
+- Retention/outbox job failures now raise system alerts in addition to the error log.
+
 ## [0.6.3-WMS] — 2026-11-12
 
 Continuation (Reusable Continuation Prompt v0.6). Gate state stays **`WMS_IN_PROGRESS`**

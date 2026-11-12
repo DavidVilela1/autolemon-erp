@@ -1,6 +1,6 @@
 {
   "name": "@autolemon/api",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "private": true,
   "type": "module",
   "description": "AutoLemon ERP API: NestJS modular monolith (platform + autonomous WMS).",

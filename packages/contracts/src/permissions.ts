@@ -61,6 +61,7 @@ export const STEP_UP_ACTIONS = [
   'inventory.adjust.approve',
   'pii.read',
   'account.mfa.change',
+  'security.alert.ack',
 ] as const;
 /** Step-up action identifier. */
 export type StepUpAction = (typeof STEP_UP_ACTIONS)[number];

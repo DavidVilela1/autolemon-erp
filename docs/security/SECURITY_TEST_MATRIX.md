@@ -94,3 +94,14 @@ Abbreviations: PKY = `tests/security/passkeys-account.test.ts`; WMS =
 | Isolation      | Destination sees reserved quantity but not source positions; non-source user cannot allocate (404)                | `transfer-reservations.test.ts`                   | Automated | PASS              |
 | Authorization  | Expiry report requires `wms.report` (403); window bounded 0–365 days (400)                                        | `transfer-reservations.test.ts`                   | Automated | PASS              |
 | Authentication | Passwords present in the offline breached corpus are refused; malformed/unsorted corpus file refuses start-up     | `apps/api/src/platform/auth/password.test.ts`     | Automated | PASS              |
+
+## Added in v0.6.4
+
+| Area          | Threat / requirement                                                                                                                      | Test                                         | Type      | Result (last run) |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | --------- | ----------------- |
+| Monitoring    | Login-failure / MFA / denial bursts and single high-risk events raise alerts; one open alert per company+rule (incl. concurrent monitors) | `tests/security/security-monitoring.test.ts` | Automated | PASS              |
+| Monitoring    | Acknowledgement: admin-only, step-up, tenant-isolated (404), one-way (409 + DB trigger), audited; only new events re-raise                | `security-monitoring.test.ts`                | Automated | PASS              |
+| Integrity     | Tampered audit entry detected incrementally and, before the checkpoint, by the daily full pass (CRITICAL alert)                           | `security-monitoring.test.ts`                | Automated | PASS              |
+| Privacy       | Alert log line and webhook payload carry no e-mail/IP; job-failure alerts and audit store no error message                                | `security-monitoring.test.ts`                | Automated | PASS              |
+| Egress        | Webhook HMAC signature, no redirects, URL-free stored errors, bounded retries; unsafe webhook configuration refused                       | `security-monitoring.test.ts`                | Automated | PASS              |
+| Authorization | New `/api/admin/security/*` routes: anonymous, CSRF, staff and malformed-id checks                                                        | `tests/security/route-inventory.test.ts`     | Automated | PASS              |

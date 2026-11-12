@@ -40,7 +40,11 @@ envelopes, shown to users on errors for support. Hosts must use NTP (chrony) —
   inventory history: life of the company records (legal/tax requirements to confirm).
 - Logs must not be used to reconstruct personal data beyond the stated purpose (GDPR minimisation).
 
-## 5. Alerting (to implement with monitoring, NOT DEPLOYED)
+## 5. Alerting
+
+**Implemented in the application (v0.6.4, ADR-0026):** rules, dedupe, log/webhook delivery,
+incremental + daily full chain verification, Segurança page. **Not deployed:** log shipping,
+paging/on-call, off-site digests. Original list of signals:
 
 Alert on: `auth.login.recovery_code_used`, `auth.mfa_reset.completed`, bursts of
 `auth.login` FAILURE / 429, `authz.denied` spikes, `admin.keys.rotate`, `admin.pii.read`, audit

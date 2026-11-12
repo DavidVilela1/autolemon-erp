@@ -10,7 +10,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { Button, Field, Form } from './components/ui';
 import { AccountPage } from './pages/Account';
 import { SearchPage } from './pages/Search';
-import { AdminPage, AuditPage } from './pages/Admin';
+import { AdminPage, AuditPage, SecurityPage } from './pages/Admin';
 import { EnrollmentPage, LoginPage, ResetPasswordPage } from './pages/Auth';
 import { InboundPage, PutawayPage } from './pages/Inbound';
 import { CountsPage, ReplenishmentPage, ReturnsPage, TransfersPage } from './pages/Operations';
@@ -46,6 +46,7 @@ const ROUTES: RouteDef[] = [
   { path: '/etiquetas', label: 'Etiquetas', perm: 'wms.view', render: () => <LabelsPage /> },
   { path: '/admin', label: 'Administração', admin: true, render: () => <AdminPage /> },
   { path: '/auditoria', label: 'Auditoria', perm: 'admin.audit.read', render: () => <AuditPage /> },
+  { path: '/seguranca', label: 'Segurança', perm: 'admin.audit.read', render: () => <SecurityPage /> },
   { path: '/conta', label: 'A minha conta', render: () => <AccountPage /> },
 ];
 

@@ -4,7 +4,10 @@
  */
 import { Body, Controller, Get, HttpCode, Inject, Param, Post, Put, Query, Req } from '@nestjs/common';
 import {
+  AcknowledgeAlertInput,
   CreateUserInput,
+  SecurityAlertsQuery,
+  SecurityOverviewQuery,
   CreateWarehouseInput,
   SwitchWarehouseInput,
   UpdatePermissionsInput,
@@ -113,6 +116,25 @@ export class AdminController {
   @Get('admin/audit/verify')
   verify(@Req() req: AppRequest) {
     return this.s.admin.verifyAudit(actorOf(req));
+  }
+
+  /** Security monitoring overview: counters, open alerts, chain checkpoint, outbox (ADR-0026). */
+  @Get('admin/security/overview')
+  securityOverview(@Req() req: AppRequest, @Query() q: unknown) {
+    return this.s.monitor.overview(actorOf(req), parse(SecurityOverviewQuery, q).windowMinutes);
+  }
+
+  /** Security alerts of the company. */
+  @Get('admin/security/alerts')
+  securityAlerts(@Req() req: AppRequest, @Query() q: unknown) {
+    return this.s.monitor.alerts(actorOf(req), parse(SecurityAlertsQuery, q));
+  }
+
+  /** Acknowledge (mark as seen) an open alert — step-up required, audited, one-way. */
+  @Post('admin/security/alerts/:id/ack')
+  @HttpCode(200)
+  acknowledgeAlert(@Req() req: AppRequest, @Param('id') id: string, @Body() body: unknown) {
+    return this.s.monitor.acknowledge(actorOf(req), uuidParam(id), parse(AcknowledgeAlertInput, body ?? {}));
   }
 
   /** Admin warehouse context switch. */

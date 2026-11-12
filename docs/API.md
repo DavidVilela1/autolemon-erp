@@ -1,4 +1,4 @@
-# API — AutoLemon ERP v0.6.3
+# API — AutoLemon ERP v0.6.4
 
 Owning module: platform/http. The machine-readable spec is **generated from the code**:
 `docs/api/openapi.json` (OpenAPI 3.1, 89 operations). Regenerate with
@@ -88,3 +88,22 @@ Use the WMS application services (in-process) and subscribe to `domain_outbox` e
 - `GET /api/wms/w/{wh}/reports/expiry?days=30` (`wms.report`, `days` 0–365) lists positions
   whose lot expires within the window, including expired ones (`expired: true`), ordered by
   expiry; at most 2000 rows.
+
+## Security monitoring (v0.6.4, ADR-0026) — administrators only
+
+- `GET /api/admin/security/overview?windowMinutes=60` (`admin.audit.read`; 5–10 080) →
+  `{ windowMinutes, counters: { loginFailure, mfaFailure, accessDenied, recoveryCodeUsed, mfaReset,
+passwordChange, passkeyChange, piiRead, export, keyRotation, privilegeChange, loginSuccess },
+openAlerts: { CRITICAL, HIGH, MEDIUM, LOW }, auditChain: { verifiedSeq, verifiedAt, result,
+brokenAtSeq } | null, outbox: { pending, oldestPendingAt }, monitor: { intervalSeconds,
+channels, rules } }`. Never returns the webhook URL or secret.
+- `GET /api/admin/security/alerts?status=OPEN|ACKNOWLEDGED|ALL&limit=100` (`admin.audit.read`).
+  Only the caller's company; system alerts are not listed.
+- `POST /api/admin/security/alerts/{id}/ack` body `{ "note"?: string ≤ 300 }` (`admin.security`
+  - step-up `security.alert.ack`). Errors: `403 STEP_UP_REQUIRED`, `404` (unknown or other
+    company), `409 ALERT_ALREADY_ACKNOWLEDGED`.
+- Webhook payload (optional): `POST` JSON `{ type: "autolemon.security_alert", version: 1, alert:
+{ id, rule, severity, companyId, occurrences, windowMinutes, firstSeenAt, details } }` with
+  headers `X-AutoLemon-Timestamp` and `X-AutoLemon-Signature: v1=<hex HMAC-SHA256(secret,
+timestamp + "." + body)>`. Receivers verify the signature, reject timestamps older than 5 min
+  and de-duplicate on `alert.id`.

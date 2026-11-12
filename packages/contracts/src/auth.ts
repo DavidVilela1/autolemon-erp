@@ -3,7 +3,7 @@
  * @module contracts (owning module: platform identity)
  */
 import { z } from 'zod';
-import { Code, SafeLine, Uuid } from './common.js';
+import { Code, SafeLine, SafeText, Uuid } from './common.js';
 import { PERMISSIONS, ROLES } from './permissions.js';
 
 /** Normalised e-mail address (lower-case, NFC, max 254). */
@@ -137,3 +137,17 @@ export const PasskeyAssertInput = z.object({ response: WebAuthnAuthenticationRes
 
 /** Self-service password change. */
 export const ChangePasswordInput = z.object({ currentPassword: z.string().min(1).max(128), newPassword: NewPassword }).strict();
+
+/** Security monitoring (ADR-0026): counters window, 5 minutes … 7 days. */
+export const SecurityOverviewQuery = z.object({ windowMinutes: z.coerce.number().int().min(5).max(10_080).default(60) }).strict();
+
+/** Security alert list filter. */
+export const SecurityAlertsQuery = z
+  .object({
+    status: z.enum(['OPEN', 'ACKNOWLEDGED', 'ALL']).default('OPEN'),
+    limit: z.coerce.number().int().min(1).max(500).default(100),
+  })
+  .strict();
+
+/** Acknowledging an alert (one-way; requires step-up). */
+export const AcknowledgeAlertInput = z.object({ note: SafeText(300).optional() }).strict();

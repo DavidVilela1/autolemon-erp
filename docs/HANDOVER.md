@@ -36,6 +36,14 @@ Owning module: repository. A continuation developer should be able to start from
   `docs/WMS_RELEASE_STATUS.json`; after changing it run `pnpm gate:render`. `pnpm gate:check`
   refuses any state the evidence does not support (ADR-0021). Governing instructions: the
   product owner's _Reusable Continuation Prompt v0.6_ and _WMS Production Readiness Gate v0.6_.
+- New security-relevant audit actions: add them to a rule or an overview group in
+  `platform/monitoring/security-monitor.ts` with a test (ADR-0026).
+- **Commit messages (product-owner rule):** a full message, never just a title. First line
+  `vX.Y.Z: <summary>`, blank line, then a context paragraph (session, gate state) and sections
+  for each feature (what changed, routes, migrations, UI), tests with counts and results, docs
+  touched, rollback and what remains open. ASCII only, wrapped at about 80 columns. **No
+  `Co-Authored-By` or other attribution trailers.** Hand them over as a PowerShell here-string
+  written to a file and committed with `git commit -F`.
 
 ## 3. Documentation standard (enforced partly by `pnpm lint`)
 

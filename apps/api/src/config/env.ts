@@ -45,6 +45,16 @@ const EnvSchema = z.object({
   RETENTION_OUTBOX_DAYS: z.coerce.number().int().min(7).max(3650).default(90),
   /** Optional offline breached-password corpus (sorted SHA-1 lines); see breached-corpus.ts. */
   BREACHED_PASSWORD_CORPUS: z.string().min(1).optional(),
+  /** Security monitor period (ADR-0026): rule evaluation, audit-chain checkpoints, alert delivery. */
+  SECURITY_MONITOR_INTERVAL_SECONDS: z.coerce.number().int().min(30).max(3600).default(300),
+  /**
+   * Optional alert webhook (SIEM / chat / pager bridge). https only in production; plain http
+   * only to a loopback address outside production. Requests are HMAC-signed with
+   * ALERT_WEBHOOK_SECRET and carry no personal data.
+   */
+  ALERT_WEBHOOK_URL: z.string().url().optional(),
+  /** HMAC-SHA256 key for the webhook signature (≥ 32 characters; from the secrets manager). */
+  ALERT_WEBHOOK_SECRET: z.string().min(32).optional(),
   /** WebAuthn relying-party id (defaults to the WEB_ORIGIN hostname). */
   WEBAUTHN_RP_ID: z
     .string()
@@ -88,6 +98,15 @@ export function loadConfig(source: Record<string, string | undefined> = process.
     if (!cfg.ADMIN_PASSKEY_REQUIRED) problems.push('ADMIN_PASSKEY_REQUIRED must be true in production');
     if (cfg.TRUST_PROXY.trim().toLowerCase() === 'true') problems.push('TRUST_PROXY=true is forbidden; list proxy addresses');
   }
+  if (cfg.ALERT_WEBHOOK_URL) {
+    const u = new URL(cfg.ALERT_WEBHOOK_URL);
+    const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(u.hostname);
+    if (!cfg.ALERT_WEBHOOK_SECRET) problems.push('ALERT_WEBHOOK_SECRET is required when ALERT_WEBHOOK_URL is set');
+    if (u.username || u.password) problems.push('ALERT_WEBHOOK_URL must not embed credentials');
+    if (u.protocol !== 'https:' && !(u.protocol === 'http:' && loopback && cfg.NODE_ENV !== 'production')) {
+      problems.push('ALERT_WEBHOOK_URL must be https (http only to loopback outside production)');
+    }
+  }
   if (cfg.KEY_PROVIDER === 'local-dev' && !cfg.LOCAL_DEV_KEKS) {
     problems.push('LOCAL_DEV_KEKS is required for KEY_PROVIDER=local-dev (run: node scripts/gen-dev-keys.mjs)');
   }
@@ -109,6 +128,7 @@ export function describeConfig(cfg: AppConfig): Record<string, unknown> {
     modules: cfg.ENABLED_MODULES,
     webOrigin: cfg.WEB_ORIGIN,
     trustProxy: cfg.TRUST_PROXY !== 'false',
+    alertWebhook: !!cfg.ALERT_WEBHOOK_URL,
   };
 }
 

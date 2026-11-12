@@ -23,6 +23,7 @@ flowchart LR
       ADMIN[admin · tenant provisioning]
       MODS[module registry]
       OUTBOX[outbox dispatcher]
+      MON[security monitor<br/>alerts, chain checks]
     end
     subgraph WMS[Autonomous WMS]
       RUNNER[WmsRunner<br/>authz + RLS + idempotency]
@@ -45,7 +46,7 @@ flowchart LR
 
 | Context                                              | Owns (tables)                                                                                                                                                                                                                                                     | May depend on                                          | Must not                                                   |
 | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------- |
-| Platform (`apps/api/src/platform`)                   | companies, warehouses, users, user_permissions, sessions, mfa_*, one_time_tokens, auth_throttle, tenant_data_keys, security_audit_log, command_log, domain_outbox, doc_sequences                                                                                  | db, common, contracts                                  | import WMS code                                            |
+| Platform (`apps/api/src/platform`)                   | companies, warehouses, users, user_permissions, sessions, mfa_*, one_time_tokens, auth_throttle, tenant_data_keys, security_audit_log, command_log, domain_outbox, doc_sequences, security_alerts, audit_chain_checkpoints                                        | db, common, contracts                                  | import WMS code                                            |
 | WMS (`apps/api/src/wms`)                             | skus, sku_barcodes, storage_nodes, containers, container_movements, stock_positions, inventory_transactions, inventory_ledger, reservations, inbound__, putaway_tasks, outbound__, transfers, transfer_lines, returns, return_lines, count_*, replenishment_rules | platform (authz, audit, crypto), db, common, contracts | be written to by any other module                          |
 | Future modules (Sales, Purchasing, Finance, Catalog) | their own tables                                                                                                                                                                                                                                                  | WMS **application services** + versioned outbox events | write WMS tables, read decrypted secrets, touch auth state |
 

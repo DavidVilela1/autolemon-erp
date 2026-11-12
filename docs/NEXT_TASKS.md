@@ -1,4 +1,4 @@
-# Next tasks — ordered roadmap (WMS hardening first) — updated v0.6.3
+# Next tasks — ordered roadmap (WMS hardening first) — updated v0.6.4
 
 Owning module: architecture. Each task lists dependencies and the acceptance test that closes it.
 **Product-owner rule (2026-11-10):** the entire autonomous WMS must be production-ready, verified
@@ -11,19 +11,19 @@ manual screen-reader pass still open), T-12 (retention), T-21 (units of measure)
 un-pack), T-24 (rename/deactivate; moving subtrees still unsupported), lots through transfers
 (part of T-20).
 
-## Next three WMS tasks (gate order) — after v0.6.3
+## Next three WMS tasks (gate order) — after v0.6.4
 
-1. **S-05 code part** — security-event metrics endpoint (bounded, authenticated) and alert hooks
-   for audit-chain failure / purge failure / authentication anomalies; ASVS self-assessment
-   refresh.
-2. **O-02** — owner confirms the `node-next` and `release-candidate` jobs; container image
+1. **O-02** — owner confirms the `node-next` and `release-candidate` jobs; container image
    signing (cosign keyless) and a deployment workflow gated on manual approval (no deployment).
+2. **SEC-OPEN-008 code part** — scheduled, signed audit-chain head digests for off-site
+   write-once storage and a `pnpm audit:verify-digests` command.
 3. **E-04** — once the owner agrees targets: reproducible load harness and results.
 
-Owner-side, in parallel: push v0.6.3; apply branch protection; KMS choice (S-03); staging
-(S-04/O-01/O-03…O-05); provision the breached-password corpus; penetration test (S-07);
-warehouse pilot (O-06).
+Owner-side, in parallel: push v0.6.4; apply branch protection; KMS choice (S-03); staging with
+log shipping and paging for `securityAlert` lines (S-04/O-01/O-03…O-05); provision the
+breached-password corpus; penetration test (S-07); warehouse pilot (O-06).
 
+Done in v0.6.4: S-05 code part (security monitoring and alerts, ADR-0026).
 Done in v0.6.3: T-26 (transfer reservations, near-expiry report), T-04 code part (offline corpus).
 Done in v0.6.2: T-20 (FEFO, requested lots, serial uniqueness); O-02 workflow parts.
 Done in v0.6.1: F-12 (T-27), E-05 (T-31), F-05 replenishment scan prompt, local gitleaks.

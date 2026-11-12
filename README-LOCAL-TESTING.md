@@ -1,7 +1,7 @@
-# Local setup and testing — AutoLemon ERP v0.6.3
+# Local setup and testing — AutoLemon ERP v0.6.4
 
-Owning module: repository. Archive: **`AutoLemon-ERP-v0.6.3-WMS.zip`**, root folder
-**`autolemon-erp/`**. Checksum file: `AutoLemon-ERP-v0.6.3-WMS.zip.sha256`.
+Owning module: repository. Archive: **`AutoLemon-ERP-v0.6.4-WMS.zip`**, root folder
+**`autolemon-erp/`**. Checksum file: `AutoLemon-ERP-v0.6.4-WMS.zip.sha256`.
 
 ## Prerequisites
 
@@ -19,18 +19,18 @@ If port 5432 is busy, change `POSTGRES_PORT` **and** the port in `DATABASE_URL` 
 ## Verify the archive
 
 ```bash
-sha256sum -c AutoLemon-ERP-v0.6.3-WMS.zip.sha256          # Linux
-shasum -a 256 -c AutoLemon-ERP-v0.6.3-WMS.zip.sha256      # macOS
+sha256sum -c AutoLemon-ERP-v0.6.4-WMS.zip.sha256          # Linux
+shasum -a 256 -c AutoLemon-ERP-v0.6.4-WMS.zip.sha256      # macOS
 ```
 
 ```powershell
-(Get-FileHash .\AutoLemon-ERP-v0.6.3-WMS.zip -Algorithm SHA256).Hash   # compare with the .sha256 file
+(Get-FileHash .\AutoLemon-ERP-v0.6.4-WMS.zip -Algorithm SHA256).Hash   # compare with the .sha256 file
 ```
 
 ## macOS / Linux
 
 ```bash
-unzip AutoLemon-ERP-v0.6.3-WMS.zip -d AutoLemon-ERP-extracted
+unzip AutoLemon-ERP-v0.6.4-WMS.zip -d AutoLemon-ERP-extracted
 cd AutoLemon-ERP-extracted/autolemon-erp
 node --version
 npm install --global pnpm@12.18.0
@@ -54,7 +54,7 @@ pnpm dev
 ## Windows PowerShell
 
 ```powershell
-Expand-Archive -Path .\AutoLemon-ERP-v0.6.3-WMS.zip -DestinationPath .\AutoLemon-ERP-extracted
+Expand-Archive -Path .\AutoLemon-ERP-v0.6.4-WMS.zip -DestinationPath .\AutoLemon-ERP-extracted
 Set-Location .\AutoLemon-ERP-extracted\autolemon-erp
 node --version
 npm install --global pnpm@12.18.0

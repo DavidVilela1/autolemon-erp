@@ -1,4 +1,4 @@
-# Database — AutoLemon ERP v0.6.3
+# Database — AutoLemon ERP v0.6.4
 
 Owning module: platform/db. Engine: PostgreSQL 18 (target; Docker Compose) — the automated test
 evidence in this build was produced on PostgreSQL **16.15** because the build environment could
@@ -16,6 +16,7 @@ not pull the 18 image (see `docs/PROJECT_STATE.md`). No 17/18-only features are 
 | `0006_retention.sql`             | `app_retention_purge(...)` SECURITY DEFINER purge of expired operational data (≥ 7-day windows); runtime role gets EXECUTE only, still no DELETE (ADR-0020)                                                                                                                                                                                                       |
 | `0007_lots_and_serials.sql`      | `sku_lots` (company-wide lot/serial master with optional expiry; RLS by company; runtime role may only fill a missing `expires_on`), `outbound_lines.lot_code` (requested lot), trigger `wms_serial_guard` (SECURITY DEFINER; ≤ 1 unit per serial position and one on-hand position per serial per company; advisory lock against concurrent receipts) — ADR-0024 |
 | `0008_transfer_reservations.sql` | `reservations.transfer_line_id` (composite FK to `transfer_lines`; `outbound_line_id` now nullable; CHECK exactly one demand line), partial index on active transfer reservations, `transfer_lines.qty_reserved` — ADR-0025                                                                                                                                       |
+| `0009_security_monitoring.sql`   | `security_alerts` (one OPEN alert per company+rule via partial unique index; runtime role: no DELETE, column-limited UPDATE; trigger `security_alerts_guard` makes acknowledgement one-way), `audit_chain_checkpoints` (incremental verification), index `security_audit_time_action` — ADR-0026                                                                  |
 
 Runner: `apps/api/src/db/migrator.ts` — forward-only, one transaction per file, advisory lock,
 SHA-256 checksum per applied file (edited applied migration ⇒ abort). Migrations run with the
