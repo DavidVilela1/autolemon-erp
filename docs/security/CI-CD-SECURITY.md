@@ -1,4 +1,4 @@
-# CI/CD security and release controls — v0.5.0
+# CI/CD security and release controls — v0.6.2
 
 Owning module: operations/security. Workflow: `.github/workflows/ci.yml`. **Status: written and
 YAML-validated; never executed** (no GitHub repository/runner was connected — SEC-OPEN-006).
@@ -35,7 +35,16 @@ penetration test before the first real customer.
 - All third-party actions pinned to full commit SHAs (resolved 2026-11-09 via `git ls-remote`):
   checkout v7.0.1 `3d3c42e5…`, setup-node v7.1.0 `949feb24…`, pnpm/action-setup v6.1.1 `73e46992…`,
   upload-artifact v7.0.2 `cf430e03…`, codeql-action v4.39.3 `33d7b85d…`, trivy-action v0.36.0
-  `ed142fd0…`, gitleaks-action v3.0.0 `e0c47f4f…`.
+  `ed142fd0…`, gitleaks-action v3.0.0 `e0c47f4f…`, attest-build-provenance v4.2.2 `4d101475…`
+  (added 2026-11-10, lightweight tag resolved with `git ls-remote`).
+- **Build provenance (v0.6.2):** job `release-candidate` runs only on `main` after every other
+  job passed, rebuilds the release ZIP, runs `verify:handover` and creates a Sigstore-backed SLSA
+  provenance attestation (`actions/attest-build-provenance`, OIDC, no stored keys); the ZIP,
+  checksum and manifest are kept 90 days. Verify a downloaded archive with
+  `gh attestation verify AutoLemon-ERP-<version>-WMS.zip --repo <owner>/<repo>`.
+- **Forward compatibility (v0.6.2):** job `node-next` type-checks, unit-tests and builds on Node
+  26.x on every run (DB suites run on Node 22 in `verify`).
+- Local parity: `pnpm security:scan` runs gitleaks with the CI rules when the binary exists.
 - `permissions: contents: read` by default; `persist-credentials: false`.
 - Exact dependency pins, committed lockfile, pnpm supply-chain policy (minimum release age with
   documented exclusions), `allowBuilds` only for esbuild.
@@ -48,6 +57,31 @@ penetration test before the first real customer.
   changes under `platform/auth`, `platform/crypto`, `platform/authz`, `db/migrations`,
   `wms/inventory`, `.github/`. Use CODEOWNERS. AI review is supplementary only.
 - No force-push, signed commits recommended, linear history.
+
+**How to apply (repository owner; GitHub → Settings → Branches → Add classic branch protection
+rule for `main`, or with the GitHub CLI):**
+
+```bash
+cat > protection.json <<'JSON'
+{
+  "required_status_checks": { "strict": true,
+    "contexts": ["verify", "node-next", "codeql", "secrets-and-iac", "container"] },
+  "enforce_admins": true,
+  "required_pull_request_reviews": { "required_approving_review_count": 1, "dismiss_stale_reviews": true },
+  "restrictions": null,
+  "required_linear_history": true,
+  "allow_force_pushes": false,
+  "allow_deletions": false
+}
+JSON
+gh api -X PUT repos/<owner>/<repo>/branches/main/protection --input protection.json
+```
+
+A **single-maintainer repository cannot approve its own pull requests**: until a second
+reviewer exists, set `"required_pull_request_reviews": null` (status checks, linear history and
+no force-push still apply) and record that as an accepted, time-boxed exception. Gate item O-02
+stays open until protected approvals with a real second reviewer are in place and a release
+candidate with a verified attestation has been produced.
 
 ## 4. Release and deployment
 

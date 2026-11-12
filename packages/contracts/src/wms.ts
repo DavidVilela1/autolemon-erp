@@ -44,6 +44,9 @@ export type HolderRefInput = z.infer<typeof HolderRef>;
 
 const Lot = SafeLine(40).optional();
 
+/** Lot expiry date (YYYY-MM-DD); requires a lot. Drives FEFO allocation. */
+const ExpiresOn = z.iso.date().optional();
+
 /**
  * Scan confirmation of the destination: the code read from the destination's label (location
  * code or container code). Optional in the API for compatibility; the pt-PT UI always sends it,
@@ -126,7 +129,7 @@ export const CreateSkuInput = z
 export const OpeningStockInput = z
   .object({
     lines: z
-      .array(z.object({ skuId: Uuid, to: HolderRef, qty: Qty, lot: Lot }).strict())
+      .array(z.object({ skuId: Uuid, to: HolderRef, qty: Qty, lot: Lot, expiresOn: ExpiresOn }).strict())
       .min(1)
       .max(500),
     note: SafeText(500).optional(),
@@ -207,6 +210,7 @@ export const ReceiveInput = z
             qty: Qty,
             condition: z.enum(['GOOD', 'DAMAGED']).default('GOOD'),
             lot: Lot,
+            expiresOn: ExpiresOn,
           })
           .strict()
           .refine((l) => l.lineId || l.skuId || l.barcode, 'Indique linha, artigo ou código de barras'),
@@ -227,7 +231,8 @@ export const CreateOutboundInput = z
     externalRef: SafeLine(80).optional(),
     recipientContact: SafeText(500).optional(),
     lines: z
-      .array(z.object({ skuId: Uuid, qty: Qty }).strict())
+      // `lot`: only that lot/serial may be allocated to the line (otherwise FEFO/FIFO).
+      .array(z.object({ skuId: Uuid, qty: Qty, lot: Lot }).strict())
       .min(1)
       .max(500),
   })
@@ -237,7 +242,7 @@ export const CreateOutboundInput = z
 export const ReplaceOutboundLinesInput = z
   .object({
     lines: z
-      .array(z.object({ skuId: Uuid, qty: Qty }).strict())
+      .array(z.object({ skuId: Uuid, qty: Qty, lot: Lot }).strict())
       .min(1)
       .max(500),
   })
@@ -319,7 +324,7 @@ export const CreateReturnInput = z
     externalRef: SafeLine(80).optional(),
     inspectionNodeId: Uuid,
     lines: z
-      .array(z.object({ skuId: Uuid, qty: Qty }).strict())
+      .array(z.object({ skuId: Uuid, qty: Qty, lot: Lot, expiresOn: ExpiresOn }).strict())
       .min(1)
       .max(200),
   })
@@ -359,7 +364,7 @@ export const CreateCountInput = z
 export const RecordCountInput = z.object({ qtyCounted: QtyOrZero }).strict();
 
 /** Record stock found during counting that the system did not expect. */
-export const FoundStockInput = z.object({ skuId: Uuid, holder: HolderRef, qtyCounted: Qty, lot: Lot }).strict();
+export const FoundStockInput = z.object({ skuId: Uuid, holder: HolderRef, qtyCounted: Qty, lot: Lot, expiresOn: ExpiresOn }).strict();
 
 // ---------------------------------------------------------------- replenishment & corrections
 

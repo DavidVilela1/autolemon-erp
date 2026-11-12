@@ -17,7 +17,7 @@ import { sql } from 'drizzle-orm';
 import type { NodeKind, StockStatus } from '@autolemon/contracts';
 import type { Tx } from '../../db/database.js';
 import { one, row, rows } from '../../db/database.js';
-import { Conflict, InsufficientStock, NotFound } from '../../common/errors.js';
+import { Conflict, InsufficientStock, NotFound, ValidationFailed } from '../../common/errors.js';
 import type { Actor } from '../../platform/authz/actor.js';
 import { cmp, isPositive, mul, neg, sub, toMilli } from './qty.js';
 
@@ -320,6 +320,62 @@ export async function scannedBaseQty(ctx: Pick<OpCtx, 'tx' | 'companyId'>, skuId
   } catch {
     throw new Conflict('Quantidade resultante com mais de 3 casas decimais', 'QTY_PRECISION');
   }
+}
+
+/**
+ * Registers (or checks) the lot/serial of a receipt-like operation and returns the canonical
+ * lot code ('' for untracked stock without a lot):
+ *  - LOT/SERIAL-tracked SKUs require a lot (LOT_REQUIRED);
+ *  - an expiry date requires a lot; it is stored on the company-wide lot master and must agree
+ *    with an expiry already recorded for that lot (LOT_EXPIRY_MISMATCH); a missing expiry may be
+ *    filled in later;
+ *  - for SERIAL SKUs the serial must not be in transit in another transfer (SERIAL_DUPLICATE);
+ *    "on hand twice" and "more than 1 unit" are enforced by the database trigger
+ *    (migration 0007), which covers every writer.
+ * `fromTransfer` skips the in-transit check (a transfer receipt is the serial arriving).
+ */
+export async function registerLot(
+  ctx: Pick<OpCtx, 'tx' | 'companyId'>,
+  sku: { id: string; code: string; tracking: string },
+  lot: string | undefined,
+  expiresOn: string | undefined,
+  opts: { fromTransfer?: boolean } = {},
+): Promise<string> {
+  const code = (lot ?? '').trim();
+  if (sku.tracking !== 'NONE' && !code) {
+    throw new ValidationFailed([{ path: 'lot', message: `Lote/número de série obrigatório para ${sku.code}` }]);
+  }
+  if (!code) {
+    if (expiresOn) throw new ValidationFailed([{ path: 'expiresOn', message: 'A validade exige um lote' }]);
+    return '';
+  }
+  await ctx.tx.execute(
+    sql`INSERT INTO sku_lots (company_id, sku_id, lot_code, expires_on) VALUES (${ctx.companyId}, ${sku.id}, ${code}, ${expiresOn ?? null}::date)
+        ON CONFLICT (company_id, sku_id, lot_code) DO NOTHING`,
+  );
+  if (expiresOn) {
+    await ctx.tx.execute(
+      sql`UPDATE sku_lots SET expires_on = ${expiresOn}::date
+          WHERE company_id = ${ctx.companyId} AND sku_id = ${sku.id} AND lot_code = ${code} AND expires_on IS NULL`,
+    );
+    const r = await one<{ e: string }>(
+      ctx.tx,
+      sql`SELECT expires_on::text AS e FROM sku_lots WHERE company_id = ${ctx.companyId} AND sku_id = ${sku.id} AND lot_code = ${code}`,
+    );
+    if (r.e !== expiresOn) {
+      throw new Conflict(`O lote ${code} já tem validade ${r.e}`, 'LOT_EXPIRY_MISMATCH');
+    }
+  }
+  if (sku.tracking === 'SERIAL' && !opts.fromTransfer) {
+    const transit = await row<{ n: number }>(
+      ctx.tx,
+      sql`SELECT 1 AS n FROM transfer_line_lots x JOIN transfer_lines l ON l.id = x.transfer_line_id
+          WHERE x.company_id = ${ctx.companyId} AND l.sku_id = ${sku.id} AND x.lot_code = ${code}
+            AND x.qty_shipped > x.qty_received + x.qty_lost LIMIT 1`,
+    );
+    if (transit) throw new Conflict('Este número de série está em trânsito noutra transferência', 'SERIAL_DUPLICATE');
+  }
+  return code;
 }
 
 /** Resolves a barcode/SKU code to a SKU id, or undefined. */

@@ -109,6 +109,11 @@ export function translatePgError(err: unknown): DomainError | undefined {
     case '23505':
       return new Conflict('Já existe um registo com este código ou número', 'DUPLICATE');
     case '23514':
+      // Named database rules with their own user-facing meaning (migration 0007).
+      if (e.constraint === 'serial_unique') return new Conflict('Este número de série já existe em stock', 'SERIAL_DUPLICATE');
+      if (e.constraint === 'serial_single_unit') {
+        return new Conflict('Artigos com número de série têm 1 unidade por número de série', 'SERIAL_QTY');
+      }
       return new Conflict('A operação viola uma regra de integridade do armazém', 'RULE_VIOLATION');
     case '23503':
       return new NotFound('Referência');

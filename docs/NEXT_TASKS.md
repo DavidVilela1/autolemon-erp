@@ -11,22 +11,21 @@ manual screen-reader pass still open), T-12 (retention), T-21 (units of measure)
 un-pack), T-24 (rename/deactivate; moving subtrees still unsupported), lots through transfers
 (part of T-20).
 
-## Next three WMS tasks (gate order) — after v0.6.1
+## Next three WMS tasks (gate order) — after v0.6.2
 
-1. **O-02** — CI: build provenance/signature for the release archive and container image
-   (GitHub artifact attestations or cosign), Node 26 in the matrix, and a documented protected
-   branch + required-review setup (the owner applies the GitHub settings).
-2. **T-20** — lot-aware allocation (FEFO/FIFO, explicit lot choice) and serial-number uniqueness,
-   with negative and concurrency tests; then **T-26** transfer reservations at the source.
-3. **E-04** — once the owner agrees targets: reproducible load harness (concurrent pickers,
-   allocation contention, ledger growth) and results in the evidence file; **S-05/S-06** code
-   parts (structured security-event metrics/alert hooks; breached-password corpus check).
+1. **T-26** — transfer reservations at the source (plan → reserve → dispatch from reservations),
+   with concurrency and cross-warehouse conservation tests; near-expiry report.
+2. **S-05/S-06 code parts** — security-event metrics endpoint (bounded, authenticated) and
+   alert hooks for audit-chain failure / purge failure / auth anomalies; breached-password
+   corpus check at enrolment and password change; ASVS self-assessment refresh.
+3. **E-04** — once the owner agrees targets: reproducible load harness and results.
 
-Owner-side, in parallel: KMS choice (S-03), staging environment (S-04/O-01/O-03…O-05),
-penetration test (S-07), warehouse pilot (O-06).
+Owner-side, in parallel: push v0.6.2 and confirm the `node-next` and `release-candidate` jobs;
+apply branch protection; KMS choice (S-03); staging (S-04/O-01/O-03…O-05); penetration test
+(S-07); warehouse pilot (O-06).
 
-Done in v0.6.1: F-12 (T-27 activity export + search), E-05 (runbooks, operator/admin manual),
-F-05 replenishment scan prompt, local gitleaks.
+Done in v0.6.2: T-20 (FEFO, requested lots, serial uniqueness); O-02 workflow parts.
+Done in v0.6.1: F-12 (T-27), E-05 (T-31), F-05 replenishment scan prompt, local gitleaks.
 
 ## A. Security and production-readiness (release blockers)
 

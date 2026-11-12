@@ -82,6 +82,11 @@ export function StockPage() {
                 ),
               },
               { h: 'Lote', c: (r) => r.lot || '—' },
+              {
+                h: 'Validade',
+                c: (r) =>
+                  r.expiresOn ? String(r.expired) === 'true' ? <Pill tone="danger">Expirado {r.expiresOn}</Pill> : r.expiresOn : '—',
+              },
               { h: 'Existência', c: (r) => fmtQty(r.onHand), num: true },
               { h: 'Reservado', c: (r) => fmtQty(r.reserved), num: true },
               { h: 'Livre', c: (r) => fmtQty(r.free), num: true },

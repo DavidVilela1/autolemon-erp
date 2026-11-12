@@ -34,6 +34,7 @@ import {
   reconcile,
   reconcileReservations,
   relocate,
+  registerLot,
   requireSku,
   resolveHolder,
 } from './inventory/engine.js';
@@ -60,9 +61,11 @@ export class StockService {
               p.holder_node_id AS "nodeId", p.holder_container_id AS "containerId",
               coalesce(n.path, cn.path) AS "nodePath", coalesce(n.kind, cn.kind) AS "nodeKind", c.code AS "containerCode",
               p.stock_status AS status, p.lot_code AS lot, p.qty_on_hand::text AS "onHand", p.qty_reserved::text AS reserved,
-              (p.qty_on_hand - p.qty_reserved)::text AS free, p.version::text AS version
+              (p.qty_on_hand - p.qty_reserved)::text AS free, p.version::text AS version,
+              sl.expires_on::text AS "expiresOn", (sl.expires_on < current_date) AS expired
             FROM stock_positions p
             JOIN skus s ON s.id = p.sku_id
+            LEFT JOIN sku_lots sl ON sl.company_id = p.company_id AND sl.sku_id = p.sku_id AND sl.lot_code = p.lot_code
             LEFT JOIN storage_nodes n ON n.id = p.holder_node_id
             LEFT JOIN containers c ON c.id = p.holder_container_id
             LEFT JOIN storage_nodes cn ON cn.id = c.current_node_id
@@ -86,9 +89,10 @@ export class StockService {
     return this.runner.command(actor, warehouseId, 'wms.adjust', key, 'stock.opening', input, async (ctx) => {
       const txnId = await newTxn(ctx, 'OPENING', { note: input.note, idempotencyKey: key });
       for (const l of input.lines) {
-        await requireSku(ctx, l.skuId);
+        const sku = await requireSku(ctx, l.skuId);
+        const lot = await registerLot(ctx, sku, l.lot, l.expiresOn);
         const holder = await resolveHolder(ctx, l.to, { allowedKinds: ['SHELF', 'BIN', 'LOCATION'] });
-        const pos = await ensurePosition(ctx, { skuId: l.skuId, holder, status: 'AVAILABLE', lot: l.lot });
+        const pos = await ensurePosition(ctx, { skuId: l.skuId, holder, status: 'AVAILABLE', lot });
         await applyDelta(ctx, txnId, pos, l.qty);
       }
       await emitEvent(ctx, 'wms.stock.opening_posted', 'inventory_transaction', txnId, { lines: input.lines.length });

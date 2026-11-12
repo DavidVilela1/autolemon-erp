@@ -1,8 +1,8 @@
-# Project state — AutoLemon ERP v0.6.1-WMS
+# Project state — AutoLemon ERP v0.6.2-WMS
 
 Owning module: repository. Last updated: 2026-11-10 (Europe/Lisbon). Archive:
-`AutoLemon-ERP-v0.6.1-WMS.zip` (root `autolemon-erp/`); its SHA-256 is in the adjacent
-`AutoLemon-ERP-v0.6.1-WMS.zip.sha256` (a file cannot contain its own hash).
+`AutoLemon-ERP-v0.6.2-WMS.zip` (root `autolemon-erp/`); its SHA-256 is in the adjacent
+`AutoLemon-ERP-v0.6.2-WMS.zip.sha256` (a file cannot contain its own hash).
 
 ## 1. Summary
 
@@ -12,7 +12,10 @@ Production Readiness Gate v0.6**. WMS release gate state: **`WMS_IN_PROGRESS`**
 (`docs/WMS_RELEASE_GATE.md`: PASS 20 · FAIL 4 · BLOCKED 9 · NOT_RUN 1). **Not production-ready.**
 No other ERP business module has been started.
 
-v0.6.1 session (continuation): activity export + cross-document search (F-12), operator/admin
+v0.6.2 session (continuation): lots with expiry and FEFO allocation, requested lots, serial-number
+uniqueness (database trigger), Node 26 CI job and attested release-candidate job (ADR-0024).
+
+v0.6.1 session: activity export + cross-document search (F-12), operator/admin
 manual and runbooks (E-05), replenishment scan prompt, gitleaks in the local security scan, and
 a security fix — MFA reset now revokes passkeys.
 
@@ -41,8 +44,10 @@ accessibility sweep, and the release gate as code.
 
 ## 3. Migrations and rollback plan
 
-v0.6.1 adds **no migration** (schema unchanged since v0.6.0); rollback to v0.6.0 is a plain
-redeploy.
+v0.6.2 adds **`0007_lots_and_serials.sql`** (additive: new table, nullable column, trigger;
+existing lots back-filled without expiry). Rollback: redeploy v0.6.1 — it ignores the new table
+and column, but the serial trigger stays active (it only refuses states that were already
+invalid). To remove it, restore the pre-upgrade backup.
 
 New: `0004_passkeys_and_account.sql`, `0005_wms_completion.sql`, `0006_retention.sql` — all
 additive (new tables/columns with defaults, widened CHECK, back-fill of lots in transit, a
@@ -61,18 +66,18 @@ available here.
 | Command                 | Result                                                                                                                              |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `pnpm format:check`     | all files formatted                                                                                                                 |
-| `pnpm lint`             | 0 problems; documentation gate 119 files, 333 exported symbols                                                                      |
+| `pnpm lint`             | 0 problems; documentation gate 121 files, 334 exported symbols                                                                      |
 | `pnpm typecheck`        | 0 errors                                                                                                                            |
 | `pnpm api:check`        | OpenAPI matches code (100 paths / 110 operations)                                                                                   |
 | `pnpm gate:check`       | `WMS_IN_PROGRESS`; PASS 20 · FAIL 4 · BLOCKED 9 · NOT_RUN 1                                                                         |
 | `pnpm test:unit`        | 7 files, **37 passed**                                                                                                              |
-| `pnpm test:integration` | 5 files, **39 passed**                                                                                                              |
+| `pnpm test:integration` | 6 files, **46 passed**                                                                                                              |
 | `pnpm test:security`    | 8 files, **74 passed**                                                                                                              |
 | `pnpm test:e2e`         | **2 passed** (≈ 1.5 min; axe WCAG 2.2 AA clean on all 17 navigation screens, login and account)                                     |
 | `pnpm test:all`         | exit 0                                                                                                                              |
 | `pnpm security:scan`    | all PASS incl. **gitleaks 8.24.3** (CI rules); audit 0 critical / 0 high / 1 moderate (dev-only, SEC-OPEN-009); SBOM 122 components |
 | `pnpm backup:local`     | encrypted backup written; off-site copy NOT CONFIGURED                                                                              |
-| `pnpm restore:smoke`    | PASSED (2.0 s)                                                                                                                      |
+| `pnpm restore:smoke`    | PASSED (2.7 s)                                                                                                                      |
 | `pnpm build`            | contracts + API + web (382 kB JS / 107 kB gzip)                                                                                     |
 
 Not run here: Docker Compose stack, PostgreSQL 18, Node 26, CodeQL/gitleaks/Trivy (CI only), DAST,
@@ -80,7 +85,7 @@ load tests, screen-reader testing, any production control.
 
 ## 5. Clean-room verification from the ZIP
 
-Run 2026-11-10 on the v0.6.1 archive: copied only the ZIP + `.sha256` into an empty directory and
+Run 2026-11-10 on the v0.6.2 archive: copied only the ZIP + `.sha256` into an empty directory and
 followed `README-LOCAL-TESTING.md` "Without Docker (native PostgreSQL)" (local PostgreSQL 16.15,
 fresh database; Playwright via `PLAYWRIGHT_CHROME_PATH`).
 
@@ -89,11 +94,11 @@ fresh database; Playwright via `PLAYWRIGHT_CHROME_PATH`).
 | `sha256sum -c`                                              | OK                                                                                         |
 | extract → `autolemon-erp/`                                  | OK — no `.env`, `node_modules`, `.git`, `invitations-dev.txt`, backups or artifacts inside |
 | `pnpm install --frozen-lockfile`                            | OK (Node 22.23.4, pnpm 12.18.0)                                                            |
-| `cp .env.example .env` → `pnpm db:migrate` → `pnpm db:seed` | 6 migrations applied; seed OK                                                              |
+| `cp .env.example .env` → `pnpm db:migrate` → `pnpm db:seed` | 7 migrations applied; seed OK                                                              |
 | `pnpm typecheck` / `pnpm lint`                              | exit 0 / exit 0                                                                            |
-| `pnpm test:all`                                             | **exit 0** — unit 37, integration 39, security 74, e2e 2; gate check OK                    |
+| `pnpm test:all`                                             | **exit 0** — unit 37, integration 46, security 74, e2e 2; gate check OK                    |
 | `pnpm security:scan` (with `GITLEAKS_BIN`)                  | exit 0                                                                                     |
-| `pnpm restore:smoke`                                        | PASSED (2.6 s)                                                                             |
+| `pnpm restore:smoke`                                        | PASSED (2.7 s)                                                                             |
 | `pnpm build`                                                | exit 0                                                                                     |
 | `pnpm dev`                                                  | web :5173 → 200; `/api/health` → 200; `/api/auth/session` without cookie → 401             |
 
@@ -109,7 +114,7 @@ The final archive differs from the clean-room archive only in this section.
 
 ## 7. Next three WMS tasks
 
-1. O-02: signed/attested release artifacts, Node 26 in CI, protected-branch documentation.
-2. T-20 FEFO allocation + serial uniqueness, then T-26 transfer reservations.
-3. E-04 load harness once targets are agreed; S-05/S-06 code parts. Owner-side: KMS, staging,
-   penetration test, warehouse pilot.
+1. T-26 transfer reservations at the source; near-expiry report.
+2. S-05/S-06 code parts: security-event metrics/alert hooks, breached-password corpus check.
+3. E-04 load harness once targets are agreed. Owner-side: confirm the new CI jobs, branch
+   protection, KMS, staging, penetration test, warehouse pilot.

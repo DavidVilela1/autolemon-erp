@@ -2,6 +2,31 @@
 
 All notable changes. Owning module: repository. Format: Keep a Changelog; versioning: SemVer.
 
+## [0.6.2-WMS] — 2026-11-10
+
+Continuation (Reusable Continuation Prompt v0.6). Gate state stays **`WMS_IN_PROGRESS`**
+(PASS 20 · FAIL 4 · BLOCKED 9 · NOT_RUN 1); F-07 open action narrowed, O-02 progressed.
+
+### Added
+
+- **Lots with expiry and FEFO allocation** (ADR-0024, migration 0007): company-wide lot master
+  (`sku_lots`), expiry captured on receipt/opening/return/found stock, allocation by earliest
+  expiry → lot code → fullest position, **expired lots never allocated** (flagged "Expirado" in
+  Stock), optional requested lot per outbound line, lot shown on the pick list.
+- **Serial-number uniqueness** enforced by a database trigger for every writer (1 unit per
+  serial, one on-hand position per company, advisory lock against concurrent receipts) plus an
+  in-transit check; errors `SERIAL_QTY` / `SERIAL_DUPLICATE`.
+- Receipt screen: lot/serial and expiry fields; outbound creation: optional requested lot.
+- CI: `node-next` job (Node 26: typecheck, unit tests, build) and `release-candidate` job on
+  `main` (release ZIP + `verify:handover` + SLSA build-provenance attestation, 90-day
+  retention); branch-protection instructions in `docs/security/CI-CD-SECURITY.md`.
+- Tests: `lots-serials` (7, incl. a concurrency race).
+
+### Changed
+
+- LOT/SERIAL-tracked SKUs now require a lot on opening stock, returns and found stock too (was
+  only enforced on inbound receipts).
+
 ## [0.6.1-WMS] — 2026-11-10
 
 Continuation (Reusable Continuation Prompt v0.6). Gate state stays **`WMS_IN_PROGRESS`**

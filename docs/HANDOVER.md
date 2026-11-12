@@ -27,6 +27,8 @@ Owning module: repository. A continuation developer should be able to start from
   route is automatically checked for authentication, CSRF and warehouse/admin scope.
 - Operator/admin manual: `docs/MANUAL_OPERADOR_E_ADMIN.md`; incident and maintenance runbooks:
   `docs/runbooks/RUNBOOKS.md` — keep both in sync with UI labels when screens change.
+- Any new receipt-like stock path must call `registerLot()` (lot required for tracked SKUs,
+  expiry master, serial in-transit check); the serial trigger then guards every writer (ADR-0024).
 - New account-security routes that must stay reachable for an admin without a passkey need
   `@AccountSecurity()`; everything else is blocked for them under `ADMIN_PASSKEY_REQUIRED`.
 - **Product-owner rule:** no Sales/Purchasing/CRM/Accounting/other ERP module until the WMS is

@@ -44,7 +44,7 @@ export function OutboundPage() {
   const nodes = useLoad(() => loadNodes(wh), [wh]);
   const [openId, setOpenId] = useState<string>();
   const doc = useLoad(() => (openId ? api<OutDoc>('GET', `${wp(wh)}/outbound/${openId}`) : Promise.resolve(undefined)), [wh, openId]);
-  const [nf, setNf] = useState({ skuId: '', qty: '', externalRef: '', recipient: '' });
+  const [nf, setNf] = useState({ skuId: '', qty: '', externalRef: '', recipient: '', lot: '' });
   const [packNode, setPackNode] = useState('');
   const [pick, setPick] = useState<{ reservationId: string; qty: string; short: boolean } | null>(null);
   const [pack, setPack] = useState({ packageId: '', lineId: '', qty: '' });
@@ -88,7 +88,7 @@ export function OutboundPage() {
               onSubmit={() =>
                 void a.run(async () => {
                   const r = await api<{ id: string }>('POST', `${wp(wh)}/outbound`, {
-                    lines: [{ skuId: nf.skuId, qty: nf.qty }],
+                    lines: [{ skuId: nf.skuId, qty: nf.qty, ...(nf.lot.trim() ? { lot: nf.lot.trim() } : {}) }],
                     ...(nf.externalRef ? { externalRef: nf.externalRef } : {}),
                     ...(nf.recipient ? { recipientContact: nf.recipient } : {}),
                   });
@@ -106,6 +106,13 @@ export function OutboundPage() {
                 required
               />
               <Field label="Quantidade" value={nf.qty} onChange={(v) => setNf({ ...nf, qty: v })} required inputMode="decimal" />
+              <Field
+                label="Lote / n.º de série pedido (opcional)"
+                value={nf.lot}
+                onChange={(v) => setNf({ ...nf, lot: v })}
+                maxLength={40}
+                autoComplete="off"
+              />
               <Field label="Referência externa" value={nf.externalRef} onChange={(v) => setNf({ ...nf, externalRef: v })} maxLength={80} />
               <Field
                 label="Contacto/morada de entrega (cifrado)"

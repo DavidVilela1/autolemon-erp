@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "product": "AutoLemon ERP — WMS",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "updatedAt": "2026-11-10",
   "state": "WMS_IN_PROGRESS",
   "allowedStates": [
@@ -38,7 +38,8 @@
       "verificationMethod": "Integration tests (case barcode = 12 units on receive/pick/pack; positions on shelf, bin, box)",
       "evidence": [
         "tests/integration/wms-completion.test.ts (R-02)",
-        "tests/integration/acceptance.test.ts #2–#3"
+        "tests/integration/acceptance.test.ts #2–#3",
+        "tests/integration/lots-serials.test.ts (lots, expiry, serials)"
       ],
       "verifiedAt": "2026-11-10",
       "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
@@ -101,15 +102,16 @@
     {
       "id": "F-07",
       "requiredResult": "WMS-native outbound requests, picking across positions, packing and dispatch",
-      "verificationMethod": "Integration tests incl. short pick, partial dispatch, backorder, un-pick, un-pack, cancel after picking",
+      "verificationMethod": "Integration tests incl. short pick, partial dispatch, backorder, un-pick, un-pack, cancel after picking; FEFO lot allocation (expired lots never allocated), requested lot, serial uniqueness incl. concurrency",
       "evidence": [
         "tests/integration/acceptance.test.ts #4–#5",
-        "tests/integration/wms-completion.test.ts (R-04/R-10)"
+        "tests/integration/wms-completion.test.ts (R-04/R-10)",
+        "tests/integration/lots-serials.test.ts"
       ],
       "verifiedAt": "2026-11-10",
       "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
       "status": "PASS",
-      "openAction": "Lot-aware (FEFO) allocation and serial uniqueness not implemented (T-20)"
+      "openAction": "Transfer reservations at source (T-26)"
     },
     {
       "id": "F-08",
@@ -385,15 +387,15 @@
     {
       "id": "O-02",
       "requiredResult": "Fail-closed CI/CD, artifact signatures and gated deployments demonstrated",
-      "verificationMethod": "GitHub Actions workflow (format, lint, typecheck, DB tests, e2e, CodeQL, gitleaks, Trivy, container) — green runs reported by the owner",
+      "verificationMethod": "Workflow: fail-closed jobs + Node 26 forward-compat job + main-only release-candidate job with SLSA build-provenance attestation (Sigstore/OIDC) of the release ZIP; branch-protection settings documented",
       "evidence": [
-        ".github/workflows/",
-        "owner report 2026-11-10 (run logs not attached)"
+        ".github/workflows/ci.yml",
+        "docs/security/CI-CD-SECURITY.md §2–§3"
       ],
       "verifiedAt": "2026-11-10",
       "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
       "status": "FAIL",
-      "openAction": "Artifact signing, protected branches/approvals and gated deployment not implemented/demonstrated (T-32)"
+      "openAction": "Owner: push and confirm all jobs incl. node-next and release-candidate are green; apply branch protection; add a second human reviewer; verify an attestation with `gh attestation verify`. Container image signing and gated deployment remain (no deployment target yet)"
     },
     {
       "id": "O-03",

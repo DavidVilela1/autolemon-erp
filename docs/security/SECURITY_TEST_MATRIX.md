@@ -1,4 +1,4 @@
-# Security test matrix — v0.6.1
+# Security test matrix — v0.6.2
 
 Owning module: security. "Automated" = runs in `pnpm test:all` against real PostgreSQL (no mocks
 for DB, concurrency or isolation). File abbreviations: **ACC** `tests/integration/acceptance.test.ts`,
@@ -77,3 +77,11 @@ Abbreviations: PKY = `tests/security/passkeys-account.test.ts`; WMS =
 | Search          | Warehouse-scoped (other warehouse's documents invisible; cross-warehouse 404); LIKE wildcards literal; injection strings harmless; control characters refused | `reports-search.test.ts`                                                       | Automated                           | PASS              |
 | MFA reset       | Lost/stolen device: reset revokes TOTP, recovery codes **and passkeys**, ends sessions                                                                        | PKY "an administrator's MFA reset …"                                           | Automated                           | PASS              |
 | Secrets (local) | gitleaks with CI rules over authored files; a planted key-like test variable is detected                                                                      | `pnpm security:scan` (manual probe recorded in `docs/WMS_RELEASE_EVIDENCE.md`) | Automated (when gitleaks installed) | PASS              |
+
+## Added in v0.6.2
+
+| Area           | Threat / requirement                                                                       | Test                                     | Type      | Result (last run)            |
+| -------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------- | --------- | ---------------------------- |
+| Data integrity | Serial duplicated across warehouses (incl. concurrent receipts, in-transit serial) refused | `tests/integration/lots-serials.test.ts` | Automated | PASS                         |
+| Data integrity | Expired lots never allocated; conflicting lot expiry refused                               | `lots-serials.test.ts`                   | Automated | PASS                         |
+| Supply chain   | Release archive has SLSA build provenance (attestation)                                    | CI `release-candidate` job               | CI        | NOT RUN (pending owner push) |

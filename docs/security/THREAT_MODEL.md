@@ -1,4 +1,4 @@
-# Threat model — AutoLemon ERP v0.6.1 (WMS)
+# Threat model — AutoLemon ERP v0.6.2 (WMS)
 
 Owning module: security. Method: STRIDE per trust boundary + abuse cases. Owner column names the
 role accountable for the residual risk (to be assigned to people before any production rollout).
@@ -94,3 +94,12 @@ flowchart LR
   count, ≤ 366 days, 100 000-row cap), CSV formula injection (cell neutralisation; plain numbers
   only are left numeric).
 - **MFA reset** now revokes passkeys — closes the "stolen passkey survives reset" path.
+
+## v0.6.2 changes
+
+- New SECURITY DEFINER trigger `wms_serial_guard`: it bypasses RLS to see all warehouses of the
+  company, so it is restricted to reads of rows with the same `company_id`, has a fixed
+  `search_path`, `EXECUTE` revoked from PUBLIC, and only raises errors (no writes).
+- `sku_lots`: company-scoped RLS; runtime role can only insert and fill a missing expiry.
+- CI release job gets `id-token: write` + `attestations: write` only in that job, only on `main`,
+  only after every other job passed; no deployment credentials exist.

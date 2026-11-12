@@ -1,4 +1,4 @@
-# Manual do operador e do administrador — AutoLemon WMS v0.6.1
+# Manual do operador e do administrador — AutoLemon WMS v0.6.2
 
 Módulo responsável: WMS / formação. Público: operadores de armazém, chefes de armazém e
 administradores da empresa. Este manual descreve o que a aplicação faz **hoje**; não substitui a

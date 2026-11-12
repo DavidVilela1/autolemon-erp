@@ -60,7 +60,11 @@ interface LineRow {
   qty_packed: string;
   qty_dispatched: string;
   qty_short: string;
+  lot_code: string | null;
 }
+
+/** Locale-independent string order (codes, ISO dates, ids). */
+const byCode = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 /** Outbound use cases. */
 export class OutboundService {
@@ -114,13 +118,15 @@ export class OutboundService {
         ctx.tx,
         sql`SELECT l.id, l.line_no AS "lineNo", l.sku_id AS "skuId", s.code AS "skuCode", s.description,
               l.qty_requested::text AS "qtyRequested", l.qty_allocated::text AS "qtyAllocated", l.qty_picked::text AS "qtyPicked",
-              l.qty_packed::text AS "qtyPacked", l.qty_dispatched::text AS "qtyDispatched", l.qty_short::text AS "qtyShort"
+              l.qty_packed::text AS "qtyPacked", l.qty_dispatched::text AS "qtyDispatched", l.qty_short::text AS "qtyShort",
+              l.lot_code AS lot
             FROM outbound_lines l JOIN skus s ON s.id = l.sku_id WHERE l.outbound_id = ${id} ORDER BY l.line_no`,
       );
       const pickList = await rows(
         ctx.tx,
         sql`SELECT r.id AS "reservationId", r.outbound_line_id AS "lineId", r.position_id AS "positionId", s.code AS "skuCode",
-              r.qty_open::text AS "qtyOpen", coalesce(n.path, cn.path) AS "nodePath", c.code AS "containerCode"
+              r.qty_open::text AS "qtyOpen", coalesce(n.path, cn.path) AS "nodePath", c.code AS "containerCode",
+              nullif(p.lot_code, '') AS lot
             FROM reservations r JOIN stock_positions p ON p.id = r.position_id JOIN skus s ON s.id = p.sku_id
             LEFT JOIN storage_nodes n ON n.id = p.holder_node_id
             LEFT JOIN containers c ON c.id = p.holder_container_id LEFT JOIN storage_nodes cn ON cn.id = c.current_node_id
@@ -195,22 +201,39 @@ export class OutboundService {
       const result: Array<{ lineId: string; allocated: string; missing: string }> = [];
       for (const line of lines) {
         let need = toMilli(line.qty_requested) - toMilli(line.qty_allocated) - toMilli(line.qty_picked) - toMilli(line.qty_short);
-        const candidates = await rows<PositionRow>(
+        // Allocation order (ADR-0024):
+        //  1. FEFO — earliest expiry first; expired lots are never allocated (they stay on hand
+        //     for quarantine/disposal); lots without expiry come after dated ones;
+        //  2. FIFO by lot code (oldest first when codes are date-based); untracked stock has
+        //     lot '' so this is neutral for it;
+        //  3. fullest free quantity first, to minimise pick stops; id as a stable tie-breaker.
+        // A line with lot_code only takes that lot/serial.
+        // Rows are locked in ascending id order (deadlock avoidance, see engine.ts) and the
+        // allocation order is applied afterwards in memory.
+        const candidates = await rows<PositionRow & { expires_on: string | null }>(
           ctx.tx,
-          sql`SELECT p.* FROM stock_positions p
+          sql`SELECT p.*, sl.expires_on::text AS expires_on FROM stock_positions p
               LEFT JOIN storage_nodes n ON n.id = p.holder_node_id
               LEFT JOIN containers c ON c.id = p.holder_container_id
               LEFT JOIN storage_nodes cn ON cn.id = c.current_node_id
+              LEFT JOIN sku_lots sl ON sl.company_id = p.company_id AND sl.sku_id = p.sku_id AND sl.lot_code = p.lot_code
               WHERE p.warehouse_id = ${warehouseId} AND p.sku_id = ${line.sku_id} AND p.stock_status = 'AVAILABLE'
                 AND p.qty_on_hand > p.qty_reserved AND (c.id IS NULL OR c.status = 'ACTIVE')
                 AND coalesce(n.kind, cn.kind) IN (${sql.join(
                   ALLOCATABLE_NODE_KINDS.map((k) => sql`${k}`),
                   sql`, `,
                 )})
+                AND (sl.expires_on IS NULL OR sl.expires_on >= current_date)
+                AND (${line.lot_code}::text IS NULL OR p.lot_code = ${line.lot_code}::text)
               ORDER BY p.id FOR UPDATE OF p`,
         );
-        // Prefer the fullest positions to minimise pick stops.
-        candidates.sort((a, b) => cmp(sub(b.qty_on_hand, b.qty_reserved), sub(a.qty_on_hand, a.qty_reserved)));
+        candidates.sort(
+          (a, b) =>
+            byCode(a.expires_on ?? '9999-12-31', b.expires_on ?? '9999-12-31') ||
+            byCode(a.lot_code, b.lot_code) ||
+            cmp(sub(b.qty_on_hand, b.qty_reserved), sub(a.qty_on_hand, a.qty_reserved)) ||
+            byCode(a.id, b.id),
+        );
         let got = 0n;
         for (const p of candidates) {
           if (need <= 0n) break;
@@ -560,12 +583,20 @@ export class OutboundService {
     return o;
   }
 
-  private async writeLines(ctx: OpCtx, outboundId: string, lines: Array<{ skuId: string; qty: string }>) {
+  private async writeLines(ctx: OpCtx, outboundId: string, lines: Array<{ skuId: string; qty: string; lot?: string }>) {
     for (const l of lines) {
       await requireSku(ctx, l.skuId);
-      await ctx.tx.execute(sql`INSERT INTO outbound_lines (company_id, warehouse_id, outbound_id, line_no, sku_id, qty_requested)
+      const lot = l.lot?.trim() || null;
+      if (lot) {
+        const known = await row(
+          ctx.tx,
+          sql`SELECT 1 FROM sku_lots WHERE company_id = ${ctx.companyId} AND sku_id = ${l.skuId} AND lot_code = ${lot}`,
+        );
+        if (!known) throw new NotFound('Lote');
+      }
+      await ctx.tx.execute(sql`INSERT INTO outbound_lines (company_id, warehouse_id, outbound_id, line_no, sku_id, qty_requested, lot_code)
           VALUES (${ctx.companyId}, ${ctx.warehouseId}, ${outboundId},
-            (SELECT coalesce(max(line_no), 0) + 1 FROM outbound_lines WHERE outbound_id = ${outboundId}), ${l.skuId}, ${l.qty}::numeric)`);
+            (SELECT coalesce(max(line_no), 0) + 1 FROM outbound_lines WHERE outbound_id = ${outboundId}), ${l.skuId}, ${l.qty}::numeric, ${lot})`);
     }
   }
 

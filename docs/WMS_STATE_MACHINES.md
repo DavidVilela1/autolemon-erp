@@ -1,4 +1,4 @@
-# WMS state machines and invariants — v0.6.0
+# WMS state machines and invariants — v0.6.2
 
 Owning module: WMS. Each transition below is implemented in the named service and covered by
 the tests listed in `docs/security/SECURITY_TEST_MATRIX.md`.
@@ -133,6 +133,13 @@ Nodes: rename (code immutable — printed on labels); deactivate applies to the 
 refused while any node in it holds stock or an ACTIVE container; inactive nodes reject every
 stock operation and child creation; reactivation is top-down. Containers: ACTIVE → CLOSED when
 empty (packages close with their order); CLOSED containers cannot hold stock or move.
+
+## Lots, expiry and serials (ADR-0024)
+
+Allocation order: earliest expiry first (FEFO), expired lots never allocated, undated lots last;
+then lot code ascending; then fullest free quantity. A line may request one lot. Serial-tracked
+SKUs: 1 unit per serial position and one on-hand position per serial per company (database
+trigger), and a serial in transit cannot be received elsewhere.
 
 ## Reservations
 

@@ -1,4 +1,4 @@
-# API — AutoLemon ERP v0.6.1
+# API — AutoLemon ERP v0.6.2
 
 Owning module: platform/http. The machine-readable spec is **generated from the code**:
 `docs/api/openapi.json` (OpenAPI 3.1, 89 operations). Regenerate with
@@ -65,3 +65,13 @@ Content-Type: application/json
 Use the WMS application services (in-process) and subscribe to `domain_outbox` events
 (`event_type`, `event_version`, `payload`). Event types are listed in
 `platform/modules/registry.ts`. Never write WMS tables directly (`docs/EXTENDING_AUTOLEMON.md`).
+
+## Lots and serials (v0.6.2)
+
+- Receipt-like bodies (`/inbound/{id}/receive` lines, `/stock/opening` lines, `/returns` lines,
+  `/counts/{id}/found`) accept `lot` (≤ 40 chars) and `expiresOn` (`YYYY-MM-DD`, requires a lot).
+  LOT/SERIAL SKUs without a lot → `400`; conflicting expiry → `409 LOT_EXPIRY_MISMATCH`.
+- `/outbound` and `/outbound/{id}/lines` lines accept `lot` (must exist for the SKU, else `404`).
+- Serial SKUs: `409 SERIAL_QTY` (more than 1 unit per serial), `409 SERIAL_DUPLICATE` (already on
+  hand or in transit).
+- `GET /stock` rows include `expiresOn` and `expired`; outbound `pickList` rows include `lot`.

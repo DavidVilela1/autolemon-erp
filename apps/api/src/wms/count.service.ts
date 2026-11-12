@@ -26,6 +26,7 @@ import {
   lockPosition,
   newTxn,
   nextDocNumber,
+  registerLot,
   requireSku,
   resolveHolder,
   warehouseCode,
@@ -161,14 +162,15 @@ export class CountService {
   async found(actor: Actor, warehouseId: string, id: string, key: string, input: z.infer<typeof FoundStockInput>) {
     return this.runner.command(actor, warehouseId, 'wms.count', key, 'count.found', { id, ...input }, async (ctx) => {
       await this.lockSession(ctx, id, ['OPEN']);
-      await requireSku(ctx, input.skuId);
+      const sku = await requireSku(ctx, input.skuId);
+      const lot = await registerLot(ctx, sku, input.lot, input.expiresOn);
       const holder = await resolveHolder(ctx, input.holder, { allowedKinds: ['SHELF', 'BIN', 'LOCATION'] });
       const l = await one<{ id: string }>(
         ctx.tx,
         sql`INSERT INTO count_lines (company_id, warehouse_id, session_id, position_id, sku_id, holder_node_id, holder_container_id,
               stock_status, lot_code, qty_snapshot, version_snapshot, qty_counted, counted_by, counted_at, state)
             VALUES (${ctx.companyId}, ${warehouseId}, ${id}, NULL, ${input.skuId}, ${holder.nodeId ?? null}, ${holder.containerId ?? null},
-              'AVAILABLE', ${input.lot ?? ''}, 0, -1, ${input.qtyCounted}::numeric, ${actor.userId}, now(), 'COUNTED') RETURNING id`,
+              'AVAILABLE', ${lot}, 0, -1, ${input.qtyCounted}::numeric, ${actor.userId}, now(), 'COUNTED') RETURNING id`,
       );
       return { lineId: l.id };
     });

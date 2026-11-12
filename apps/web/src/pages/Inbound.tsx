@@ -41,7 +41,7 @@ export function InboundPage() {
   const [openId, setOpenId] = useState<string>();
   const doc = useLoad(() => (openId ? api<InboundDoc>('GET', `${wp(wh)}/inbound/${openId}`) : Promise.resolve(undefined)), [wh, openId]);
   const [nl, setNl] = useState({ skuId: '', qty: '', externalRef: '' });
-  const [rx, setRx] = useState({ staging: '', damaged: '', qty: '1', condition: 'GOOD' });
+  const [rx, setRx] = useState({ staging: '', damaged: '', qty: '1', condition: 'GOOD', lot: '', expiresOn: '' });
   const a = useAction();
   const refresh = () => (list.reload(), doc.reload());
   return (
@@ -157,6 +157,19 @@ export function InboundPage() {
                       { value: 'DAMAGED', label: 'Danificado' },
                     ]}
                   />
+                  <Field
+                    label="Lote / n.º de série (se aplicável)"
+                    value={rx.lot}
+                    onChange={(v) => setRx({ ...rx, lot: v })}
+                    maxLength={40}
+                    autoComplete="off"
+                  />
+                  <Field
+                    label="Validade (se aplicável)"
+                    type="date"
+                    value={rx.expiresOn}
+                    onChange={(v) => setRx({ ...rx, expiresOn: v })}
+                  />
                   <div className="md:col-span-4">
                     <ScanInput
                       label="Ler código de barras do artigo"
@@ -165,7 +178,15 @@ export function InboundPage() {
                           await api('POST', `${wp(wh)}/inbound/${doc.data!.id}/receive`, {
                             stagingNodeId: rx.staging,
                             ...(rx.damaged ? { damagedNodeId: rx.damaged } : {}),
-                            lines: [{ barcode, qty: rx.qty, condition: rx.condition }],
+                            lines: [
+                              {
+                                barcode,
+                                qty: rx.qty,
+                                condition: rx.condition,
+                                ...(rx.lot.trim() ? { lot: rx.lot.trim() } : {}),
+                                ...(rx.expiresOn ? { expiresOn: rx.expiresOn } : {}),
+                              },
+                            ],
                           });
                           refresh();
                         }, `Recebido ${rx.qty} × ${barcode}.`)

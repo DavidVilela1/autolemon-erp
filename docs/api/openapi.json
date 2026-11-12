@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "AutoLemon ERP API (platform + autonomous WMS)",
-    "version": "0.6.1",
+    "version": "0.6.2",
     "description": "Cookie-session API. All writes require X-Requested-With: autolemon and X-CSRF-Token; WMS commands require Idempotency-Key. Generated from code — see docs/API.md."
   },
   "servers": [
@@ -3636,6 +3636,11 @@
                   "lot": {
                     "type": "string",
                     "maxLength": 40
+                  },
+                  "expiresOn": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
                   }
                 },
                 "required": [
@@ -4459,6 +4464,11 @@
                         "lot": {
                           "type": "string",
                           "maxLength": 40
+                        },
+                        "expiresOn": {
+                          "type": "string",
+                          "format": "date",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
                         }
                       },
                       "required": [
@@ -4916,6 +4926,10 @@
                             "number",
                             "string"
                           ]
+                        },
+                        "lot": {
+                          "type": "string",
+                          "maxLength": 40
                         }
                       },
                       "required": [
@@ -5448,6 +5462,10 @@
                             "number",
                             "string"
                           ]
+                        },
+                        "lot": {
+                          "type": "string",
+                          "maxLength": 40
                         }
                       },
                       "required": [
@@ -6810,6 +6828,15 @@
                             "number",
                             "string"
                           ]
+                        },
+                        "lot": {
+                          "type": "string",
+                          "maxLength": 40
+                        },
+                        "expiresOn": {
+                          "type": "string",
+                          "format": "date",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
                         }
                       },
                       "required": [
@@ -7364,6 +7391,11 @@
                         "lot": {
                           "type": "string",
                           "maxLength": 40
+                        },
+                        "expiresOn": {
+                          "type": "string",
+                          "format": "date",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
                         }
                       },
                       "required": [

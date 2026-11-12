@@ -22,6 +22,7 @@ import {
   nextDocNumber,
   relocate,
   requireNodeKind,
+  registerLot,
   requireSku,
   resolveHolder,
   warehouseCode,
@@ -62,8 +63,9 @@ export class ReturnsService {
       const txnId = await newTxn(ctx, 'RETURN_RECEIPT', { referenceType: 'return', referenceId: r.id, idempotencyKey: key });
       let n = 1;
       for (const l of input.lines) {
-        await requireSku(ctx, l.skuId);
-        const pos = await ensurePosition(ctx, { skuId: l.skuId, holder: inspection, status: 'INSPECTION' });
+        const sku = await requireSku(ctx, l.skuId);
+        const lot = await registerLot(ctx, sku, l.lot, l.expiresOn);
+        const pos = await ensurePosition(ctx, { skuId: l.skuId, holder: inspection, status: 'INSPECTION', lot });
         await applyDelta(ctx, txnId, pos, l.qty);
         await ctx.tx
           .execute(sql`INSERT INTO return_lines (company_id, warehouse_id, return_id, line_no, sku_id, inspection_position_id, qty_received)

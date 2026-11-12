@@ -27,6 +27,7 @@ import {
   nextDocNumber,
   relocate,
   requireNodeKind,
+  registerLot,
   requireSku,
   scannedBaseQty,
   resolveHolder,
@@ -166,16 +167,16 @@ export class InboundService {
         // A scan counts packs of the scanned barcode's unit (e.g. case of 12) → base units.
         const qty = l.barcode ? await scannedBaseQty(ctx, line.sku_id, l.barcode, l.qty) : l.qty;
         received.push({ lineId: line.id, skuCode: sku.code, qty });
-        if (sku.tracking !== 'NONE' && !l.lot) throw new ValidationFailed([{ path: 'lot', message: `Lote obrigatório para ${sku.code}` }]);
+        const lot = await registerLot(ctx, sku, l.lot, l.expiresOn);
         if (l.condition === 'DAMAGED') {
           if (!damagedHolder) throw new ValidationFailed([{ path: 'damagedNodeId', message: 'Indique a zona de quarentena/inspeção' }]);
-          const pos = await ensurePosition(ctx, { skuId: line.sku_id, holder: damagedHolder, status: 'DAMAGED', lot: l.lot });
+          const pos = await ensurePosition(ctx, { skuId: line.sku_id, holder: damagedHolder, status: 'DAMAGED', lot });
           await applyDelta(ctx, txnId, pos, qty);
           await ctx.tx.execute(
             sql`UPDATE inbound_lines SET qty_received = qty_received + ${qty}::numeric, qty_damaged = qty_damaged + ${qty}::numeric WHERE id = ${line.id}`,
           );
         } else {
-          const pos = await ensurePosition(ctx, { skuId: line.sku_id, holder: staging, status: 'RECEIVED', lot: l.lot });
+          const pos = await ensurePosition(ctx, { skuId: line.sku_id, holder: staging, status: 'RECEIVED', lot });
           await applyDelta(ctx, txnId, pos, qty);
           await ctx.tx.execute(sql`UPDATE inbound_lines SET qty_received = qty_received + ${qty}::numeric WHERE id = ${line.id}`);
           const t = await one<{ id: string }>(
