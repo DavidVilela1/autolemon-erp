@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "product": "AutoLemon ERP — WMS",
-  "version": "0.6.5",
+  "version": "0.6.6",
   "updatedAt": "2026-11-12",
   "state": "WMS_IN_PROGRESS",
   "allowedStates": [
@@ -346,16 +346,18 @@
     {
       "id": "S-06",
       "requiredResult": "Applicable ASVS Level 2 controls and security negative tests have evidence",
-      "verificationMethod": "Developer self-assessment + test matrix",
+      "verificationMethod": "Requirement-level ASVS 5.0.0 L1+L2 self-assessment as code (253 ids, status + evidence, CI-checked) + security tests",
       "evidence": [
         "docs/security/ASVS_L2_ASSESSMENT.md",
-        "docs/security/SECURITY_TEST_MATRIX.md",
-        "apps/api/src/platform/auth/password.test.ts (offline breached-password corpus)"
+        "docs/security/asvs/assessment.json",
+        "tests/security/asvs-assessment.test.ts",
+        "tests/security/session-controls.test.ts",
+        "docs/DECISIONS/ADR-0028-asvs-l2-requirement-level-review.md"
       ],
       "verifiedAt": "2026-11-12",
       "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
       "status": "FAIL",
-      "openAction": "Breached-password corpus done (offline, opt-in via BREACHED_PASSWORD_CORPUS; owner must supply the HIBP file). Still open: DAST, deployment controls; independent verification"
+      "openAction": "Self-assessment v0.6.6: I+T 91, I 67, P 4 (V6.4.4, V12.3.1, V13.2.4, V16.3.3), O 0, ENV 13, N/A 78. Still open: DAST against staging, the 13 ENV items on the target environment, the 4 partial items, independent verification (S-07)"
     },
     {
       "id": "S-07",

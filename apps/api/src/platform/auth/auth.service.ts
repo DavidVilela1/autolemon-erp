@@ -24,7 +24,7 @@ import { randomToken, safeEqual, sha256 } from '../../common/crypto-util.js';
 import type { AuditService } from '../audit/audit.service.js';
 import type { FieldCrypto } from '../crypto/field-crypto.js';
 import type { Actor } from '../authz/actor.js';
-import { hashPassword, needsRehash, screenPassword, verifyPassword } from './password.js';
+import { hashPassword, needsRehash, type PasswordContext, screenPassword, verifyPassword } from './password.js';
 import type { ThrottleService } from './throttle.service.js';
 import { newRecoveryCodes, newTotpSecret, otpauthUri, verifyTotp } from './totp.js';
 
@@ -257,6 +257,14 @@ export class AuthService {
     return r?.n ?? 0;
   }
 
+  /** Password-screening context of a user: e-mail, display name, company code and name. */
+  async passwordContext(user: UserRow): Promise<PasswordContext> {
+    const c = await this.database.systemTx((tx) =>
+      row<{ code: string; name: string }>(tx, sql`SELECT code, name FROM companies WHERE id = ${user.company_id}`),
+    );
+    return { email: user.email, displayName: user.display_name, companyCode: c?.code, companyName: c?.name };
+  }
+
   /** Loads a user row by id. */
   async userById(userId: string): Promise<UserRow | undefined> {
     return this.database.systemTx((tx) => row<UserRow>(tx, sql`SELECT * FROM users WHERE id = ${userId}`));
@@ -386,7 +394,7 @@ export class AuthService {
     const user = await this.database.systemTx((tx) => row<UserRow>(tx, sql`SELECT * FROM users WHERE id = ${t.user_id}`));
     if (!user || user.status === 'DISABLED') throw new NotFound('Convite');
     if (t.purpose === 'INVITATION') {
-      const reason = screenPassword(password, { email: user.email, displayName: user.display_name });
+      const reason = screenPassword(password, await this.passwordContext(user));
       if (reason) throw new ValidationFailed([{ path: 'password', message: reason }], reason);
     } else if (!user.password_hash || !(await verifyPassword(user.password_hash, password))) {
       await this.throttle.recordFailure(`ott:${client.ip}`, 10);
@@ -472,7 +480,7 @@ export class AuthService {
     const t = await this.findToken(token, ['PASSWORD_RESET'], client);
     const user = await this.database.systemTx((tx) => row<UserRow>(tx, sql`SELECT * FROM users WHERE id = ${t.user_id}`));
     if (!user || user.status === 'DISABLED') throw new NotFound('Pedido');
-    const reason = screenPassword(password, { email: user.email });
+    const reason = screenPassword(password, await this.passwordContext(user));
     if (reason) throw new ValidationFailed([{ path: 'password', message: reason }], reason);
     const h = await hashPassword(password, this.argon());
     await this.database.systemTx(async (tx) => {

@@ -62,6 +62,8 @@ export const STEP_UP_ACTIONS = [
   'pii.read',
   'account.mfa.change',
   'security.alert.ack',
+  'account.sessions.revoke',
+  'users.sessions.revoke',
 ] as const;
 /** Step-up action identifier. */
 export type StepUpAction = (typeof STEP_UP_ACTIONS)[number];

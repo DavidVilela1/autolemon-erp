@@ -78,6 +78,20 @@ export class AdminController {
     return this.s.admin.deactivate(actorOf(req), uuidParam(id));
   }
 
+  /** End every session of one user (step-up). */
+  @Post('admin/users/:id/sessions/revoke')
+  @HttpCode(200)
+  revokeUserSessions(@Req() req: AppRequest, @Param('id') id: string) {
+    return this.s.admin.revokeUserSessions(actorOf(req), uuidParam(id));
+  }
+
+  /** End every session of the company except mine (step-up; incident response). */
+  @Post('admin/sessions/revoke-all')
+  @HttpCode(200)
+  revokeAllSessions(@Req() req: AppRequest) {
+    return this.s.admin.revokeAllSessions(actorOf(req));
+  }
+
   /** MFA reset (step-up). */
   @Post('admin/users/:id/mfa-reset')
   @HttpCode(200)

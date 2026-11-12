@@ -115,3 +115,15 @@ Abbreviations: PKY = `tests/security/passkeys-account.test.ts`; WMS =
 | Integrity | Forged digest, other key, unknown fields, malformed chains and non-Ed25519 keys rejected                        | `audit-digests.test.ts`                | Automated | PASS              |
 | Secrets   | keygen refuses the repository, private key 0600 and never printed; digests read-only; exit codes 0/1/2          | `audit-digests.test.ts`                | Automated | PASS              |
 | Privacy   | Digests contain no audit contents (no IPs, actions)                                                             | `audit-digests.test.ts`                | Automated | PASS              |
+
+## Added in v0.6.6
+
+| Area            | Threat / requirement                                                                                             | Test                                          | Type      | Result (last run) |
+| --------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | --------- | ----------------- |
+| Sessions        | Admin ends one user's / all company sessions: step-up, admin-only, tenant-isolated, audited, caller kept         | `tests/security/session-controls.test.ts`     | Automated | PASS              |
+| Sessions        | Ending another own session needs step-up; idle and absolute expiry refuse the session                            | `session-controls.test.ts`                    | Automated | PASS              |
+| CSRF / XS-Leaks | Cross-site reads (incl. CSV export) refused; TRACE not routed; logout sends Clear-Site-Data                      | `session-controls.test.ts`                    | Automated | PASS              |
+| Authentication  | Recovery codes 120 bits; legacy 80-bit code works once                                                           | `session-controls.test.ts`                    | Automated | PASS              |
+| Authentication  | Top-5000 policy-length common passwords, context-dominated passwords, 64+ chars accepted                         | `apps/api/src/platform/auth/password.test.ts` | Automated | PASS              |
+| Configuration   | Production refuses `DB_SSL` other than verify-full                                                               | `apps/api/src/config/env.test.ts`             | Automated | PASS              |
+| Assurance       | ASVS assessment covers all 253 L1+L2 ids, evidence exists, I+T cites tests, report current; checker fails closed | `tests/security/asvs-assessment.test.ts`      | Automated | PASS              |

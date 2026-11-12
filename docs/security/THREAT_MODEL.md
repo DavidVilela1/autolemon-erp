@@ -136,3 +136,14 @@ flowchart LR
   chain (keep the job off the database host; compare digest series over time).
 - Untrusted input: digest files are size-bounded (16 MB) and strictly schema-validated before
   their signature is checked.
+
+## v0.6.6 changes (ASVS L2 review, ADR-0028)
+
+- New admin endpoints that end sessions: abuse by a hijacked admin session is limited by
+  `admin.security` + step-up, audit entries and the caller keeping only their own session; a
+  mass revocation is visible to every user (forced re-login) and in the audit trail.
+- Users need a fresh factor to end their other sessions, so a stolen session cannot lock out
+  the legitimate user.
+- Cross-site reads refused by Fetch Metadata (defence in depth on top of SameSite=Strict).
+- Password screening now rejects the top 5000 policy-length common passwords and
+  context-dominated passwords; recovery codes 120 bits.

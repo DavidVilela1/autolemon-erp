@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "AutoLemon ERP API (platform + autonomous WMS)",
-    "version": "0.6.5",
+    "version": "0.6.6",
     "description": "Cookie-session API. All writes require X-Requested-With: autolemon and X-CSRF-Token; WMS commands require Idempotency-Key. Generated from code — see docs/API.md."
   },
   "servers": [
@@ -260,6 +260,43 @@
         "security": [
           {
             "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "2XX": {
+            "description": "Success (JSON; CSV for reports/stock.csv)"
+          }
+        }
+      }
+    },
+    "/api/admin/sessions/revoke-all": {
+      "post": {
+        "operationId": "AdminController.revokeAllSessions",
+        "tags": [
+          "Admin"
+        ],
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfToken": []
           }
         ],
         "responses": {
@@ -694,6 +731,54 @@
         "security": [
           {
             "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "2XX": {
+            "description": "Success (JSON; CSV for reports/stock.csv)"
+          }
+        }
+      }
+    },
+    "/api/admin/users/{id}/sessions/revoke": {
+      "post": {
+        "operationId": "AdminController.revokeUserSessions",
+        "tags": [
+          "Admin"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfToken": []
           }
         ],
         "responses": {
@@ -1262,7 +1347,8 @@
                     "pattern": "^\\d{6}$"
                   },
                   "recoveryCode": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 40
                   }
                 },
                 "additionalProperties": false

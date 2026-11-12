@@ -1,0 +1,1527 @@
+{
+  "standard": "OWASP ASVS 5.0.0",
+  "levels": "L1+L2",
+  "source": "https://github.com/OWASP/ASVS/blob/v5.0.0/5.0/docs_en/OWASP_Application_Security_Verification_Standard_5.0.0_en.csv",
+  "sourceSha256": "98c8fe911b9edb403af8ee05d3ce8201ecac2659e313b053890a62847cdcf680",
+  "note": "Requirement identifiers, levels and chapter/section names only. Requirement texts are in the standard (CC BY-SA 4.0).",
+  "requirements": [
+    {
+      "id": "V1.1.1",
+      "level": 2,
+      "chapter": "Encoding and Sanitization",
+      "section": "Encoding and Sanitization Architecture"
+    },
+    {
+      "id": "V1.1.2",
+      "level": 2,
+      "chapter": "Encoding and Sanitization",
+      "section": "Encoding and Sanitization Architecture"
+    },
+    {
+      "id": "V1.2.1",
+      "level": 1,
+      "chapter": "Encoding and Sanitization",
+      "section": "Injection Prevention"
+    },
+    {
+      "id": "V1.2.2",
+      "level": 1,
+      "chapter": "Encoding and Sanitization",
+      "section": "Injection Prevention"
+    },
+    {
+      "id": "V1.2.3",
+      "level": 1,
+      "chapter": "Encoding and Sanitization",
+      "section": "Injection Prevention"
+    },
+    {
+      "id": "V1.2.4",
+      "level": 1,
+      "chapter": "Encoding and Sanitization",
+      "section": "Injection Prevention"
+    },
+    {
+      "id": "V1.2.5",
+      "level": 1,
+      "chapter": "Encoding and Sanitization",
+      "section": "Injection Prevention"
+    },
+    {
+      "id": "V1.2.6",
+      "level": 2,
+      "chapter": "Encoding and Sanitization",
+      "section": "Injection Prevention"
+    },
+    {
+      "id": "V1.2.7",
+      "level": 2,
+      "chapter": "Encoding and Sanitization",
+      "section": "Injection Prevention"
+    },
+    {
+      "id": "V1.2.8",
+      "level": 2,
+      "chapter": "Encoding and Sanitization",
+      "section": "Injection Prevention"
+    },
+    {
+      "id": "V1.2.9",
+      "level": 2,
+      "chapter": "Encoding and Sanitization",
+      "section": "Injection Prevention"
+    },
+    {
+      "id": "V1.3.1",
+      "level": 1,
+      "chapter": "Encoding and Sanitization",
+      "section": "Sanitization"
+    },
+    {
+      "id": "V1.3.2",
+      "level": 1,
+      "chapter": "Encoding and Sanitization",
+      "section": "Sanitization"
+    },
+    {
+      "id": "V1.3.3",
+      "level": 2,
+      "chapter": "Encoding and Sanitization",
+      "section": "Sanitization"
+    },
+    {
+      "id": "V1.3.4",
+      "level": 2,
+      "chapter": "Encoding and Sanitization",
+      "section": "Sanitization"
+    },
+    {
+      "id": "V1.3.5",
+      "level": 2,
+      "chapter": "Encoding and Sanitization",
+      "section": "Sanitization"
+    },
+    {
+      "id": "V1.3.6",
+      "level": 2,
+      "chapter": "Encoding and Sanitization",
+      "section": "Sanitization"
+    },
+    {
+      "id": "V1.3.7",
+      "level": 2,
+      "chapter": "Encoding and Sanitization",
+      "section": "Sanitization"
+    },
+    {
+      "id": "V1.3.8",
+      "level": 2,
+      "chapter": "Encoding and Sanitization",
+      "section": "Sanitization"
+    },
+    {
+      "id": "V1.3.9",
+      "level": 2,
+      "chapter": "Encoding and Sanitization",
+      "section": "Sanitization"
+    },
+    {
+      "id": "V1.3.10",
+      "level": 2,
+      "chapter": "Encoding and Sanitization",
+      "section": "Sanitization"
+    },
+    {
+      "id": "V1.3.11",
+      "level": 2,
+      "chapter": "Encoding and Sanitization",
+      "section": "Sanitization"
+    },
+    {
+      "id": "V1.4.1",
+      "level": 2,
+      "chapter": "Encoding and Sanitization",
+      "section": "Memory, String, and Unmanaged Code"
+    },
+    {
+      "id": "V1.4.2",
+      "level": 2,
+      "chapter": "Encoding and Sanitization",
+      "section": "Memory, String, and Unmanaged Code"
+    },
+    {
+      "id": "V1.4.3",
+      "level": 2,
+      "chapter": "Encoding and Sanitization",
+      "section": "Memory, String, and Unmanaged Code"
+    },
+    {
+      "id": "V1.5.1",
+      "level": 1,
+      "chapter": "Encoding and Sanitization",
+      "section": "Safe Deserialization"
+    },
+    {
+      "id": "V1.5.2",
+      "level": 2,
+      "chapter": "Encoding and Sanitization",
+      "section": "Safe Deserialization"
+    },
+    {
+      "id": "V2.1.1",
+      "level": 1,
+      "chapter": "Validation and Business Logic",
+      "section": "Validation and Business Logic Documentation"
+    },
+    {
+      "id": "V2.1.2",
+      "level": 2,
+      "chapter": "Validation and Business Logic",
+      "section": "Validation and Business Logic Documentation"
+    },
+    {
+      "id": "V2.1.3",
+      "level": 2,
+      "chapter": "Validation and Business Logic",
+      "section": "Validation and Business Logic Documentation"
+    },
+    {
+      "id": "V2.2.1",
+      "level": 1,
+      "chapter": "Validation and Business Logic",
+      "section": "Input Validation"
+    },
+    {
+      "id": "V2.2.2",
+      "level": 1,
+      "chapter": "Validation and Business Logic",
+      "section": "Input Validation"
+    },
+    {
+      "id": "V2.2.3",
+      "level": 2,
+      "chapter": "Validation and Business Logic",
+      "section": "Input Validation"
+    },
+    {
+      "id": "V2.3.1",
+      "level": 1,
+      "chapter": "Validation and Business Logic",
+      "section": "Business Logic Security"
+    },
+    {
+      "id": "V2.3.2",
+      "level": 2,
+      "chapter": "Validation and Business Logic",
+      "section": "Business Logic Security"
+    },
+    {
+      "id": "V2.3.3",
+      "level": 2,
+      "chapter": "Validation and Business Logic",
+      "section": "Business Logic Security"
+    },
+    {
+      "id": "V2.3.4",
+      "level": 2,
+      "chapter": "Validation and Business Logic",
+      "section": "Business Logic Security"
+    },
+    {
+      "id": "V2.4.1",
+      "level": 2,
+      "chapter": "Validation and Business Logic",
+      "section": "Anti-automation"
+    },
+    {
+      "id": "V3.2.1",
+      "level": 1,
+      "chapter": "Web Frontend Security",
+      "section": "Unintended Content Interpretation"
+    },
+    {
+      "id": "V3.2.2",
+      "level": 1,
+      "chapter": "Web Frontend Security",
+      "section": "Unintended Content Interpretation"
+    },
+    {
+      "id": "V3.3.1",
+      "level": 1,
+      "chapter": "Web Frontend Security",
+      "section": "Cookie Setup"
+    },
+    {
+      "id": "V3.3.2",
+      "level": 2,
+      "chapter": "Web Frontend Security",
+      "section": "Cookie Setup"
+    },
+    {
+      "id": "V3.3.3",
+      "level": 2,
+      "chapter": "Web Frontend Security",
+      "section": "Cookie Setup"
+    },
+    {
+      "id": "V3.3.4",
+      "level": 2,
+      "chapter": "Web Frontend Security",
+      "section": "Cookie Setup"
+    },
+    {
+      "id": "V3.4.1",
+      "level": 1,
+      "chapter": "Web Frontend Security",
+      "section": "Browser Security Mechanism Headers"
+    },
+    {
+      "id": "V3.4.2",
+      "level": 1,
+      "chapter": "Web Frontend Security",
+      "section": "Browser Security Mechanism Headers"
+    },
+    {
+      "id": "V3.4.3",
+      "level": 2,
+      "chapter": "Web Frontend Security",
+      "section": "Browser Security Mechanism Headers"
+    },
+    {
+      "id": "V3.4.4",
+      "level": 2,
+      "chapter": "Web Frontend Security",
+      "section": "Browser Security Mechanism Headers"
+    },
+    {
+      "id": "V3.4.5",
+      "level": 2,
+      "chapter": "Web Frontend Security",
+      "section": "Browser Security Mechanism Headers"
+    },
+    {
+      "id": "V3.4.6",
+      "level": 2,
+      "chapter": "Web Frontend Security",
+      "section": "Browser Security Mechanism Headers"
+    },
+    {
+      "id": "V3.5.1",
+      "level": 1,
+      "chapter": "Web Frontend Security",
+      "section": "Browser Origin Separation"
+    },
+    {
+      "id": "V3.5.2",
+      "level": 1,
+      "chapter": "Web Frontend Security",
+      "section": "Browser Origin Separation"
+    },
+    {
+      "id": "V3.5.3",
+      "level": 1,
+      "chapter": "Web Frontend Security",
+      "section": "Browser Origin Separation"
+    },
+    {
+      "id": "V3.5.4",
+      "level": 2,
+      "chapter": "Web Frontend Security",
+      "section": "Browser Origin Separation"
+    },
+    {
+      "id": "V3.5.5",
+      "level": 2,
+      "chapter": "Web Frontend Security",
+      "section": "Browser Origin Separation"
+    },
+    {
+      "id": "V3.7.1",
+      "level": 2,
+      "chapter": "Web Frontend Security",
+      "section": "Other Browser Security Considerations"
+    },
+    {
+      "id": "V3.7.2",
+      "level": 2,
+      "chapter": "Web Frontend Security",
+      "section": "Other Browser Security Considerations"
+    },
+    {
+      "id": "V4.1.1",
+      "level": 1,
+      "chapter": "API and Web Service",
+      "section": "Generic Web Service Security"
+    },
+    {
+      "id": "V4.1.2",
+      "level": 2,
+      "chapter": "API and Web Service",
+      "section": "Generic Web Service Security"
+    },
+    {
+      "id": "V4.1.3",
+      "level": 2,
+      "chapter": "API and Web Service",
+      "section": "Generic Web Service Security"
+    },
+    {
+      "id": "V4.2.1",
+      "level": 2,
+      "chapter": "API and Web Service",
+      "section": "HTTP Message Structure Validation"
+    },
+    {
+      "id": "V4.3.1",
+      "level": 2,
+      "chapter": "API and Web Service",
+      "section": "GraphQL"
+    },
+    {
+      "id": "V4.3.2",
+      "level": 2,
+      "chapter": "API and Web Service",
+      "section": "GraphQL"
+    },
+    {
+      "id": "V4.4.1",
+      "level": 1,
+      "chapter": "API and Web Service",
+      "section": "WebSocket"
+    },
+    {
+      "id": "V4.4.2",
+      "level": 2,
+      "chapter": "API and Web Service",
+      "section": "WebSocket"
+    },
+    {
+      "id": "V4.4.3",
+      "level": 2,
+      "chapter": "API and Web Service",
+      "section": "WebSocket"
+    },
+    {
+      "id": "V4.4.4",
+      "level": 2,
+      "chapter": "API and Web Service",
+      "section": "WebSocket"
+    },
+    {
+      "id": "V5.1.1",
+      "level": 2,
+      "chapter": "File Handling",
+      "section": "File Handling Documentation"
+    },
+    {
+      "id": "V5.2.1",
+      "level": 1,
+      "chapter": "File Handling",
+      "section": "File Upload and Content"
+    },
+    {
+      "id": "V5.2.2",
+      "level": 1,
+      "chapter": "File Handling",
+      "section": "File Upload and Content"
+    },
+    {
+      "id": "V5.2.3",
+      "level": 2,
+      "chapter": "File Handling",
+      "section": "File Upload and Content"
+    },
+    {
+      "id": "V5.3.1",
+      "level": 1,
+      "chapter": "File Handling",
+      "section": "File Storage"
+    },
+    {
+      "id": "V5.3.2",
+      "level": 1,
+      "chapter": "File Handling",
+      "section": "File Storage"
+    },
+    {
+      "id": "V5.4.1",
+      "level": 2,
+      "chapter": "File Handling",
+      "section": "File Download"
+    },
+    {
+      "id": "V5.4.2",
+      "level": 2,
+      "chapter": "File Handling",
+      "section": "File Download"
+    },
+    {
+      "id": "V5.4.3",
+      "level": 2,
+      "chapter": "File Handling",
+      "section": "File Download"
+    },
+    {
+      "id": "V6.1.1",
+      "level": 1,
+      "chapter": "Authentication",
+      "section": "Authentication Documentation"
+    },
+    {
+      "id": "V6.1.2",
+      "level": 2,
+      "chapter": "Authentication",
+      "section": "Authentication Documentation"
+    },
+    {
+      "id": "V6.1.3",
+      "level": 2,
+      "chapter": "Authentication",
+      "section": "Authentication Documentation"
+    },
+    {
+      "id": "V6.2.1",
+      "level": 1,
+      "chapter": "Authentication",
+      "section": "Password Security"
+    },
+    {
+      "id": "V6.2.2",
+      "level": 1,
+      "chapter": "Authentication",
+      "section": "Password Security"
+    },
+    {
+      "id": "V6.2.3",
+      "level": 1,
+      "chapter": "Authentication",
+      "section": "Password Security"
+    },
+    {
+      "id": "V6.2.4",
+      "level": 1,
+      "chapter": "Authentication",
+      "section": "Password Security"
+    },
+    {
+      "id": "V6.2.5",
+      "level": 1,
+      "chapter": "Authentication",
+      "section": "Password Security"
+    },
+    {
+      "id": "V6.2.6",
+      "level": 1,
+      "chapter": "Authentication",
+      "section": "Password Security"
+    },
+    {
+      "id": "V6.2.7",
+      "level": 1,
+      "chapter": "Authentication",
+      "section": "Password Security"
+    },
+    {
+      "id": "V6.2.8",
+      "level": 1,
+      "chapter": "Authentication",
+      "section": "Password Security"
+    },
+    {
+      "id": "V6.2.9",
+      "level": 2,
+      "chapter": "Authentication",
+      "section": "Password Security"
+    },
+    {
+      "id": "V6.2.10",
+      "level": 2,
+      "chapter": "Authentication",
+      "section": "Password Security"
+    },
+    {
+      "id": "V6.2.11",
+      "level": 2,
+      "chapter": "Authentication",
+      "section": "Password Security"
+    },
+    {
+      "id": "V6.2.12",
+      "level": 2,
+      "chapter": "Authentication",
+      "section": "Password Security"
+    },
+    {
+      "id": "V6.3.1",
+      "level": 1,
+      "chapter": "Authentication",
+      "section": "General Authentication Security"
+    },
+    {
+      "id": "V6.3.2",
+      "level": 1,
+      "chapter": "Authentication",
+      "section": "General Authentication Security"
+    },
+    {
+      "id": "V6.3.3",
+      "level": 2,
+      "chapter": "Authentication",
+      "section": "General Authentication Security"
+    },
+    {
+      "id": "V6.3.4",
+      "level": 2,
+      "chapter": "Authentication",
+      "section": "General Authentication Security"
+    },
+    {
+      "id": "V6.4.1",
+      "level": 1,
+      "chapter": "Authentication",
+      "section": "Authentication Factor Lifecycle and Recovery"
+    },
+    {
+      "id": "V6.4.2",
+      "level": 1,
+      "chapter": "Authentication",
+      "section": "Authentication Factor Lifecycle and Recovery"
+    },
+    {
+      "id": "V6.4.3",
+      "level": 2,
+      "chapter": "Authentication",
+      "section": "Authentication Factor Lifecycle and Recovery"
+    },
+    {
+      "id": "V6.4.4",
+      "level": 2,
+      "chapter": "Authentication",
+      "section": "Authentication Factor Lifecycle and Recovery"
+    },
+    {
+      "id": "V6.5.1",
+      "level": 2,
+      "chapter": "Authentication",
+      "section": "General Multi-factor authentication requirements"
+    },
+    {
+      "id": "V6.5.2",
+      "level": 2,
+      "chapter": "Authentication",
+      "section": "General Multi-factor authentication requirements"
+    },
+    {
+      "id": "V6.5.3",
+      "level": 2,
+      "chapter": "Authentication",
+      "section": "General Multi-factor authentication requirements"
+    },
+    {
+      "id": "V6.5.4",
+      "level": 2,
+      "chapter": "Authentication",
+      "section": "General Multi-factor authentication requirements"
+    },
+    {
+      "id": "V6.5.5",
+      "level": 2,
+      "chapter": "Authentication",
+      "section": "General Multi-factor authentication requirements"
+    },
+    {
+      "id": "V6.6.1",
+      "level": 2,
+      "chapter": "Authentication",
+      "section": "Out-of-Band authentication mechanisms"
+    },
+    {
+      "id": "V6.6.2",
+      "level": 2,
+      "chapter": "Authentication",
+      "section": "Out-of-Band authentication mechanisms"
+    },
+    {
+      "id": "V6.6.3",
+      "level": 2,
+      "chapter": "Authentication",
+      "section": "Out-of-Band authentication mechanisms"
+    },
+    {
+      "id": "V6.8.1",
+      "level": 2,
+      "chapter": "Authentication",
+      "section": "Authentication with an Identity Provider"
+    },
+    {
+      "id": "V6.8.2",
+      "level": 2,
+      "chapter": "Authentication",
+      "section": "Authentication with an Identity Provider"
+    },
+    {
+      "id": "V6.8.3",
+      "level": 2,
+      "chapter": "Authentication",
+      "section": "Authentication with an Identity Provider"
+    },
+    {
+      "id": "V6.8.4",
+      "level": 2,
+      "chapter": "Authentication",
+      "section": "Authentication with an Identity Provider"
+    },
+    {
+      "id": "V7.1.1",
+      "level": 2,
+      "chapter": "Session Management",
+      "section": "Session Management Documentation"
+    },
+    {
+      "id": "V7.1.2",
+      "level": 2,
+      "chapter": "Session Management",
+      "section": "Session Management Documentation"
+    },
+    {
+      "id": "V7.1.3",
+      "level": 2,
+      "chapter": "Session Management",
+      "section": "Session Management Documentation"
+    },
+    {
+      "id": "V7.2.1",
+      "level": 1,
+      "chapter": "Session Management",
+      "section": "Fundamental Session Management Security"
+    },
+    {
+      "id": "V7.2.2",
+      "level": 1,
+      "chapter": "Session Management",
+      "section": "Fundamental Session Management Security"
+    },
+    {
+      "id": "V7.2.3",
+      "level": 1,
+      "chapter": "Session Management",
+      "section": "Fundamental Session Management Security"
+    },
+    {
+      "id": "V7.2.4",
+      "level": 1,
+      "chapter": "Session Management",
+      "section": "Fundamental Session Management Security"
+    },
+    {
+      "id": "V7.3.1",
+      "level": 2,
+      "chapter": "Session Management",
+      "section": "Session Timeout"
+    },
+    {
+      "id": "V7.3.2",
+      "level": 2,
+      "chapter": "Session Management",
+      "section": "Session Timeout"
+    },
+    {
+      "id": "V7.4.1",
+      "level": 1,
+      "chapter": "Session Management",
+      "section": "Session Termination"
+    },
+    {
+      "id": "V7.4.2",
+      "level": 1,
+      "chapter": "Session Management",
+      "section": "Session Termination"
+    },
+    {
+      "id": "V7.4.3",
+      "level": 2,
+      "chapter": "Session Management",
+      "section": "Session Termination"
+    },
+    {
+      "id": "V7.4.4",
+      "level": 2,
+      "chapter": "Session Management",
+      "section": "Session Termination"
+    },
+    {
+      "id": "V7.4.5",
+      "level": 2,
+      "chapter": "Session Management",
+      "section": "Session Termination"
+    },
+    {
+      "id": "V7.5.1",
+      "level": 2,
+      "chapter": "Session Management",
+      "section": "Defenses Against Session Abuse"
+    },
+    {
+      "id": "V7.5.2",
+      "level": 2,
+      "chapter": "Session Management",
+      "section": "Defenses Against Session Abuse"
+    },
+    {
+      "id": "V7.6.1",
+      "level": 2,
+      "chapter": "Session Management",
+      "section": "Federated Re-authentication"
+    },
+    {
+      "id": "V7.6.2",
+      "level": 2,
+      "chapter": "Session Management",
+      "section": "Federated Re-authentication"
+    },
+    {
+      "id": "V8.1.1",
+      "level": 1,
+      "chapter": "Authorization",
+      "section": "Authorization Documentation"
+    },
+    {
+      "id": "V8.1.2",
+      "level": 2,
+      "chapter": "Authorization",
+      "section": "Authorization Documentation"
+    },
+    {
+      "id": "V8.2.1",
+      "level": 1,
+      "chapter": "Authorization",
+      "section": "General Authorization Design"
+    },
+    {
+      "id": "V8.2.2",
+      "level": 1,
+      "chapter": "Authorization",
+      "section": "General Authorization Design"
+    },
+    {
+      "id": "V8.2.3",
+      "level": 2,
+      "chapter": "Authorization",
+      "section": "General Authorization Design"
+    },
+    {
+      "id": "V8.3.1",
+      "level": 1,
+      "chapter": "Authorization",
+      "section": "Operation Level Authorization"
+    },
+    {
+      "id": "V8.4.1",
+      "level": 2,
+      "chapter": "Authorization",
+      "section": "Other Authorization Considerations"
+    },
+    {
+      "id": "V9.1.1",
+      "level": 1,
+      "chapter": "Self-contained Tokens",
+      "section": "Token source and integrity"
+    },
+    {
+      "id": "V9.1.2",
+      "level": 1,
+      "chapter": "Self-contained Tokens",
+      "section": "Token source and integrity"
+    },
+    {
+      "id": "V9.1.3",
+      "level": 1,
+      "chapter": "Self-contained Tokens",
+      "section": "Token source and integrity"
+    },
+    {
+      "id": "V9.2.1",
+      "level": 1,
+      "chapter": "Self-contained Tokens",
+      "section": "Token content"
+    },
+    {
+      "id": "V9.2.2",
+      "level": 2,
+      "chapter": "Self-contained Tokens",
+      "section": "Token content"
+    },
+    {
+      "id": "V9.2.3",
+      "level": 2,
+      "chapter": "Self-contained Tokens",
+      "section": "Token content"
+    },
+    {
+      "id": "V9.2.4",
+      "level": 2,
+      "chapter": "Self-contained Tokens",
+      "section": "Token content"
+    },
+    {
+      "id": "V10.1.1",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "Generic OAuth and OIDC Security"
+    },
+    {
+      "id": "V10.1.2",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "Generic OAuth and OIDC Security"
+    },
+    {
+      "id": "V10.2.1",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "OAuth Client"
+    },
+    {
+      "id": "V10.2.2",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "OAuth Client"
+    },
+    {
+      "id": "V10.3.1",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "OAuth Resource Server"
+    },
+    {
+      "id": "V10.3.2",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "OAuth Resource Server"
+    },
+    {
+      "id": "V10.3.3",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "OAuth Resource Server"
+    },
+    {
+      "id": "V10.3.4",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "OAuth Resource Server"
+    },
+    {
+      "id": "V10.4.1",
+      "level": 1,
+      "chapter": "OAuth and OIDC",
+      "section": "OAuth Authorization Server"
+    },
+    {
+      "id": "V10.4.2",
+      "level": 1,
+      "chapter": "OAuth and OIDC",
+      "section": "OAuth Authorization Server"
+    },
+    {
+      "id": "V10.4.3",
+      "level": 1,
+      "chapter": "OAuth and OIDC",
+      "section": "OAuth Authorization Server"
+    },
+    {
+      "id": "V10.4.4",
+      "level": 1,
+      "chapter": "OAuth and OIDC",
+      "section": "OAuth Authorization Server"
+    },
+    {
+      "id": "V10.4.5",
+      "level": 1,
+      "chapter": "OAuth and OIDC",
+      "section": "OAuth Authorization Server"
+    },
+    {
+      "id": "V10.4.6",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "OAuth Authorization Server"
+    },
+    {
+      "id": "V10.4.7",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "OAuth Authorization Server"
+    },
+    {
+      "id": "V10.4.8",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "OAuth Authorization Server"
+    },
+    {
+      "id": "V10.4.9",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "OAuth Authorization Server"
+    },
+    {
+      "id": "V10.4.10",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "OAuth Authorization Server"
+    },
+    {
+      "id": "V10.4.11",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "OAuth Authorization Server"
+    },
+    {
+      "id": "V10.5.1",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "OIDC Client"
+    },
+    {
+      "id": "V10.5.2",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "OIDC Client"
+    },
+    {
+      "id": "V10.5.3",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "OIDC Client"
+    },
+    {
+      "id": "V10.5.4",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "OIDC Client"
+    },
+    {
+      "id": "V10.5.5",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "OIDC Client"
+    },
+    {
+      "id": "V10.6.1",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "OpenID Provider"
+    },
+    {
+      "id": "V10.6.2",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "OpenID Provider"
+    },
+    {
+      "id": "V10.7.1",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "Consent Management"
+    },
+    {
+      "id": "V10.7.2",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "Consent Management"
+    },
+    {
+      "id": "V10.7.3",
+      "level": 2,
+      "chapter": "OAuth and OIDC",
+      "section": "Consent Management"
+    },
+    {
+      "id": "V11.1.1",
+      "level": 2,
+      "chapter": "Cryptography",
+      "section": "Cryptographic Inventory and Documentation"
+    },
+    {
+      "id": "V11.1.2",
+      "level": 2,
+      "chapter": "Cryptography",
+      "section": "Cryptographic Inventory and Documentation"
+    },
+    {
+      "id": "V11.2.1",
+      "level": 2,
+      "chapter": "Cryptography",
+      "section": "Secure Cryptography Implementation"
+    },
+    {
+      "id": "V11.2.2",
+      "level": 2,
+      "chapter": "Cryptography",
+      "section": "Secure Cryptography Implementation"
+    },
+    {
+      "id": "V11.2.3",
+      "level": 2,
+      "chapter": "Cryptography",
+      "section": "Secure Cryptography Implementation"
+    },
+    {
+      "id": "V11.3.1",
+      "level": 1,
+      "chapter": "Cryptography",
+      "section": "Encryption Algorithms"
+    },
+    {
+      "id": "V11.3.2",
+      "level": 1,
+      "chapter": "Cryptography",
+      "section": "Encryption Algorithms"
+    },
+    {
+      "id": "V11.3.3",
+      "level": 2,
+      "chapter": "Cryptography",
+      "section": "Encryption Algorithms"
+    },
+    {
+      "id": "V11.4.1",
+      "level": 1,
+      "chapter": "Cryptography",
+      "section": "Hashing and Hash-based Functions"
+    },
+    {
+      "id": "V11.4.2",
+      "level": 2,
+      "chapter": "Cryptography",
+      "section": "Hashing and Hash-based Functions"
+    },
+    {
+      "id": "V11.4.3",
+      "level": 2,
+      "chapter": "Cryptography",
+      "section": "Hashing and Hash-based Functions"
+    },
+    {
+      "id": "V11.4.4",
+      "level": 2,
+      "chapter": "Cryptography",
+      "section": "Hashing and Hash-based Functions"
+    },
+    {
+      "id": "V11.5.1",
+      "level": 2,
+      "chapter": "Cryptography",
+      "section": "Random Values"
+    },
+    {
+      "id": "V11.6.1",
+      "level": 2,
+      "chapter": "Cryptography",
+      "section": "Public Key Cryptography"
+    },
+    {
+      "id": "V12.1.1",
+      "level": 1,
+      "chapter": "Secure Communication",
+      "section": "General TLS Security Guidance"
+    },
+    {
+      "id": "V12.1.2",
+      "level": 2,
+      "chapter": "Secure Communication",
+      "section": "General TLS Security Guidance"
+    },
+    {
+      "id": "V12.1.3",
+      "level": 2,
+      "chapter": "Secure Communication",
+      "section": "General TLS Security Guidance"
+    },
+    {
+      "id": "V12.2.1",
+      "level": 1,
+      "chapter": "Secure Communication",
+      "section": "HTTPS Communication with External Facing Services"
+    },
+    {
+      "id": "V12.2.2",
+      "level": 1,
+      "chapter": "Secure Communication",
+      "section": "HTTPS Communication with External Facing Services"
+    },
+    {
+      "id": "V12.3.1",
+      "level": 2,
+      "chapter": "Secure Communication",
+      "section": "General Service to Service Communication Security"
+    },
+    {
+      "id": "V12.3.2",
+      "level": 2,
+      "chapter": "Secure Communication",
+      "section": "General Service to Service Communication Security"
+    },
+    {
+      "id": "V12.3.3",
+      "level": 2,
+      "chapter": "Secure Communication",
+      "section": "General Service to Service Communication Security"
+    },
+    {
+      "id": "V12.3.4",
+      "level": 2,
+      "chapter": "Secure Communication",
+      "section": "General Service to Service Communication Security"
+    },
+    {
+      "id": "V13.1.1",
+      "level": 2,
+      "chapter": "Configuration",
+      "section": "Configuration Documentation"
+    },
+    {
+      "id": "V13.2.1",
+      "level": 2,
+      "chapter": "Configuration",
+      "section": "Backend Communication Configuration"
+    },
+    {
+      "id": "V13.2.2",
+      "level": 2,
+      "chapter": "Configuration",
+      "section": "Backend Communication Configuration"
+    },
+    {
+      "id": "V13.2.3",
+      "level": 2,
+      "chapter": "Configuration",
+      "section": "Backend Communication Configuration"
+    },
+    {
+      "id": "V13.2.4",
+      "level": 2,
+      "chapter": "Configuration",
+      "section": "Backend Communication Configuration"
+    },
+    {
+      "id": "V13.2.5",
+      "level": 2,
+      "chapter": "Configuration",
+      "section": "Backend Communication Configuration"
+    },
+    {
+      "id": "V13.3.1",
+      "level": 2,
+      "chapter": "Configuration",
+      "section": "Secret Management"
+    },
+    {
+      "id": "V13.3.2",
+      "level": 2,
+      "chapter": "Configuration",
+      "section": "Secret Management"
+    },
+    {
+      "id": "V13.4.1",
+      "level": 1,
+      "chapter": "Configuration",
+      "section": "Unintended Information Leakage"
+    },
+    {
+      "id": "V13.4.2",
+      "level": 2,
+      "chapter": "Configuration",
+      "section": "Unintended Information Leakage"
+    },
+    {
+      "id": "V13.4.3",
+      "level": 2,
+      "chapter": "Configuration",
+      "section": "Unintended Information Leakage"
+    },
+    {
+      "id": "V13.4.4",
+      "level": 2,
+      "chapter": "Configuration",
+      "section": "Unintended Information Leakage"
+    },
+    {
+      "id": "V13.4.5",
+      "level": 2,
+      "chapter": "Configuration",
+      "section": "Unintended Information Leakage"
+    },
+    {
+      "id": "V14.1.1",
+      "level": 2,
+      "chapter": "Data Protection",
+      "section": "Data Protection Documentation"
+    },
+    {
+      "id": "V14.1.2",
+      "level": 2,
+      "chapter": "Data Protection",
+      "section": "Data Protection Documentation"
+    },
+    {
+      "id": "V14.2.1",
+      "level": 1,
+      "chapter": "Data Protection",
+      "section": "General Data Protection"
+    },
+    {
+      "id": "V14.2.2",
+      "level": 2,
+      "chapter": "Data Protection",
+      "section": "General Data Protection"
+    },
+    {
+      "id": "V14.2.3",
+      "level": 2,
+      "chapter": "Data Protection",
+      "section": "General Data Protection"
+    },
+    {
+      "id": "V14.2.4",
+      "level": 2,
+      "chapter": "Data Protection",
+      "section": "General Data Protection"
+    },
+    {
+      "id": "V14.3.1",
+      "level": 1,
+      "chapter": "Data Protection",
+      "section": "Client-side Data Protection"
+    },
+    {
+      "id": "V14.3.2",
+      "level": 2,
+      "chapter": "Data Protection",
+      "section": "Client-side Data Protection"
+    },
+    {
+      "id": "V14.3.3",
+      "level": 2,
+      "chapter": "Data Protection",
+      "section": "Client-side Data Protection"
+    },
+    {
+      "id": "V15.1.1",
+      "level": 1,
+      "chapter": "Secure Coding and Architecture",
+      "section": "Secure Coding and Architecture Documentation"
+    },
+    {
+      "id": "V15.1.2",
+      "level": 2,
+      "chapter": "Secure Coding and Architecture",
+      "section": "Secure Coding and Architecture Documentation"
+    },
+    {
+      "id": "V15.1.3",
+      "level": 2,
+      "chapter": "Secure Coding and Architecture",
+      "section": "Secure Coding and Architecture Documentation"
+    },
+    {
+      "id": "V15.2.1",
+      "level": 1,
+      "chapter": "Secure Coding and Architecture",
+      "section": "Security Architecture and Dependencies"
+    },
+    {
+      "id": "V15.2.2",
+      "level": 2,
+      "chapter": "Secure Coding and Architecture",
+      "section": "Security Architecture and Dependencies"
+    },
+    {
+      "id": "V15.2.3",
+      "level": 2,
+      "chapter": "Secure Coding and Architecture",
+      "section": "Security Architecture and Dependencies"
+    },
+    {
+      "id": "V15.3.1",
+      "level": 1,
+      "chapter": "Secure Coding and Architecture",
+      "section": "Defensive Coding"
+    },
+    {
+      "id": "V15.3.2",
+      "level": 2,
+      "chapter": "Secure Coding and Architecture",
+      "section": "Defensive Coding"
+    },
+    {
+      "id": "V15.3.3",
+      "level": 2,
+      "chapter": "Secure Coding and Architecture",
+      "section": "Defensive Coding"
+    },
+    {
+      "id": "V15.3.4",
+      "level": 2,
+      "chapter": "Secure Coding and Architecture",
+      "section": "Defensive Coding"
+    },
+    {
+      "id": "V15.3.5",
+      "level": 2,
+      "chapter": "Secure Coding and Architecture",
+      "section": "Defensive Coding"
+    },
+    {
+      "id": "V15.3.6",
+      "level": 2,
+      "chapter": "Secure Coding and Architecture",
+      "section": "Defensive Coding"
+    },
+    {
+      "id": "V15.3.7",
+      "level": 2,
+      "chapter": "Secure Coding and Architecture",
+      "section": "Defensive Coding"
+    },
+    {
+      "id": "V16.1.1",
+      "level": 2,
+      "chapter": "Security Logging and Error Handling",
+      "section": "Security Logging Documentation"
+    },
+    {
+      "id": "V16.2.1",
+      "level": 2,
+      "chapter": "Security Logging and Error Handling",
+      "section": "General Logging"
+    },
+    {
+      "id": "V16.2.2",
+      "level": 2,
+      "chapter": "Security Logging and Error Handling",
+      "section": "General Logging"
+    },
+    {
+      "id": "V16.2.3",
+      "level": 2,
+      "chapter": "Security Logging and Error Handling",
+      "section": "General Logging"
+    },
+    {
+      "id": "V16.2.4",
+      "level": 2,
+      "chapter": "Security Logging and Error Handling",
+      "section": "General Logging"
+    },
+    {
+      "id": "V16.2.5",
+      "level": 2,
+      "chapter": "Security Logging and Error Handling",
+      "section": "General Logging"
+    },
+    {
+      "id": "V16.3.1",
+      "level": 2,
+      "chapter": "Security Logging and Error Handling",
+      "section": "Security Events"
+    },
+    {
+      "id": "V16.3.2",
+      "level": 2,
+      "chapter": "Security Logging and Error Handling",
+      "section": "Security Events"
+    },
+    {
+      "id": "V16.3.3",
+      "level": 2,
+      "chapter": "Security Logging and Error Handling",
+      "section": "Security Events"
+    },
+    {
+      "id": "V16.3.4",
+      "level": 2,
+      "chapter": "Security Logging and Error Handling",
+      "section": "Security Events"
+    },
+    {
+      "id": "V16.4.1",
+      "level": 2,
+      "chapter": "Security Logging and Error Handling",
+      "section": "Log Protection"
+    },
+    {
+      "id": "V16.4.2",
+      "level": 2,
+      "chapter": "Security Logging and Error Handling",
+      "section": "Log Protection"
+    },
+    {
+      "id": "V16.4.3",
+      "level": 2,
+      "chapter": "Security Logging and Error Handling",
+      "section": "Log Protection"
+    },
+    {
+      "id": "V16.5.1",
+      "level": 2,
+      "chapter": "Security Logging and Error Handling",
+      "section": "Error Handling"
+    },
+    {
+      "id": "V16.5.2",
+      "level": 2,
+      "chapter": "Security Logging and Error Handling",
+      "section": "Error Handling"
+    },
+    {
+      "id": "V16.5.3",
+      "level": 2,
+      "chapter": "Security Logging and Error Handling",
+      "section": "Error Handling"
+    },
+    {
+      "id": "V17.1.1",
+      "level": 2,
+      "chapter": "WebRTC",
+      "section": "TURN Server"
+    },
+    {
+      "id": "V17.2.1",
+      "level": 2,
+      "chapter": "WebRTC",
+      "section": "Media"
+    },
+    {
+      "id": "V17.2.2",
+      "level": 2,
+      "chapter": "WebRTC",
+      "section": "Media"
+    },
+    {
+      "id": "V17.2.3",
+      "level": 2,
+      "chapter": "WebRTC",
+      "section": "Media"
+    },
+    {
+      "id": "V17.2.4",
+      "level": 2,
+      "chapter": "WebRTC",
+      "section": "Media"
+    },
+    {
+      "id": "V17.3.1",
+      "level": 2,
+      "chapter": "WebRTC",
+      "section": "Signaling"
+    },
+    {
+      "id": "V17.3.2",
+      "level": 2,
+      "chapter": "WebRTC",
+      "section": "Signaling"
+    }
+  ]
+}

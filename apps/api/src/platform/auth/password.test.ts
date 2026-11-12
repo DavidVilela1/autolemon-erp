@@ -34,9 +34,34 @@ describe('password screening (NIST 800-63B style)', () => {
     ['contains email', 'joana.silva-2026!'],
     ['repetitive', 'aaaaaaaaaaaaaa'],
     ['app name', 'my-autolemon-pass'],
+    ['top common that fits the policy (V6.2.4)', 'Q1W2E3R4T5Y6'],
+    ['top common 2', 'qwerty123456'],
   ])('rejects %s', (_l, pw) => expect(screenPassword(pw, ctx)).toBeDefined());
   it('accepts long unique passphrases without composition rules', () => {
     expect(screenPassword('cavalo correto bateria agrafo', ctx)).toBeUndefined();
+  });
+  it('ships at least 3000 policy-length common passwords (ASVS 5.0 V6.2.4)', async () => {
+    const { POLICY_COMMON_PASSWORD_HASHES } = await import('./policy-common-passwords.js');
+    expect(POLICY_COMMON_PASSWORD_HASHES.size).toBeGreaterThanOrEqual(3000);
+  });
+  it('accepts 64+ character passwords and checks them exactly as typed (no truncation)', () => {
+    const long = 'uma frase muito comprida sobre caixas azuis e paletes vermelhas, 2026';
+    expect(long.length).toBeGreaterThan(64);
+    expect(screenPassword(long, ctx)).toBeUndefined();
+  });
+  describe('documented context words (ASVS 5.0 V6.1.2 / V6.2.11)', () => {
+    const full = { email: 'rui.costa@pecasnorte.pt', displayName: 'Rui Costa', companyCode: 'PNORTE', companyName: 'Peças do Norte Lda' };
+    it.each([
+      ['domain word + year', 'ArmazemNovo26'],
+      ['role words', 'AdministradorPorto1'],
+      ['company code', 'PNORTE-2026-xyz'],
+      ['company name', 'pecas do norte 1!'],
+      ['display name', 'Costa.Rui.2026#'],
+      ['accent-folded', 'Armazém-Lisboa-99'],
+    ])('rejects %s', (_l, pw) => expect(screenPassword(pw, full)).toMatch(/previsíveis|e-mail/));
+    it('accepts a passphrase that merely contains a context word', () => {
+      expect(screenPassword('o meu armazem tem caixas azuis', full)).toBeUndefined();
+    });
   });
 });
 
@@ -47,7 +72,7 @@ describe('breached-password corpus (offline, SHA-1, binary search)', () => {
     const { tmpdir } = await import('node:os');
     const { join } = await import('node:path');
     const { BreachedPasswordCorpus, configureBreachedCorpus } = await import('./breached-corpus.js');
-    const breached = ['correct horse battery staple', 'Lisboa-Porto-2026!', 'armazem central norte'];
+    const breached = ['correct horse battery staple', 'Coimbra-Braga-2026!', 'armazem central norte'];
     const filler = Array.from({ length: 500 }, (_, i) => `filler-password-${i}`);
     const lines = [...breached, ...filler].map((p) => createHash('sha1').update(p).digest('hex').toUpperCase()).sort();
     const dir = mkdtempSync(join(tmpdir(), 'corpus-'));
@@ -58,7 +83,7 @@ describe('breached-password corpus (offline, SHA-1, binary search)', () => {
     for (const p of breached) expect(screenPassword(p, { email: 'x@example.test' })).toMatch(/fugas de dados/);
     expect(screenPassword('uma frase nova e longa 81', { email: 'x@example.test' })).toBeUndefined();
     configureBreachedCorpus(undefined);
-    expect(screenPassword('Lisboa-Porto-2026!', { email: 'x@example.test' })).toBeUndefined();
+    expect(screenPassword('Coimbra-Braga-2026!', { email: 'x@example.test' })).toBeUndefined();
     writeFileSync(join(dir, 'bad.txt'), 'ABC\n');
     expect(() => new BreachedPasswordCorpus(join(dir, 'bad.txt'))).toThrow(/41-byte/);
     writeFileSync(

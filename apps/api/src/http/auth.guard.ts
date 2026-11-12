@@ -38,6 +38,10 @@ export class AuthGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<AppRequest>();
     const isPublic = this.reflector.getAllAndOverride<boolean>(PUBLIC_ROUTE, [context.getHandler(), context.getClass()]);
     const mutating = !SAFE_METHODS.has(req.method);
+    // Fetch Metadata resource isolation for EVERY API request, reads included (ASVS 5.0
+    // V3.5.3 alternative): a browser request started by another site is refused before any
+    // handler runs, so cross-site GETs (e.g. a CSV export URL in an <img>/<a>) never execute.
+    if (req.headers['sec-fetch-site'] === 'cross-site') throw new Forbidden('cross_site_fetch', 'Pedido entre sites não permitido');
     if (mutating) this.checkRequestOrigin(req);
     if (isPublic) return true;
 

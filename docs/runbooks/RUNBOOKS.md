@@ -26,8 +26,10 @@ Write the incident record (§9) before closing.
 
 ## 1. Suspected account compromise (SEV-1)
 
-1. **Contain** — Administração → user → _Desativar_ (revokes all sessions immediately). If the
-   account is an administrator and you are the only one, use §3.
+1. **Contain** — Administração → user → _Terminar sessões_ (step-up; v0.6.6) to cut a stolen
+   session while you investigate, or _Desativar_ to also block new logins. Several accounts or
+   unknown scope: Segurança → _Terminar todas as sessões_ (everyone except you signs in again).
+   If the account is an administrator and you are the only one, use §3.
 2. **MFA reset** — Administração → _Repor MFA_ (step-up). This removes TOTP, recovery codes and
    **all passkeys** (v0.6.1) and revokes sessions. Give the new enrolment link only through a
    verified channel (in person / known phone number).

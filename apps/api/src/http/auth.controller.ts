@@ -215,6 +215,9 @@ export class AuthController {
     const token = sessionToken(req, this.s.cfg);
     if (token) await this.s.auth.logout(token, clientInfo(req));
     clearSessionCookie(reply, this.s.cfg);
+    // ASVS 5.0 V14.3.1: ask the browser to drop cached responses and any client storage of
+    // this origin as well (the SPA also resets its in-memory state).
+    void reply.header('Clear-Site-Data', '"cache", "storage"');
     return { loggedOut: true };
   }
 

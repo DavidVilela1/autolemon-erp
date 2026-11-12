@@ -41,6 +41,19 @@ describe('loadConfig', () => {
         COOKIE_SECURE: 'false',
       }),
     ).toThrow(/COOKIE_SECURE/);
+    // ASVS 5.0 V12.3.1/V12.3.2: database TLS with certificate and host-name verification.
+    for (const DB_SSL of ['disable', 'require']) {
+      expect(() =>
+        loadConfig({
+          ...base,
+          NODE_ENV: 'production',
+          KEY_PROVIDER: 'external-kms',
+          DB_SSL,
+          WEB_ORIGIN: 'https://erp.example',
+          ADMIN_PASSKEY_REQUIRED: 'true',
+        }),
+      ).toThrow(/DB_SSL must be verify-full/);
+    }
     expect(
       loadConfig({
         ...base,

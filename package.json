@@ -1,6 +1,6 @@
 {
   "name": "autolemon-erp",
-  "version": "0.6.5",
+  "version": "0.6.6",
   "private": true,
   "description": "AutoLemon ERP — modular monolith foundation with an autonomous Warehouse Management System (WMS). Not production-ready: see docs/PROJECT_STATE.md.",
   "license": "UNLICENSED",
@@ -21,6 +21,8 @@
     "db:migrate": "pnpm --filter @autolemon/api db:migrate",
     "db:seed": "pnpm --filter @autolemon/api db:seed",
     "audit:digest": "pnpm --filter @autolemon/api audit:digest",
+    "asvs:render": "node scripts/asvs-report.mjs",
+    "asvs:check": "node scripts/asvs-report.mjs --check",
     "db:reset:dev": "pnpm --filter @autolemon/api db:reset:dev",
     "test:unit": "vitest run --project unit",
     "test:integration": "node scripts/with-test-db.mjs vitest run --project integration",

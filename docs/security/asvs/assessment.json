@@ -1,0 +1,1537 @@
+{
+  "assessedVersion": "0.6.6",
+  "assessedAt": "2026-11-12",
+  "assessor": "AI-assisted developer self-assessment (not an independent verification)",
+  "statuses": {
+    "I+T": "implemented and covered by an automated test",
+    "I": "implemented / documented, no dedicated automated test",
+    "P": "partially met",
+    "O": "open (not met)",
+    "ENV": "deployment or environment control - cannot be verified without the target environment",
+    "N/A": "not applicable to this application"
+  },
+  "requirements": [
+    {
+      "id": "V1.1.1",
+      "status": "I",
+      "evidence": ["packages/contracts/src/wms.ts"],
+      "note": "Fastify decodes URL/JSON once; Zod validates the decoded value; passwords NFC-normalised once before screening and hashing."
+    },
+    {
+      "id": "V1.1.2",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "React escapes at render time; SQL is parameterised by the driver; CSV cells are neutralised when written."
+    },
+    {
+      "id": "V1.2.1",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts", "tests/e2e/warehouse.spec.ts"],
+      "note": "JSON API only (no server-rendered HTML); React text rendering; no dangerouslySetInnerHTML (lint + SAST-lite)."
+    },
+    {
+      "id": "V1.2.2",
+      "status": "I",
+      "evidence": ["apps/web/src/pages/Search.tsx"],
+      "note": "URLs built in the SPA use encodeURIComponent for user text; ids are UUIDs validated server-side; no user-supplied URL schemes are rendered as links."
+    },
+    {
+      "id": "V1.2.3",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "JSON produced by JSON.stringify (Fastify serialiser); no JavaScript generated from data."
+    },
+    {
+      "id": "V1.2.4",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts", "tests/security/isolation.test.ts"],
+      "note": "Drizzle sql templates with bound parameters everywhere; raw-SQL review gate in security:scan; LIKE wildcards escaped in search."
+    },
+    {
+      "id": "V1.2.5",
+      "status": "I",
+      "evidence": ["scripts/security-scan.mjs"],
+      "note": "The API never spawns OS commands. Operator scripts call pg_dump/psql with argument arrays (no shell interpolation)."
+    },
+    {
+      "id": "V1.2.6",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No LDAP directory is used."
+    },
+    {
+      "id": "V1.2.7",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No XPath/XML processing."
+    },
+    {
+      "id": "V1.2.8",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No LaTeX processing."
+    },
+    {
+      "id": "V1.2.9",
+      "status": "I",
+      "evidence": ["apps/api/src/wms/report.service.ts"],
+      "note": "No regular expression is built from untrusted input; search metacharacters (% _ \\) are escaped for LIKE."
+    },
+    {
+      "id": "V1.3.1",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No WYSIWYG/HTML input is accepted (strict text schemas reject control characters)."
+    },
+    {
+      "id": "V1.3.2",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "No eval/new Function/vm (lint rule + SAST-lite forbidden sinks)."
+    },
+    {
+      "id": "V1.3.3",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts", "apps/api/src/common/csv.test.ts"],
+      "note": "SafeText/SafeLine schemas restrict characters and length; CSV export neutralises formula-leading cells."
+    },
+    {
+      "id": "V1.3.4",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No SVG upload or rendering of user content."
+    },
+    {
+      "id": "V1.3.5",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No Markdown/CSS/XSL/BBCode from users."
+    },
+    {
+      "id": "V1.3.6",
+      "status": "I+T",
+      "evidence": ["tests/security/security-monitoring.test.ts"],
+      "note": "The only outbound HTTP call is the operator-configured alert webhook (config-only URL, https, no credentials, no redirects); no user-supplied URL is ever fetched."
+    },
+    {
+      "id": "V1.3.7",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No server-side templates."
+    },
+    {
+      "id": "V1.3.8",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No JNDI (Node.js)."
+    },
+    {
+      "id": "V1.3.9",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No memcache."
+    },
+    {
+      "id": "V1.3.10",
+      "status": "I",
+      "evidence": ["apps/api/src/http/hardening.ts"],
+      "note": "Structured logging (pino objects); user data is never used as a format string."
+    },
+    {
+      "id": "V1.3.11",
+      "status": "N/A",
+      "evidence": [],
+      "note": "The application sends no e-mail."
+    },
+    {
+      "id": "V1.4.1",
+      "status": "N/A",
+      "evidence": [],
+      "note": "Managed, memory-safe runtime (Node.js/TypeScript); no native code of our own."
+    },
+    {
+      "id": "V1.4.2",
+      "status": "I+T",
+      "evidence": ["apps/api/src/wms/inventory/qty.test.ts", "tests/security/attacks.test.ts"],
+      "note": "Quantities are bounded decimals (numeric(18,3), Zod ranges); oversized/negative values rejected."
+    },
+    {
+      "id": "V1.4.3",
+      "status": "N/A",
+      "evidence": [],
+      "note": "Managed runtime with garbage collection."
+    },
+    {
+      "id": "V1.5.1",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No XML parsing."
+    },
+    {
+      "id": "V1.5.2",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "Only JSON.parse into strict Zod schemas; prototype-pollution payloads rejected; no class-based deserialisation."
+    },
+    {
+      "id": "V2.1.1",
+      "status": "I",
+      "evidence": ["docs/API.md", "packages/contracts/src/wms.ts"],
+      "note": "Validation rules are code-as-documentation in the shared Zod contracts and summarised in API.md."
+    },
+    {
+      "id": "V2.1.2",
+      "status": "I",
+      "evidence": ["docs/WMS_STATE_MACHINES.md", "docs/DATABASE.md"],
+      "note": "Cross-field rules (node belongs to warehouse, lot/expiry, state transitions) documented in the state machines and database constraints."
+    },
+    {
+      "id": "V2.1.3",
+      "status": "I",
+      "evidence": ["docs/API.md", "docs/OPERATIONS.md"],
+      "note": "Business limits documented: export ≤ 366 days/100 000 rows, search 2–64 chars/10 rows per kind, expiry window ≤ 365 days, rate limits, idempotency."
+    },
+    {
+      "id": "V2.2.1",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "Positive validation (enums, patterns, ranges) for every input via strict schemas."
+    },
+    {
+      "id": "V2.2.2",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts", "tests/security/route-inventory.test.ts"],
+      "note": "All validation in the API service layer; the SPA validation is convenience only."
+    },
+    {
+      "id": "V2.2.3",
+      "status": "I+T",
+      "evidence": [
+        "tests/integration/wms-completion.test.ts",
+        "tests/integration/lots-serials.test.ts",
+        "tests/integration/transfer-reservations.test.ts"
+      ],
+      "note": "Combinations validated in the domain (node/warehouse, lot/SKU, serial/quantity, transfer source/destination)."
+    },
+    {
+      "id": "V2.3.1",
+      "status": "I+T",
+      "evidence": ["tests/integration/wms-completion.test.ts", "tests/integration/acceptance.test.ts"],
+      "note": "Documents follow explicit state machines; out-of-order transitions return 409."
+    },
+    {
+      "id": "V2.3.2",
+      "status": "I+T",
+      "evidence": ["tests/integration/reports-search.test.ts", "tests/integration/transfer-reservations.test.ts"],
+      "note": "Documented limits are enforced (export caps, reservation limits, count approval)."
+    },
+    {
+      "id": "V2.3.3",
+      "status": "I+T",
+      "evidence": ["tests/integration/reliability.test.ts"],
+      "note": "Every command is one database transaction; failure injection proves all-or-nothing."
+    },
+    {
+      "id": "V2.3.4",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts", "tests/integration/transfer-reservations.test.ts"],
+      "note": "Row locks in id order and conditional updates prevent double allocation (concurrency tests)."
+    },
+    {
+      "id": "V2.4.1",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts", "tests/integration/reports-search.test.ts"],
+      "note": "Per-IP rate limit, per-account/IP auth throttles, export caps and step-up for bulk exports."
+    },
+    {
+      "id": "V3.2.1",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "API responses are JSON with CSP default-src 'none', nosniff and no-store; CSV served as attachment."
+    },
+    {
+      "id": "V3.2.2",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts", "tests/e2e/warehouse.spec.ts"],
+      "note": "React renders text nodes; hostile strings are stored and shown inert."
+    },
+    {
+      "id": "V3.3.1",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "__Host-al_sid with Secure when COOKIE_SECURE=true (mandatory in production)."
+    },
+    {
+      "id": "V3.3.2",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "SameSite=Strict on the only cookie."
+    },
+    {
+      "id": "V3.3.3",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "__Host- prefix used."
+    },
+    {
+      "id": "V3.3.4",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "HttpOnly session cookie; the token is only ever sent in Set-Cookie."
+    },
+    {
+      "id": "V3.4.1",
+      "status": "I",
+      "evidence": ["apps/api/src/http/hardening.ts", "infra/nginx/autolemon.conf"],
+      "note": "HSTS max-age 2 years with includeSubDomains in production (API and proxy template). Verify on the deployed host (NOT DEPLOYED)."
+    },
+    {
+      "id": "V3.4.2",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "No CORS headers are emitted at all; cross-origin writes refused by Origin checks."
+    },
+    {
+      "id": "V3.4.3",
+      "status": "I",
+      "evidence": ["apps/api/src/http/hardening.ts", "infra/nginx/autolemon.conf", "tests/e2e/warehouse.spec.ts"],
+      "note": "API: default-src 'none'. SPA: strict self-only CSP with object-src 'none' (dev server + proxy template; e2e checks the header). Production header to be verified on deployment."
+    },
+    {
+      "id": "V3.4.4",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "nosniff on every API response; proxy template for static files."
+    },
+    {
+      "id": "V3.4.5",
+      "status": "I",
+      "evidence": ["apps/api/src/http/hardening.ts", "infra/nginx/autolemon.conf"],
+      "note": "Referrer-Policy: no-referrer."
+    },
+    {
+      "id": "V3.4.6",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts", "infra/nginx/autolemon.conf"],
+      "note": "frame-ancestors 'none' on API responses and in the SPA policy; X-Frame-Options DENY as fallback."
+    },
+    {
+      "id": "V3.5.1",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "CSRF token (HMAC of session id) + Origin check + required custom header on every write."
+    },
+    {
+      "id": "V3.5.2",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "Custom header X-Requested-With and JSON content type force a preflight; requests without them are refused."
+    },
+    {
+      "id": "V3.5.3",
+      "status": "I+T",
+      "evidence": ["tests/security/session-controls.test.ts", "tests/security/attacks.test.ts"],
+      "note": "Writes use POST/PUT; Sec-Fetch-Site cross-site is refused on every API request including GET (v0.6.6)."
+    },
+    {
+      "id": "V3.5.4",
+      "status": "ENV",
+      "evidence": ["docs/security/NETWORK_AND_ZTNA.md"],
+      "note": "One application per hostname is a deployment rule (proxy template). Verify on deployment."
+    },
+    {
+      "id": "V3.5.5",
+      "status": "N/A",
+      "evidence": [],
+      "note": "postMessage is not used."
+    },
+    {
+      "id": "V3.7.1",
+      "status": "I",
+      "evidence": ["apps/web/package.json"],
+      "note": "Only current browser technologies (React 19, ES modules); no plugins."
+    },
+    {
+      "id": "V3.7.2",
+      "status": "N/A",
+      "evidence": [],
+      "note": "The application never redirects to other hosts."
+    },
+    {
+      "id": "V4.1.1",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "application/json; charset=utf-8 and text/csv; charset=utf-8 set explicitly."
+    },
+    {
+      "id": "V4.1.2",
+      "status": "ENV",
+      "evidence": ["infra/nginx/autolemon.conf"],
+      "note": "HTTP→HTTPS redirect only for the browser entry point in the proxy template; the API itself is never exposed on HTTP. Verify on deployment."
+    },
+    {
+      "id": "V4.1.3",
+      "status": "I",
+      "evidence": ["apps/api/src/config/env.test.ts", "docs/security/NETWORK_AND_ZTNA.md"],
+      "note": "TRUST_PROXY limits which hop may set X-Forwarded-For; client-supplied request ids are ignored. Proxy must overwrite the header (template)."
+    },
+    {
+      "id": "V4.2.1",
+      "status": "ENV",
+      "evidence": ["infra/nginx/autolemon.conf"],
+      "note": "Node.js strict HTTP parser rejects ambiguous Content-Length/Transfer-Encoding; proxy configuration to be verified on deployment."
+    },
+    {
+      "id": "V4.3.1",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No GraphQL."
+    },
+    {
+      "id": "V4.3.2",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No GraphQL."
+    },
+    {
+      "id": "V4.4.1",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No WebSockets."
+    },
+    {
+      "id": "V4.4.2",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No WebSockets."
+    },
+    {
+      "id": "V4.4.3",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No WebSockets."
+    },
+    {
+      "id": "V4.4.4",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No WebSockets."
+    },
+    {
+      "id": "V5.1.1",
+      "status": "I",
+      "evidence": ["docs/API.md"],
+      "note": "Only upload: SKU CSV import as text/csv body ≤ 1 MB, row/column limits, UTF-8 text without NUL; nothing is stored as a file or served back."
+    },
+    {
+      "id": "V5.2.1",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "Body limit 1 MB for CSV, 1 MB JSON default; oversized files rejected."
+    },
+    {
+      "id": "V5.2.2",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "Content is parsed as CSV with required headers; binary/NUL content and bad headers rejected (no file extension is involved)."
+    },
+    {
+      "id": "V5.2.3",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No compressed uploads."
+    },
+    {
+      "id": "V5.3.1",
+      "status": "N/A",
+      "evidence": [],
+      "note": "Uploads are never stored as files."
+    },
+    {
+      "id": "V5.3.2",
+      "status": "I",
+      "evidence": ["apps/api/src/db/cli/audit-digest.ts"],
+      "note": "The API never builds file paths from requests; operator CLIs take paths from the operator only."
+    },
+    {
+      "id": "V5.4.1",
+      "status": "I",
+      "evidence": ["apps/api/src/http/wms.controller.ts"],
+      "note": "Exports use fixed server-side file names in Content-Disposition."
+    },
+    {
+      "id": "V5.4.2",
+      "status": "I",
+      "evidence": ["apps/api/src/http/wms.controller.ts"],
+      "note": "Fixed ASCII file names; nothing user-controlled in headers."
+    },
+    {
+      "id": "V5.4.3",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No user files are stored or served (CSV is parsed into rows)."
+    },
+    {
+      "id": "V6.1.1",
+      "status": "I",
+      "evidence": ["docs/security/AUTH_AND_RBAC.md"],
+      "note": "Rate limiting, throttles, anti-enumeration and alerting documented."
+    },
+    {
+      "id": "V6.1.2",
+      "status": "I",
+      "evidence": ["docs/security/AUTH_AND_RBAC.md"],
+      "note": "Context-specific word list documented (v0.6.6)."
+    },
+    {
+      "id": "V6.1.3",
+      "status": "I",
+      "evidence": ["docs/security/AUTH_AND_RBAC.md"],
+      "note": "Authentication pathways table (v0.6.6)."
+    },
+    {
+      "id": "V6.2.1",
+      "status": "I+T",
+      "evidence": ["apps/api/src/platform/auth/password.test.ts"],
+      "note": "Minimum 12 characters."
+    },
+    {
+      "id": "V6.2.2",
+      "status": "I+T",
+      "evidence": ["tests/security/passkeys-account.test.ts"],
+      "note": "Self-service password change."
+    },
+    {
+      "id": "V6.2.3",
+      "status": "I+T",
+      "evidence": ["tests/security/passkeys-account.test.ts"],
+      "note": "Current password required."
+    },
+    {
+      "id": "V6.2.4",
+      "status": "I+T",
+      "evidence": ["apps/api/src/platform/auth/password.test.ts", "tests/security/attacks.test.ts"],
+      "note": "Top 5000 common passwords that fit the 12–128 policy (SecLists Pwdb top-1M) + local list (v0.6.6)."
+    },
+    {
+      "id": "V6.2.5",
+      "status": "I+T",
+      "evidence": ["apps/api/src/platform/auth/password.test.ts"],
+      "note": "No composition rules."
+    },
+    {
+      "id": "V6.2.6",
+      "status": "I",
+      "evidence": ["apps/web/src/pages/Auth.tsx"],
+      "note": "Password fields use type=password."
+    },
+    {
+      "id": "V6.2.7",
+      "status": "I",
+      "evidence": ["apps/web/src/pages/Auth.tsx"],
+      "note": "No paste blocking; autocomplete attributes allow password managers."
+    },
+    {
+      "id": "V6.2.8",
+      "status": "I+T",
+      "evidence": ["apps/api/src/platform/auth/password.test.ts"],
+      "note": "Verified exactly as received (NFC only), never truncated; > 128 is refused, not cut."
+    },
+    {
+      "id": "V6.2.9",
+      "status": "I+T",
+      "evidence": ["apps/api/src/platform/auth/password.test.ts"],
+      "note": "Up to 128 characters; 64+ tested."
+    },
+    {
+      "id": "V6.2.10",
+      "status": "I",
+      "evidence": ["docs/security/AUTH_AND_RBAC.md"],
+      "note": "No periodic rotation."
+    },
+    {
+      "id": "V6.2.11",
+      "status": "I+T",
+      "evidence": ["apps/api/src/platform/auth/password.test.ts"],
+      "note": "Context words, company code/name and display name are refused when they dominate the password (v0.6.6)."
+    },
+    {
+      "id": "V6.2.12",
+      "status": "I+T",
+      "evidence": ["apps/api/src/platform/auth/password.test.ts"],
+      "note": "Offline breached-password corpus (ADR-0025). The full HIBP file must be provisioned by the owner (SEC-OPEN-004)."
+    },
+    {
+      "id": "V6.3.1",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "Per-account and per-IP throttles, global rate limit, alerts on bursts."
+    },
+    {
+      "id": "V6.3.2",
+      "status": "I",
+      "evidence": ["docs/security/AUTH_AND_RBAC.md", "apps/api/src/db/cli/seed.ts"],
+      "note": "No default accounts or passwords; every account starts from a one-time invitation."
+    },
+    {
+      "id": "V6.3.3",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts", "tests/security/passkeys-account.test.ts"],
+      "note": "MFA mandatory for every account (TOTP or passkey; admins passkey-only in production)."
+    },
+    {
+      "id": "V6.3.4",
+      "status": "I+T",
+      "evidence": ["tests/security/route-inventory.test.ts"],
+      "note": "Route inventory test fails on any undocumented public route."
+    },
+    {
+      "id": "V6.4.1",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "Invitation/reset tokens: 256-bit CSPRNG, hashed, single use, 72 h / 24 h / 60 min."
+    },
+    {
+      "id": "V6.4.2",
+      "status": "I",
+      "evidence": ["docs/security/AUTH_AND_RBAC.md"],
+      "note": "No hints or secret questions."
+    },
+    {
+      "id": "V6.4.3",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "Administrator-issued reset sets a new password only; MFA is still required at the next login; all sessions revoked."
+    },
+    {
+      "id": "V6.4.4",
+      "status": "P",
+      "evidence": ["docs/runbooks/RUNBOOKS.md", "docs/MANUAL_OPERADOR_E_ADMIN.md"],
+      "note": "MFA reset is admin-only with step-up and audit; identity proofing is procedural (verified channel), not enforced by code."
+    },
+    {
+      "id": "V6.5.1",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts", "tests/security/passkeys-account.test.ts"],
+      "note": "TOTP replay window, single-use recovery codes and WebAuthn challenges."
+    },
+    {
+      "id": "V6.5.2",
+      "status": "I+T",
+      "evidence": ["tests/security/session-controls.test.ts", "apps/api/src/platform/auth/totp.test.ts"],
+      "note": "Recovery codes now 120 bits (≥ 112) stored as SHA-256 (v0.6.6); legacy 80-bit codes remain valid until used or regenerated."
+    },
+    {
+      "id": "V6.5.3",
+      "status": "I",
+      "evidence": ["apps/api/src/platform/auth/totp.ts"],
+      "note": "randomBytes (CSPRNG) for TOTP seeds and recovery codes."
+    },
+    {
+      "id": "V6.5.4",
+      "status": "I+T",
+      "evidence": ["apps/api/src/platform/auth/totp.test.ts"],
+      "note": "Recovery codes 120 bits; TOTP 6 digits."
+    },
+    {
+      "id": "V6.5.5",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts", "apps/api/src/platform/auth/totp.test.ts"],
+      "note": "TOTP 30 s step (±1 step skew)."
+    },
+    {
+      "id": "V6.6.1",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No SMS/e-mail/push out-of-band authentication."
+    },
+    {
+      "id": "V6.6.2",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No SMS/e-mail/push out-of-band authentication."
+    },
+    {
+      "id": "V6.6.3",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No SMS/e-mail/push out-of-band authentication."
+    },
+    {
+      "id": "V6.8.1",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No external identity provider."
+    },
+    {
+      "id": "V6.8.2",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No external identity provider."
+    },
+    {
+      "id": "V6.8.3",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No external identity provider."
+    },
+    {
+      "id": "V6.8.4",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No external identity provider."
+    },
+    {
+      "id": "V7.1.1",
+      "status": "I",
+      "evidence": ["docs/security/AUTH_AND_RBAC.md"],
+      "note": "Idle 30 min, absolute 12 h, step-up 5 min documented with justification."
+    },
+    {
+      "id": "V7.1.2",
+      "status": "I",
+      "evidence": ["docs/security/AUTH_AND_RBAC.md"],
+      "note": "Concurrent session policy documented with compensating controls (v0.6.6)."
+    },
+    {
+      "id": "V7.1.3",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No federated sessions."
+    },
+    {
+      "id": "V7.2.1",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "Opaque tokens checked in the API against hashed rows."
+    },
+    {
+      "id": "V7.2.2",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "Dynamically generated reference tokens; no static API keys."
+    },
+    {
+      "id": "V7.2.3",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "256-bit CSPRNG tokens."
+    },
+    {
+      "id": "V7.2.4",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts", "tests/security/passkeys-account.test.ts"],
+      "note": "New token after MFA (pending session revoked); step-up does not reuse login tokens."
+    },
+    {
+      "id": "V7.3.1",
+      "status": "I+T",
+      "evidence": ["tests/security/session-controls.test.ts"],
+      "note": "Idle timeout enforced (v0.6.6 test)."
+    },
+    {
+      "id": "V7.3.2",
+      "status": "I+T",
+      "evidence": ["tests/security/session-controls.test.ts"],
+      "note": "Absolute lifetime enforced (v0.6.6 test)."
+    },
+    {
+      "id": "V7.4.1",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts", "tests/security/session-controls.test.ts"],
+      "note": "Logout revokes the server session; replay refused."
+    },
+    {
+      "id": "V7.4.2",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "Deactivation revokes all sessions."
+    },
+    {
+      "id": "V7.4.3",
+      "status": "I+T",
+      "evidence": ["tests/security/passkeys-account.test.ts", "tests/security/attacks.test.ts"],
+      "note": "Password change revokes every other session automatically; MFA enrolment/reset revokes all."
+    },
+    {
+      "id": "V7.4.4",
+      "status": "I",
+      "evidence": ["apps/web/src/App.tsx"],
+      "note": "Logout button in the header on every authenticated page."
+    },
+    {
+      "id": "V7.4.5",
+      "status": "I+T",
+      "evidence": ["tests/security/session-controls.test.ts"],
+      "note": "Admins end one user's or all company sessions (step-up, audited) — v0.6.6."
+    },
+    {
+      "id": "V7.5.1",
+      "status": "I+T",
+      "evidence": ["tests/security/passkeys-account.test.ts"],
+      "note": "Step-up for MFA changes (passkeys, recovery codes); current password for password change."
+    },
+    {
+      "id": "V7.5.2",
+      "status": "I+T",
+      "evidence": ["tests/security/session-controls.test.ts", "tests/security/passkeys-account.test.ts"],
+      "note": "Users list sessions; ending other sessions needs step-up (v0.6.6)."
+    },
+    {
+      "id": "V7.6.1",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No external identity provider."
+    },
+    {
+      "id": "V7.6.2",
+      "status": "I",
+      "evidence": ["docs/security/AUTH_AND_RBAC.md"],
+      "note": "Sessions are created only by an explicit login with both factors."
+    },
+    {
+      "id": "V8.1.1",
+      "status": "I",
+      "evidence": ["docs/security/AUTH_AND_RBAC.md"],
+      "note": "Permission catalogue, roles, warehouse scope and object rules documented."
+    },
+    {
+      "id": "V8.1.2",
+      "status": "I",
+      "evidence": ["docs/security/AUTH_AND_RBAC.md", "docs/security/DATA_CLASSIFICATION.md"],
+      "note": "Field-level rules (PII masking, wms.dispatch for recipient contact, pii.read) documented."
+    },
+    {
+      "id": "V8.2.1",
+      "status": "I+T",
+      "evidence": ["tests/security/route-inventory.test.ts", "tests/security/isolation.test.ts"],
+      "note": "Default deny; every route requires a declared permission."
+    },
+    {
+      "id": "V8.2.2",
+      "status": "I+T",
+      "evidence": ["tests/security/isolation.test.ts"],
+      "note": "Object-level checks + RLS; foreign ids → 404."
+    },
+    {
+      "id": "V8.2.3",
+      "status": "I+T",
+      "evidence": ["tests/security/isolation.test.ts"],
+      "note": "Masked fields without permission; decryption only with pii.read + step-up."
+    },
+    {
+      "id": "V8.3.1",
+      "status": "I+T",
+      "evidence": ["tests/security/isolation.test.ts", "tests/security/route-inventory.test.ts"],
+      "note": "All decisions in the API; RLS as defence in depth."
+    },
+    {
+      "id": "V8.4.1",
+      "status": "I+T",
+      "evidence": ["tests/security/isolation.test.ts"],
+      "note": "Tenant isolation by session company, RLS and composite tenant FKs."
+    },
+    {
+      "id": "V9.1.1",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No self-contained tokens (JWT); opaque server sessions (ADR-0003)."
+    },
+    {
+      "id": "V9.1.2",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No self-contained tokens (JWT); opaque server sessions (ADR-0003)."
+    },
+    {
+      "id": "V9.1.3",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No self-contained tokens (JWT); opaque server sessions (ADR-0003)."
+    },
+    {
+      "id": "V9.2.1",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No self-contained tokens (JWT); opaque server sessions (ADR-0003)."
+    },
+    {
+      "id": "V9.2.2",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No self-contained tokens (JWT); opaque server sessions (ADR-0003)."
+    },
+    {
+      "id": "V9.2.3",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No self-contained tokens (JWT); opaque server sessions (ADR-0003)."
+    },
+    {
+      "id": "V9.2.4",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No self-contained tokens (JWT); opaque server sessions (ADR-0003)."
+    },
+    {
+      "id": "V10.1.1",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.1.2",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.2.1",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.2.2",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.3.1",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.3.2",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.3.3",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.3.4",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.4.1",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.4.2",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.4.3",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.4.4",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.4.5",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.4.6",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.4.7",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.4.8",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.4.9",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.4.10",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.4.11",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.5.1",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.5.2",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.5.3",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.5.4",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.5.5",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.6.1",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.6.2",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.7.1",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.7.2",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V10.7.3",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No OAuth/OIDC client, resource server or authorisation server."
+    },
+    {
+      "id": "V11.1.1",
+      "status": "I",
+      "evidence": ["docs/security/ENCRYPTION_AND_KEYS.md"],
+      "note": "Key lifecycle per NIST SP 800-57 phases documented (v0.6.6); production KMS still open (S-03)."
+    },
+    {
+      "id": "V11.1.2",
+      "status": "I",
+      "evidence": ["docs/security/ENCRYPTION_AND_KEYS.md"],
+      "note": "Cryptographic inventory table (v0.6.6)."
+    },
+    {
+      "id": "V11.2.1",
+      "status": "I",
+      "evidence": ["docs/DEPENDENCIES.md"],
+      "note": "node:crypto (OpenSSL), @node-rs/argon2, @simplewebauthn; no home-made primitives."
+    },
+    {
+      "id": "V11.2.2",
+      "status": "I+T",
+      "evidence": ["tests/security/crypto.test.ts"],
+      "note": "Versioned DEKs, KEK ids, PHC strings, digest format versions; rotation tested."
+    },
+    {
+      "id": "V11.2.3",
+      "status": "I",
+      "evidence": ["docs/security/ENCRYPTION_AND_KEYS.md"],
+      "note": "AES-256, SHA-256, Ed25519, HMAC-SHA256, 256-bit tokens (≥ 128-bit security)."
+    },
+    {
+      "id": "V11.3.1",
+      "status": "I",
+      "evidence": ["docs/security/ENCRYPTION_AND_KEYS.md"],
+      "note": "Only AES-GCM; no ECB, no RSA PKCS#1 v1.5 encryption."
+    },
+    {
+      "id": "V11.3.2",
+      "status": "I+T",
+      "evidence": ["tests/security/crypto.test.ts"],
+      "note": "AES-256-GCM."
+    },
+    {
+      "id": "V11.3.3",
+      "status": "I+T",
+      "evidence": ["tests/security/crypto.test.ts"],
+      "note": "Authenticated encryption; tampering detected (fail closed)."
+    },
+    {
+      "id": "V11.4.1",
+      "status": "I",
+      "evidence": ["docs/security/ENCRYPTION_AND_KEYS.md"],
+      "note": "SHA-256/HMAC-SHA256/Ed25519; SHA-1 only as HIBP lookup key and inside HMAC for TOTP (RFC 6238 compatibility), documented."
+    },
+    {
+      "id": "V11.4.2",
+      "status": "I+T",
+      "evidence": ["apps/api/src/platform/auth/password.test.ts"],
+      "note": "Argon2id m=64 MiB t=3 p=1 with rehash on parameter increase."
+    },
+    {
+      "id": "V11.4.3",
+      "status": "I",
+      "evidence": ["docs/security/ENCRYPTION_AND_KEYS.md"],
+      "note": "SHA-256 for integrity (audit chain, digests)."
+    },
+    {
+      "id": "V11.4.4",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No keys are derived from passwords."
+    },
+    {
+      "id": "V11.5.1",
+      "status": "I",
+      "evidence": ["docs/security/ENCRYPTION_AND_KEYS.md"],
+      "note": "randomBytes for every secret (tokens 256 bits); UUIDs are never used as secrets."
+    },
+    {
+      "id": "V11.6.1",
+      "status": "I",
+      "evidence": ["docs/security/ENCRYPTION_AND_KEYS.md"],
+      "note": "Ed25519 via node:crypto; WebAuthn algorithms via @simplewebauthn defaults."
+    },
+    {
+      "id": "V12.1.1",
+      "status": "ENV",
+      "evidence": ["docs/security/ENCRYPTION_AND_KEYS.md", "infra/nginx/autolemon.conf"],
+      "note": "TLS 1.3 (1.2 by exception) in the proxy template; NOT DEPLOYED."
+    },
+    {
+      "id": "V12.1.2",
+      "status": "ENV",
+      "evidence": ["infra/nginx/autolemon.conf"],
+      "note": "The proxy template allows TLS 1.3 only, whose cipher suites are all AEAD with forward secrecy; NOT DEPLOYED."
+    },
+    {
+      "id": "V12.1.3",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No mTLS client authentication."
+    },
+    {
+      "id": "V12.2.1",
+      "status": "ENV",
+      "evidence": ["docs/security/NETWORK_AND_ZTNA.md"],
+      "note": "TLS-only external entry point by design; NOT DEPLOYED."
+    },
+    {
+      "id": "V12.2.2",
+      "status": "ENV",
+      "evidence": ["docs/security/NETWORK_AND_ZTNA.md"],
+      "note": "Publicly trusted certificates at the proxy; NOT DEPLOYED."
+    },
+    {
+      "id": "V12.3.1",
+      "status": "P",
+      "evidence": ["apps/api/src/config/env.test.ts", "docs/security/ENCRYPTION_AND_KEYS.md"],
+      "note": "DB_SSL=verify-full enforced by configuration in production; other hops are deployment controls (NOT DEPLOYED)."
+    },
+    {
+      "id": "V12.3.2",
+      "status": "I+T",
+      "evidence": ["apps/api/src/config/env.test.ts"],
+      "note": "verify-full (certificate + host name) required in production configuration."
+    },
+    {
+      "id": "V12.3.3",
+      "status": "ENV",
+      "evidence": ["docs/security/NETWORK_AND_ZTNA.md"],
+      "note": "proxy→app TLS is a deployment control."
+    },
+    {
+      "id": "V12.3.4",
+      "status": "ENV",
+      "evidence": ["docs/security/NETWORK_AND_ZTNA.md"],
+      "note": "Internal CA pinning is a deployment control (DB_SSL_CA_FILE supported)."
+    },
+    {
+      "id": "V13.1.1",
+      "status": "I",
+      "evidence": ["docs/ARCHITECTURE.md", "docs/OPERATIONS.md", "docs/security/NETWORK_AND_ZTNA.md"],
+      "note": "Communication needs documented: PostgreSQL, optional KMS, optional alert webhook; no other egress."
+    },
+    {
+      "id": "V13.2.1",
+      "status": "I",
+      "evidence": ["docs/DATABASE.md", "docs/OPERATIONS.md"],
+      "note": "Database access with a dedicated runtime role and password (separate owner role)."
+    },
+    {
+      "id": "V13.2.2",
+      "status": "I+T",
+      "evidence": ["tests/security/isolation.test.ts", "tests/security/retention.test.ts", "tests/security/security-monitoring.test.ts"],
+      "note": "Runtime role has no DDL, no DELETE on append-only tables, column-limited updates."
+    },
+    {
+      "id": "V13.2.3",
+      "status": "I",
+      "evidence": ["apps/api/src/config/env.test.ts"],
+      "note": "Production configuration refuses development secrets; no default credentials exist."
+    },
+    {
+      "id": "V13.2.4",
+      "status": "P",
+      "evidence": ["docs/OPERATIONS.md"],
+      "note": "Application-level: only configured endpoints (DB, webhook). Network egress allowlist is a deployment control."
+    },
+    {
+      "id": "V13.2.5",
+      "status": "ENV",
+      "evidence": ["docs/security/NETWORK_AND_ZTNA.md"],
+      "note": "Server egress allowlist at the network/proxy layer; NOT DEPLOYED."
+    },
+    {
+      "id": "V13.3.1",
+      "status": "ENV",
+      "evidence": ["docs/security/ENCRYPTION_AND_KEYS.md", "docs/OPERATIONS.md"],
+      "note": "Secrets come from environment/secrets manager; a vault/KMS is not deployed (S-03)."
+    },
+    {
+      "id": "V13.3.2",
+      "status": "ENV",
+      "evidence": ["docs/OPERATIONS.md"],
+      "note": "Least-privilege access to secrets is a deployment control."
+    },
+    {
+      "id": "V13.4.1",
+      "status": "I",
+      "evidence": ["scripts/verify-handover.mjs"],
+      "note": "Archive and image contain no .git (verify:handover fails otherwise). Automated by verify:handover (release script, not a test file)."
+    },
+    {
+      "id": "V13.4.2",
+      "status": "I+T",
+      "evidence": ["apps/api/src/config/env.test.ts"],
+      "note": "Production configuration interlocks (no dev key provider, secure cookies, verify-full TLS, log level)."
+    },
+    {
+      "id": "V13.4.3",
+      "status": "I",
+      "evidence": ["infra/nginx/autolemon.conf"],
+      "note": "The API serves no static directories; the proxy template serves the SPA with try_files (nginx autoindex is off by default)."
+    },
+    {
+      "id": "V13.4.4",
+      "status": "I+T",
+      "evidence": ["tests/security/session-controls.test.ts"],
+      "note": "TRACE is not routed (404)."
+    },
+    {
+      "id": "V13.4.5",
+      "status": "I",
+      "evidence": ["docs/API.md"],
+      "note": "OpenAPI is a file in the repository, not served; /api/health returns minimal status only."
+    },
+    {
+      "id": "V14.1.1",
+      "status": "I",
+      "evidence": ["docs/security/DATA_CLASSIFICATION.md"],
+      "note": "Data classified into levels."
+    },
+    {
+      "id": "V14.1.2",
+      "status": "I",
+      "evidence": ["docs/security/DATA_CLASSIFICATION.md"],
+      "note": "Protection requirements per level (encryption, masking, retention, logging)."
+    },
+    {
+      "id": "V14.2.1",
+      "status": "I",
+      "evidence": ["docs/security/AUTH_AND_RBAC.md", "docs/API.md"],
+      "note": "Tokens travel in the body or cookies; invitation tokens are in the URL fragment (never sent to the server); search terms are not logged."
+    },
+    {
+      "id": "V14.2.2",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "Cache-Control: no-store on every API response."
+    },
+    {
+      "id": "V14.2.3",
+      "status": "I",
+      "evidence": ["docs/security/DATA_CLASSIFICATION.md"],
+      "note": "No trackers or third-party scripts (CSP self-only)."
+    },
+    {
+      "id": "V14.2.4",
+      "status": "I+T",
+      "evidence": ["tests/security/crypto.test.ts", "tests/security/isolation.test.ts"],
+      "note": "Encryption, masking and log redaction implemented as documented."
+    },
+    {
+      "id": "V14.3.1",
+      "status": "I+T",
+      "evidence": ["tests/security/session-controls.test.ts"],
+      "note": "Logout sends Clear-Site-Data \"cache\", \"storage\"; SPA keeps auth state in memory only (v0.6.6)."
+    },
+    {
+      "id": "V14.3.2",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "no-store on API responses."
+    },
+    {
+      "id": "V14.3.3",
+      "status": "I",
+      "evidence": ["apps/web/src/session.tsx"],
+      "note": "No sensitive data in localStorage/sessionStorage; session token is HttpOnly; CSRF token kept in memory."
+    },
+    {
+      "id": "V15.1.1",
+      "status": "I",
+      "evidence": ["docs/DEPENDENCIES.md"],
+      "note": "Remediation time frames: critical/high 72 h, moderate 30 days, low quarterly."
+    },
+    {
+      "id": "V15.1.2",
+      "status": "I",
+      "evidence": ["docs/DEPENDENCIES.md", "scripts/security-scan.mjs"],
+      "note": "CycloneDX SBOM generated by security:scan; registry pinned; lockfile frozen. Automated by security:scan (CI gate), not a test file."
+    },
+    {
+      "id": "V15.1.3",
+      "status": "I",
+      "evidence": ["docs/API.md", "docs/OPERATIONS.md"],
+      "note": "Resource-heavy functions documented with their limits (exports, search, monitor, imports)."
+    },
+    {
+      "id": "V15.2.1",
+      "status": "I",
+      "evidence": ["scripts/security-scan.mjs"],
+      "note": "pnpm audit: 0 critical/high; one accepted dev-only moderate (SEC-OPEN-009). Automated by security:scan (CI gate), not a test file."
+    },
+    {
+      "id": "V15.2.2",
+      "status": "I+T",
+      "evidence": ["tests/integration/reports-search.test.ts", "tests/security/attacks.test.ts"],
+      "note": "Caps, timeouts (statement_timeout 15 s), rate limits and step-up for exports."
+    },
+    {
+      "id": "V15.2.3",
+      "status": "I",
+      "evidence": ["Dockerfile", "docs/security/CI-CD-SECURITY.md"],
+      "note": "Production image contains the built API/web only; tests, seed links and dev servers are excluded."
+    },
+    {
+      "id": "V15.3.1",
+      "status": "I+T",
+      "evidence": ["tests/security/isolation.test.ts"],
+      "note": "Explicit column lists and masked DTOs; PII only through the step-up endpoint."
+    },
+    {
+      "id": "V15.3.2",
+      "status": "I+T",
+      "evidence": ["tests/security/security-monitoring.test.ts"],
+      "note": "Webhook fetch uses redirect: error; there are no other outbound calls."
+    },
+    {
+      "id": "V15.3.3",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "Strict schemas reject unknown fields."
+    },
+    {
+      "id": "V15.3.4",
+      "status": "I",
+      "evidence": ["apps/api/src/config/env.test.ts", "docs/security/NETWORK_AND_ZTNA.md"],
+      "note": "Client IP from Fastify trustProxy (TRUST_PROXY); correct proxy configuration to be verified on deployment."
+    },
+    {
+      "id": "V15.3.5",
+      "status": "I",
+      "evidence": ["eslint.config.js"],
+      "note": "TypeScript strict mode, Zod-typed inputs, strict equality (lint)."
+    },
+    {
+      "id": "V15.3.6",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "Prototype-pollution payloads (__proto__, constructor) rejected by strict schemas before any object merge."
+    },
+    {
+      "id": "V15.3.7",
+      "status": "I",
+      "evidence": ["packages/contracts/src/wms.ts"],
+      "note": "Each parameter has one source (path/query/body) and a strict schema; repeated query keys fail validation."
+    },
+    {
+      "id": "V16.1.1",
+      "status": "I",
+      "evidence": ["docs/security/AUDIT_LOGGING.md", "docs/OPERATIONS.md"],
+      "note": "Log inventory: security audit (DB, hash-chained), application log (pino JSON), alerts, retention."
+    },
+    {
+      "id": "V16.2.1",
+      "status": "I+T",
+      "evidence": ["tests/security/isolation.test.ts", "tests/security/security-monitoring.test.ts"],
+      "note": "Audit entries carry time, actor, company, warehouse, action, resource, outcome, request id, client IP."
+    },
+    {
+      "id": "V16.2.2",
+      "status": "I",
+      "evidence": ["docs/security/AUDIT_LOGGING.md"],
+      "note": "Timestamps are timestamptz/ISO-8601 UTC; host time sync is a deployment control."
+    },
+    {
+      "id": "V16.2.3",
+      "status": "I",
+      "evidence": ["docs/security/AUDIT_LOGGING.md"],
+      "note": "Logs go only to the audit table and stdout (documented); webhook optional and documented."
+    },
+    {
+      "id": "V16.2.4",
+      "status": "I",
+      "evidence": ["docs/security/AUDIT_LOGGING.md"],
+      "note": "JSON logs (pino) and a documented audit schema."
+    },
+    {
+      "id": "V16.2.5",
+      "status": "I+T",
+      "evidence": ["tests/security/security-monitoring.test.ts", "tests/security/audit-digests.test.ts"],
+      "note": "Redaction of secrets in logs and audit details; alerts and digests carry no personal data."
+    },
+    {
+      "id": "V16.3.1",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts", "tests/security/security-monitoring.test.ts"],
+      "note": "Every login, MFA, step-up and recovery attempt audited with outcome and method."
+    },
+    {
+      "id": "V16.3.2",
+      "status": "I+T",
+      "evidence": ["tests/security/isolation.test.ts"],
+      "note": "authz.denied audited."
+    },
+    {
+      "id": "V16.3.3",
+      "status": "P",
+      "evidence": ["docs/security/AUDIT_LOGGING.md", "tests/security/security-monitoring.test.ts"],
+      "note": "Authorization denials, throttling of authentication and alert rules are logged; generic input-validation failures and per-IP 429s are only in the application log, not the audit trail."
+    },
+    {
+      "id": "V16.3.4",
+      "status": "I",
+      "evidence": ["apps/api/src/http/exception.filter.ts"],
+      "note": "Unexpected errors logged with request id; job failures raise alerts (ADR-0026)."
+    },
+    {
+      "id": "V16.4.1",
+      "status": "I",
+      "evidence": ["apps/api/src/http/hardening.ts"],
+      "note": "pino JSON encoding neutralises CR/LF; audit details are JSON values."
+    },
+    {
+      "id": "V16.4.2",
+      "status": "I+T",
+      "evidence": ["tests/security/isolation.test.ts", "tests/security/audit-digests.test.ts"],
+      "note": "Append-only audit with hash chain, monitor checks and signed digests; application-log storage is a deployment control."
+    },
+    {
+      "id": "V16.4.3",
+      "status": "ENV",
+      "evidence": ["docs/OPERATIONS.md"],
+      "note": "Log shipping to a separate system is NOT DEPLOYED (O-05)."
+    },
+    {
+      "id": "V16.5.1",
+      "status": "I+T",
+      "evidence": ["tests/security/attacks.test.ts"],
+      "note": "Generic error envelope with request id; no stack traces or SQL."
+    },
+    {
+      "id": "V16.5.2",
+      "status": "I",
+      "evidence": ["tests/security/security-monitoring.test.ts"],
+      "note": "Webhook/KMS failures degrade gracefully (alerts retried, fail closed for crypto)."
+    },
+    {
+      "id": "V16.5.3",
+      "status": "I+T",
+      "evidence": ["tests/integration/reliability.test.ts", "tests/security/crypto.test.ts"],
+      "note": "Transactions roll back on any error; crypto fails closed."
+    },
+    {
+      "id": "V17.1.1",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No WebRTC."
+    },
+    {
+      "id": "V17.2.1",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No WebRTC."
+    },
+    {
+      "id": "V17.2.2",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No WebRTC."
+    },
+    {
+      "id": "V17.2.3",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No WebRTC."
+    },
+    {
+      "id": "V17.2.4",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No WebRTC."
+    },
+    {
+      "id": "V17.3.1",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No WebRTC."
+    },
+    {
+      "id": "V17.3.2",
+      "status": "N/A",
+      "evidence": [],
+      "note": "No WebRTC."
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-# Next tasks — ordered roadmap (WMS hardening first) — updated v0.6.5
+# Next tasks — ordered roadmap (WMS hardening first) — updated v0.6.6
 
 Owning module: architecture. Each task lists dependencies and the acceptance test that closes it.
 **Product-owner rule (2026-11-10):** the entire autonomous WMS must be production-ready, verified
@@ -11,19 +11,22 @@ manual screen-reader pass still open), T-12 (retention), T-21 (units of measure)
 un-pack), T-24 (rename/deactivate; moving subtrees still unsupported), lots through transfers
 (part of T-20).
 
-## Next three WMS tasks (gate order) — after v0.6.5
+## Next three WMS tasks (gate order) — after v0.6.6
 
-1. **O-02** — owner reports the `node-next` and `release-candidate` results of the v0.6.3–v0.6.5
+1. **O-02** — owner reports the `node-next` and `release-candidate` results of the v0.6.3–v0.6.6
    pushes; then container image signing (cosign keyless) and a deployment workflow gated on
    manual approval (no deployment).
 2. **E-04** — once the owner agrees targets (SKUs, positions, documents/day, concurrent users,
    p95 latency): reproducible load harness and results.
-3. **S-06 code items** — refresh the ASVS 5.0 L2 self-assessment line by line and close
-   remaining code-level gaps it finds (DAST itself needs a staging environment).
+3. **S-06 residue** — V16.3.3 (security-relevant validation failures and throttling into the
+   audit trail with rate-limited entries), V6.4.4 (in-app identity-check record for MFA resets);
+   then DAST once a staging environment exists.
 
-Owner-side, in parallel: push v0.6.5; branch protection; KMS choice (S-03); staging with log
+Owner-side, in parallel: push v0.6.6; branch protection; KMS choice (S-03); staging with log
 shipping, paging and the daily digest job + write-once storage (S-04/S-05/O-01/O-03…O-05);
 breached-password corpus; penetration test (S-07); warehouse pilot (O-06).
+
+Done in v0.6.6: S-06 requirement-level ASVS review and its code-level gaps (ADR-0028).
 
 Done in v0.6.5: SEC-OPEN-008 tooling (signed audit digests, ADR-0027).
 

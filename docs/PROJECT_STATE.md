@@ -1,8 +1,8 @@
-# Project state — AutoLemon ERP v0.6.5-WMS
+# Project state — AutoLemon ERP v0.6.6-WMS
 
 Owning module: repository. Last updated: 2026-11-12 (Europe/Lisbon). Archive:
-`AutoLemon-ERP-v0.6.5-WMS.zip` (root `autolemon-erp/`); its SHA-256 is in the adjacent
-`AutoLemon-ERP-v0.6.5-WMS.zip.sha256` (a file cannot contain its own hash).
+`AutoLemon-ERP-v0.6.6-WMS.zip` (root `autolemon-erp/`); its SHA-256 is in the adjacent
+`AutoLemon-ERP-v0.6.6-WMS.zip.sha256` (a file cannot contain its own hash).
 
 ## 1. Summary
 
@@ -12,7 +12,12 @@ Production Readiness Gate v0.6**. WMS release gate state: **`WMS_IN_PROGRESS`**
 (`docs/WMS_RELEASE_GATE.md`: PASS 20 · FAIL 4 · BLOCKED 9 · NOT_RUN 1). **Not production-ready.**
 No other ERP business module has been started.
 
-v0.6.5 session (continuation): signed audit-chain digests for off-site write-once storage
+v0.6.6 session (continuation): requirement-level ASVS 5.0.0 L1+L2 self-assessment as code
+(253 requirements, CI-checked; ADR-0028) and the code-level gaps it found: administrator session
+controls, step-up for ending other own sessions, top-5000 common passwords, context-word screening,
+120-bit recovery codes, Fetch-Metadata on reads, Clear-Site-Data on logout. No migration.
+
+v0.6.5 session: signed audit-chain digests for off-site write-once storage
 (SEC-OPEN-008 tooling, ADR-0027) — `pnpm audit:digest keygen|create|verify`; detects consistent
 superuser rewrites and deletions that the hash chain alone cannot. No migration.
 
@@ -57,6 +62,10 @@ accessibility sweep, and the release gate as code.
 
 ## 3. Migrations and rollback plan
 
+v0.6.6 adds **no migration**. Rollback: redeploy v0.6.5. Recovery codes issued by v0.6.6 (6 groups)
+are rejected by v0.6.5's format check — users who enrolled or regenerated codes under v0.6.6 must
+regenerate them after a rollback (TOTP and passkeys are unaffected).
+
 v0.6.5 adds **no migration** (tooling only). Rollback: redeploy v0.6.4; existing digest files
 stay verifiable with any later version.
 
@@ -95,44 +104,42 @@ available here.
 | Command                 | Result                                                                                                                              |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `pnpm format:check`     | all files formatted                                                                                                                 |
-| `pnpm lint`             | 0 problems; documentation gate 132 files, 373 exported symbols                                                                      |
+| `pnpm lint`             | 0 problems; documentation gate 137 files, 376 exported symbols                                                                      |
 | `pnpm typecheck`        | 0 errors                                                                                                                            |
-| `pnpm api:check`        | OpenAPI matches code (105 paths / 115 operations)                                                                                   |
+| `pnpm api:check`        | OpenAPI matches code (107 paths / 117 operations)                                                                                   |
+| `pnpm asvs:check`       | 253 requirements assessed; report current                                                                                           |
 | `pnpm gate:check`       | `WMS_IN_PROGRESS`; PASS 20 · FAIL 4 · BLOCKED 9 · NOT_RUN 1                                                                         |
-| `pnpm test:unit`        | 7 files, **38 passed**                                                                                                              |
+| `pnpm test:unit`        | 7 files, **49 passed**                                                                                                              |
 | `pnpm test:integration` | 7 files, **52 passed**                                                                                                              |
-| `pnpm test:security`    | 10 files, **91 passed** (new `audit-digests`, 5 tests, 3× in isolation; whole project 3× with shuffled file order)                  |
-| `pnpm test:e2e`         | **2 passed** (≈ 1.4 min; axe WCAG 2.2 AA clean on every navigation screen)                                                          |
+| `pnpm test:security`    | 12 files, **100 passed** (new `session-controls` 7, `asvs-assessment` 2; whole project 2× more with shuffled file order)            |
+| `pnpm test:e2e`         | **2 passed** (≈ 1.7 min; axe WCAG 2.2 AA clean on every navigation screen)                                                          |
 | `pnpm test:all`         | exit 0                                                                                                                              |
 | `pnpm security:scan`    | all PASS incl. **gitleaks 8.24.3** (CI rules); audit 0 critical / 0 high / 1 moderate (dev-only, SEC-OPEN-009); SBOM 122 components |
 | `pnpm backup:local`     | encrypted backup written; off-site copy NOT CONFIGURED                                                                              |
-| `pnpm restore:smoke`    | PASSED (2.3 s); no migration in this version, so no upgrade rehearsal was needed                                                    |
-| `pnpm build`            | contracts + API + web (388 kB JS / 109 kB gzip)                                                                                     |
-| `pnpm audit:digest …`   | keygen → create → verify on the development database: OK (exit 0)                                                                   |
+| `pnpm restore:smoke`    | PASSED (2.2 s); no migration in this version                                                                                        |
+| `pnpm build`            | contracts + API + web (389 kB JS / 109 kB gzip)                                                                                     |
 
 Not run here: Docker Compose stack, PostgreSQL 18, Node 26, CodeQL/Trivy (CI only), DAST, load
-tests, screen-reader testing, Windows run of `audit:digest` (path handling uses `INIT_CWD`; file
-modes are not enforced by Windows), write-once storage, any production control.
+tests, screen-reader testing, Windows run (owner), any production control.
 
 ## 5. Clean-room verification from the ZIP
 
-Run 2026-11-12 on the v0.6.5 archive: copied only the ZIP + `.sha256` into an empty directory and
+Run 2026-11-12 on the v0.6.6 archive: copied only the ZIP + `.sha256` into an empty directory and
 followed `README-LOCAL-TESTING.md` "Without Docker (native PostgreSQL)" (local PostgreSQL 16.15,
 fresh database; Playwright via `PLAYWRIGHT_CHROME_PATH`).
 
-| Step                                                        | Result                                                                                                |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `sha256sum -c`                                              | OK                                                                                                    |
-| extract → `autolemon-erp/`                                  | OK — no `.env`, `node_modules`, `.git`, `invitations-dev.txt`, backups, artifacts, `*.pem` or digests |
-| `pnpm install --frozen-lockfile`                            | OK (Node 22.23.4, pnpm 12.18.0)                                                                       |
-| `cp .env.example .env` → `pnpm db:migrate` → `pnpm db:seed` | 9 migrations applied (0001…0009); seed OK                                                             |
-| `pnpm typecheck` / `pnpm lint`                              | exit 0 / exit 0                                                                                       |
-| `pnpm test:all`                                             | **exit 0** — unit 38, integration 52, security 91, e2e 2; gate check OK                               |
-| `pnpm security:scan` (with `GITLEAKS_BIN`)                  | exit 0                                                                                                |
-| `pnpm restore:smoke`                                        | PASSED (2.8 s)                                                                                        |
-| `pnpm build`                                                | exit 0                                                                                                |
-| `pnpm audit:digest keygen` → `create` → `verify`            | OK (exit 0), keys and digests outside the repository                                                  |
-| `pnpm dev`                                                  | web :5173 → 200; `/api/health` → 200; `/api/auth/session` without cookie → 401                        |
+| Step                                                        | Result                                                                                                                                |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `sha256sum -c`                                              | OK                                                                                                                                    |
+| extract → `autolemon-erp/`                                  | OK — no `.env`, `node_modules`, `.git`, `invitations-dev.txt`, backups, artifacts, `*.pem` or digests                                 |
+| `pnpm install --frozen-lockfile`                            | OK (Node 22.23.4, pnpm 12.18.0)                                                                                                       |
+| `cp .env.example .env` → `pnpm db:migrate` → `pnpm db:seed` | 9 migrations applied (0001…0009); seed OK                                                                                             |
+| `pnpm typecheck` / `pnpm lint` / `pnpm asvs:check`          | exit 0 / exit 0 / 253 requirements OK                                                                                                 |
+| `pnpm test:all`                                             | **exit 0** — unit 49, integration 52, security 100, e2e 2; gate check OK                                                              |
+| `pnpm security:scan` (with `GITLEAKS_BIN`)                  | exit 0                                                                                                                                |
+| `pnpm restore:smoke`                                        | PASSED (2.5 s)                                                                                                                        |
+| `pnpm build`                                                | exit 0                                                                                                                                |
+| `pnpm dev`                                                  | web :5173 → 200; `/api/health` → 200; `/api/auth/session` without cookie → 401; `/api/health` with `Sec-Fetch-Site: cross-site` → 403 |
 
 The final archive differs from the clean-room archive only in this section.
 
@@ -148,13 +155,13 @@ The final archive differs from the clean-room archive only in this section.
   thresholds are per company, not per user/IP; with several API replicas a new alert can be
   delivered twice (receivers de-duplicate on `alert.id`); consistent audit rewrites after the
   latest stored digest are not detected until compared with the next one (digest interval =
-  exposure window).
+  exposure window); ASVS partial items V6.4.4, V12.3.1, V13.2.4, V16.3.3 and 13 environment
+  items (ADR-0028); no fixed cap on concurrent sessions per user (documented compensating controls).
 
 ## 7. Next three WMS tasks
 
-1. O-02: owner reports the CI results of the v0.6.3–v0.6.5 pushes; then container image signing
+1. O-02: owner reports the CI results of the v0.6.3–v0.6.6 pushes; then container image signing
    (cosign keyless) and a deployment workflow gated on manual approval (no deployment).
 2. E-04 load harness once targets are agreed.
-3. S-06: line-by-line ASVS 5.0 L2 self-assessment refresh and code-level gap closure. Owner-side:
-   branch protection, KMS (S-03), staging with log shipping/paging and the daily digest job,
-   breached-corpus provisioning, penetration test, warehouse pilot.
+3. S-06 residue: V16.3.3 (security-relevant validation failures/throttling into the audit trail,
+   rate-limited) and V6.4.4 (recorded identity check for MFA resets); DAST once staging exists.

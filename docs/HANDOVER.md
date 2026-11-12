@@ -38,6 +38,8 @@ Owning module: repository. A continuation developer should be able to start from
   product owner's _Reusable Continuation Prompt v0.6_ and _WMS Production Readiness Gate v0.6_.
 - New security-relevant audit actions: add them to a rule or an overview group in
   `platform/monitoring/security-monitor.ts` with a test (ADR-0026).
+- Security-relevant changes update `docs/security/asvs/assessment.json` and `pnpm asvs:render`
+  in the same commit (ADR-0028); `asvs-assessment.test.ts` fails if the report is stale.
 - Never commit `*.pem` or `audit-digest-*.json` (ignored and excluded from the archive; ADR-0027).
 - **Commit messages (product-owner rule):** a full message, never just a title. First line
   `vX.Y.Z: <summary>`, blank line, then a context paragraph (session, gate state) and sections

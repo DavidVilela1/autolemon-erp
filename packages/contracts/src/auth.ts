@@ -26,11 +26,15 @@ export const LoginInput = z.object({ email: Email, password: z.string().min(1).m
 /** Six-digit TOTP code. */
 export const TotpCode = z.string().regex(/^\d{6}$/, 'Código de 6 dígitos');
 
-/** Recovery code format: 4 groups of 4 base32 chars separated by '-'. */
+/**
+ * Recovery code format: 6 groups of 4 base32 characters (120 bits, v0.6.6+) or the legacy
+ * 4 groups (80 bits, issued before v0.6.6 and valid until used or regenerated).
+ */
 export const RecoveryCode = z
   .string()
+  .max(40)
   .transform((s) => s.trim().toUpperCase())
-  .refine((s) => /^[A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4}$/.test(s), 'Código de recuperação inválido');
+  .refine((s) => /^[A-Z2-7]{4}(-[A-Z2-7]{4}){3}((-[A-Z2-7]{4}){2})?$/.test(s), 'Código de recuperação inválido');
 
 /** MFA verification (second step of login). Exactly one factor. */
 export const MfaVerifyInput = z

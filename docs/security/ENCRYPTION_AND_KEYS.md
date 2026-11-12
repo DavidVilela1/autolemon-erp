@@ -1,4 +1,4 @@
-# Encryption and key management — v0.5.0
+# Encryption and key management — v0.6.6
 
 Owning module: platform/crypto. Password hashing (Argon2id) is **not** encryption and is covered
 in `AUTH_AND_RBAC.md`.
@@ -63,3 +63,32 @@ Ciphertext ≠ plaintext and differs per encryption; tamper of nonce/ciphertext/
 tenant/record/field binding; wrong KEK cannot unwrap; DEK rotation re-encrypts stored fields and
 MFA keeps working; old-version ciphertext still decrypts; KEK rewrap; production refuses
 `local-dev`. `restore:smoke` decrypts every encrypted field of the restored database.
+
+## 7. Cryptographic inventory (ASVS 5.0 V11.1.2) and key lifecycle (V11.1.1)
+
+| Use                               | Algorithm / parameters                                                                                  | Key / secret                            | Where it must NOT be used               |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------- | --------------------------------------- |
+| Field encryption (PII, TOTP seed) | AES-256-GCM, 96-bit random nonce, 128-bit tag, AAD                                                      | per-tenant DEK (versioned)              | anything outside `FieldCrypto`          |
+| DEK wrapping                      | AES-256-GCM (local dev) / KMS (production, not deployed)                                                | KEK (keyring / KMS)                     | data encryption directly                |
+| Password storage                  | Argon2id, m=64 MiB, t=3, p=1, 16-byte salt                                                              | —                                       | —                                       |
+| Session / one-time / CSRF tokens  | 256-bit CSPRNG; stored as SHA-256                                                                       | —                                       | —                                       |
+| CSRF token binding                | HMAC-SHA256                                                                                             | `CSRF_SECRET`                           | any other MAC                           |
+| Recovery codes                    | 120-bit CSPRNG (legacy 80-bit until regenerated); stored as SHA-256                                     | —                                       | —                                       |
+| TOTP                              | RFC 6238 HMAC-SHA-1, 6 digits, 30 s (authenticator compatibility; HMAC-SHA-1 remains approved for HMAC) | per-user seed (encrypted)               | new designs                             |
+| Passkeys                          | WebAuthn (ES256/EdDSA/RS256 via @simplewebauthn)                                                        | authenticator keys (public part stored) | —                                       |
+| Audit chain                       | SHA-256 over canonical JSON                                                                             | —                                       | —                                       |
+| Audit digests                     | Ed25519 signatures                                                                                      | operator-held digest key (ADR-0027)     | the API host                            |
+| Alert webhook                     | HMAC-SHA256 over timestamp.body                                                                         | `ALERT_WEBHOOK_SECRET`                  | —                                       |
+| Breached-password lookup          | SHA-1 as a lookup key only (HIBP format), not security                                                  | —                                       | any integrity/confidentiality purpose   |
+| Common-password list              | SHA-256 prefixes (lookup only)                                                                          | —                                       | —                                       |
+| Backups (local demo)              | AES-256-GCM                                                                                             | `.local/backup.key`                     | production (use provider backups + CMK) |
+| Transport                         | TLS 1.3 (1.2 by exception), `DB_SSL=verify-full`                                                        | certificates (deployment)               | — (NOT DEPLOYED)                        |
+
+Lifecycle (NIST SP 800-57 phases): **generation** (CSPRNG/KMS only) → **activation** (keyring
+order / ACTIVE DEK version) → **use** (purpose-bound, AAD binds tenant+record+field) →
+**rotation** (DEK yearly or on suspicion; KEK yearly via rewrap; digest key on staff change) →
+**suspension/retirement** (RETIRED DEKs kept for backup restore) → **destruction** only after the
+longest backup retention that may need the key. Keys are never shared between purposes, never
+logged, never in the repository or archive. Agility: algorithms are identified by version fields
+(DEK version + KEK id, PHC strings for passwords, digest format version), so a replacement can be
+introduced alongside the old one and data migrated by re-encryption/rehash.

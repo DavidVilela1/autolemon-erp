@@ -122,6 +122,18 @@ export function AdminPage() {
                   >
                     Repor palavra-passe
                   </Button>
+                  <Button
+                    small
+                    variant="secondary"
+                    onClick={() =>
+                      void a.run(async () => {
+                        const r = await withStepUp(() => api<{ revoked: number }>('POST', `/api/admin/users/${u.id}/sessions/revoke`));
+                        setSecretOut({ label: 'Sessões terminadas', value: String(r.revoked) });
+                      })
+                    }
+                  >
+                    Terminar sessões
+                  </Button>
                   {u.hasPhone && (
                     <Button
                       small
@@ -462,6 +474,23 @@ export function SecurityPage() {
           </Panel>
         </>
       )}
+      <Panel title="Resposta a incidentes">
+        <p className="mb-2 text-sm">
+          Termina todas as sessões da empresa exceto a sua. Todos terão de voltar a entrar com o segundo fator.
+        </p>
+        <Button
+          variant="danger"
+          onClick={() =>
+            void a.run(async () => {
+              const r = await withStepUp(() => api<{ revoked: number }>('POST', '/api/admin/sessions/revoke-all'));
+              overview.reload();
+              return r;
+            }, 'Todas as outras sessões foram terminadas.')
+          }
+        >
+          Terminar todas as sessões
+        </Button>
+      </Panel>
       <Panel title="Alertas">
         <Table
           rows={alerts.data ?? []}

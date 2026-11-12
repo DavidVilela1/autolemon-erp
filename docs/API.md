@@ -1,4 +1,4 @@
-# API — AutoLemon ERP v0.6.5
+# API — AutoLemon ERP v0.6.6
 
 Owning module: platform/http. The machine-readable spec is **generated from the code**:
 `docs/api/openapi.json` (OpenAPI 3.1, 89 operations). Regenerate with
@@ -107,3 +107,18 @@ channels, rules } }`. Never returns the webhook URL or secret.
   headers `X-AutoLemon-Timestamp` and `X-AutoLemon-Signature: v1=<hex HMAC-SHA256(secret,
 timestamp + "." + body)>`. Receivers verify the signature, reject timestamps older than 5 min
   and de-duplicate on `alert.id`.
+
+## Session controls (v0.6.6, ADR-0028)
+
+- `POST /api/admin/users/{id}/sessions/revoke` → `{ userId, revoked }`; `POST
+/api/admin/sessions/revoke-all` → `{ revoked }`. Both `admin.security` + step-up
+  `users.sessions.revoke`; the caller's current session is kept; audited
+  (`admin.user.sessions_revoked`, `admin.sessions.revoke_all`). Errors: `403 STEP_UP_REQUIRED`,
+  `404` (user of another company).
+- `POST /api/auth/sessions/{id}/revoke` (another own session) and `POST
+/api/auth/sessions/revoke-others` now require step-up `account.sessions.revoke` (`403
+STEP_UP_REQUIRED`); revoking the current session needs none.
+- Every API request with `Sec-Fetch-Site: cross-site` → `403` (reads included).
+- `POST /api/auth/logout` adds `Clear-Site-Data: "cache", "storage"`.
+- Recovery codes are now `XXXX-XXXX-XXXX-XXXX-XXXX-XXXX` (120 bits); the 4-group format is still
+  accepted for codes issued before v0.6.6.

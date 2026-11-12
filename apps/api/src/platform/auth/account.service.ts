@@ -54,7 +54,7 @@ export class AccountService {
       });
       throw new Unauthenticated('Palavra-passe atual incorreta');
     }
-    const reason = screenPassword(newPassword, { email: user.email, displayName: user.display_name });
+    const reason = screenPassword(newPassword, await this.auth.passwordContext(user));
     if (reason) throw new ValidationFailed([{ path: 'newPassword', message: reason }], reason);
     if (await verifyPassword(user.password_hash, newPassword)) {
       throw new ValidationFailed([{ path: 'newPassword', message: 'A nova palavra-passe tem de ser diferente da atual' }]);
@@ -99,6 +99,9 @@ export class AccountService {
 
   /** Revokes one of the caller's sessions (404 for anybody else's). */
   async revokeSession(actor: Actor, sessionId: string) {
+    // ASVS 5.0 V7.5.2: ending ANOTHER session needs a fresh factor, so a stolen session cannot
+    // lock the real user out. Ending the current one is a logout and needs nothing more.
+    if (sessionId !== actor.sessionId) requireStepUp(actor, 'account.sessions.revoke', this.cfg.STEP_UP_MINUTES);
     return this.database.systemTx(async (tx) => {
       const r = await row<{ id: string }>(
         tx,
@@ -122,6 +125,7 @@ export class AccountService {
 
   /** Revokes every other session of the caller ("sign out other devices"). */
   async revokeOtherSessions(actor: Actor) {
+    requireStepUp(actor, 'account.sessions.revoke', this.cfg.STEP_UP_MINUTES);
     return this.database.systemTx(async (tx) => {
       const r = await rows(
         tx,

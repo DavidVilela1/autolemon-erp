@@ -63,10 +63,15 @@ export function otpauthUri(secretB32: string, accountLabel: string, issuer = 'Au
   return `otpauth://totp/${label}?secret=${secretB32}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=${TOTP_STEP}`;
 }
 
-/** Generates `n` human-friendly recovery codes (80 bits each): XXXX-XXXX-XXXX-XXXX. */
+/**
+ * Generates `n` recovery codes of **120 bits** each, shown as six groups of four base32
+ * characters (XXXX-XXXX-XXXX-XXXX-XXXX-XXXX). ASVS 5.0 V6.5.2: lookup secrets of at least 112
+ * bits may be stored with a plain SHA-256; shorter ones would need a salted password hash.
+ * Codes issued before v0.6.6 (80 bits, four groups) stay valid until used or regenerated.
+ */
 export function newRecoveryCodes(n = 10): string[] {
   return Array.from({ length: n }, () => {
-    const s = base32Encode(randomBytes(10)).slice(0, 16);
-    return `${s.slice(0, 4)}-${s.slice(4, 8)}-${s.slice(8, 12)}-${s.slice(12, 16)}`;
+    const s = base32Encode(randomBytes(15)); // 15 bytes = 120 bits = exactly 24 base32 characters
+    return (s.match(/.{4}/g) ?? []).join('-');
   });
 }

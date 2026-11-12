@@ -155,6 +155,7 @@ function ChangePassword() {
 }
 
 function Sessions() {
+  const { withStepUp } = useSession();
   const list = useLoad(() => api<SessionRow[]>('GET', '/api/auth/sessions'), []);
   const a = useAction();
   return (
@@ -181,7 +182,10 @@ function Sessions() {
                     variant="secondary"
                     disabled={a.busy}
                     onClick={() =>
-                      void a.run(async () => (await api('POST', `/api/auth/sessions/${r.id}/revoke`), list.reload()), 'Sessão terminada.')
+                      void a.run(
+                        async () => (await withStepUp(() => api('POST', `/api/auth/sessions/${r.id}/revoke`)), list.reload()),
+                        'Sessão terminada.',
+                      )
                     }
                   >
                     Terminar
@@ -196,7 +200,10 @@ function Sessions() {
           variant="secondary"
           disabled={a.busy}
           onClick={() =>
-            void a.run(async () => (await api('POST', '/api/auth/sessions/revoke-others'), list.reload()), 'Outras sessões terminadas.')
+            void a.run(
+              async () => (await withStepUp(() => api('POST', '/api/auth/sessions/revoke-others')), list.reload()),
+              'Outras sessões terminadas.',
+            )
           }
         >
           Terminar todas as outras sessões

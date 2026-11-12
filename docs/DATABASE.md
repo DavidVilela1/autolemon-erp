@@ -1,4 +1,4 @@
-# Database — AutoLemon ERP v0.6.5
+# Database — AutoLemon ERP v0.6.6
 
 Owning module: platform/db. Engine: PostgreSQL 18 (target; Docker Compose) — the automated test
 evidence in this build was produced on PostgreSQL **16.15** because the build environment could

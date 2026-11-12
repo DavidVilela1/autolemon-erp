@@ -236,6 +236,7 @@ describe('Self-service account security', () => {
     expect(JSON.stringify(list)).not.toMatch(/token|csrf/i);
     const otherUser = await staff(t, A, A.wh.W1!, ['wms.view']);
     const theirs = ok(await otherUser.get('/api/auth/sessions'))[0].id;
+    await A.admin.stepUp(); // ending another session needs a fresh factor (V7.5.2)
     expect((await A.admin.post(`/api/auth/sessions/${theirs}/revoke`)).status).toBe(404);
     const mine = ok(await otherUser.post(`/api/auth/sessions/${theirs}/revoke`));
     expect(mine.revoked).toBe(true);

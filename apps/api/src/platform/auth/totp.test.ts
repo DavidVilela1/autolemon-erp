@@ -42,7 +42,8 @@ describe('TOTP', () => {
   it('generates distinct, well-formed recovery codes and an encoded otpauth URI', () => {
     const codes = newRecoveryCodes(10);
     expect(new Set(codes).size).toBe(10);
-    codes.forEach((c) => expect(c).toMatch(/^[A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4}-[A-Z2-7]{4}$/));
+    // 6 × 4 base32 characters = 120 bits ≥ 112 (ASVS 5.0 V6.5.2)
+    codes.forEach((c) => expect(c).toMatch(/^[A-Z2-7]{4}(-[A-Z2-7]{4}){5}$/));
     expect(otpauthUri('ABC', 'a b@x.pt')).toContain('AutoLemon%20ERP%3Aa%20b%40x.pt');
   });
 });

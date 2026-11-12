@@ -1,4 +1,4 @@
-# Operations — AutoLemon ERP v0.6.5
+# Operations — AutoLemon ERP v0.6.6
 
 Owning module: operations. **Production deployment is not configured and not approved.** This
 document describes how the system is configured and operated, and what must exist first.
@@ -107,7 +107,7 @@ Task Scheduler: run `pnpm` with "Start in" set to the repository folder and the 
 ## 6. Incident handling (outline)
 
 Detect (alerts, audit verify failure) → triage (severity, scope via audit/ledger) → contain
-(revoke sessions: `UPDATE sessions SET revoked_at=now()`; disable users; block at ZTNA/WAF) →
+(end sessions: Administração → _Terminar sessões_ per user or Segurança → _Terminar todas as sessões_, both audited; disable users; block at ZTNA/WAF) →
 eradicate → recover (restore per BACKUP_AND_DR) → post-incident review; GDPR breach assessment
 with DPO within 72 h.
 

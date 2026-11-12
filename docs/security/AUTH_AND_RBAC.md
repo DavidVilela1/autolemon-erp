@@ -1,4 +1,4 @@
-# Authentication, MFA, sessions, RBAC and tenant isolation — v0.6.0
+# Authentication, MFA, sessions, RBAC and tenant isolation — v0.6.6
 
 Owning module: platform/auth, platform/authz. References: NIST SP 800-63B-4, OWASP ASVS 5.0.0,
 OWASP Password Storage / Session Management / CSRF cheat sheets.
@@ -10,20 +10,30 @@ OWASP Password Storage / Session Management / CSRF cheat sheets.
   VM: m=19 MiB/t=2 ≈ 11–14 ms per hash; the default is proportionally slower. Tune
   `ARGON2_MEMORY_KIB`/`ARGON2_ITERATIONS` on production hardware (target 100–500 ms).
 - `needsRehash()` upgrades stored hashes after a successful login when parameters increase.
-- Policy: 12–128 chars, any Unicode, no composition rules; rejected if in the local common/
-  breached list (plus the optional offline corpus `BREACHED_PASSWORD_CORPUS`, ADR-0025), containing the e-mail local part or app name, or trivially repetitive.
+- Policy: 12–128 chars (64+ explicitly allowed, checked exactly as typed, never truncated), any
+  Unicode, no composition rules, no periodic rotation. Rejected if:
+  - in the local common list or the **top 5000 common passwords that fit the policy** (SecLists
+    Pwdb top-1M filtered to 12–128 chars, stored as SHA-256 prefixes; ASVS 5.0 V6.2.4);
+  - in the optional offline breached corpus `BREACHED_PASSWORD_CORPUS` (ADR-0025);
+  - containing the e-mail local part or the application name, or trivially repetitive;
+  - **built mostly from context words** (ASVS 5.0 V6.1.2 / V6.2.11): after removing every
+    context word, fewer than 8 letters/digits remain. Context words = the documented list below
+    - the company code and name + the user's display name and e-mail local part (accents and
+      punctuation ignored). Documented list (`CONTEXT_WORDS` in `password.ts`): autolemon, lemon,
+      limao, armazem, warehouse, stock, inventario, pecas, autopecas, admin, administrador,
+      operador, password, palavrapasse, senha, portugal, lisboa, porto.
 - Anti-enumeration: unknown accounts still run one Argon2 verification against a startup-generated
   dummy hash; one generic error for unknown user / wrong password / disabled / not enrolled.
 - Never logged: request body fields `password`, `token`, `code`, `recoveryCode` are redacted.
 
 ## 2. MFA
 
-| Factor                                          | Status             | Notes                                                                                                                  |
-| ----------------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| TOTP (RFC 6238, SHA-1, 6 digits, 30 s, ±1 step) | Implemented+Tested | Seed AES-256-GCM encrypted; replay blocked via `last_used_step` (conditional update)                                   |
-| Recovery codes (10 × 80-bit)                    | Implemented+Tested | SHA-256 stored; single use; use audited as alert                                                                       |
-| WebAuthn / passkeys (phishing-resistant)        | Implemented+Tested | Second factor and step-up; admins passkey-only when `ADMIN_PASSKEY_REQUIRED=true` (mandatory in production) — ADR-0019 |
-| SMS / e-mail OTP                                | Not offered        | Deliberately excluded                                                                                                  |
+| Factor                                          | Status             | Notes                                                                                                                            |
+| ----------------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| TOTP (RFC 6238, SHA-1, 6 digits, 30 s, ±1 step) | Implemented+Tested | Seed AES-256-GCM encrypted; replay blocked via `last_used_step` (conditional update)                                             |
+| Recovery codes (10 × 120-bit since v0.6.6)      | Implemented+Tested | SHA-256 stored (≥ 112 bits, ASVS V6.5.2); single use; use audited as alert; pre-v0.6.6 80-bit codes valid until used/regenerated |
+| WebAuthn / passkeys (phishing-resistant)        | Implemented+Tested | Second factor and step-up; admins passkey-only when `ADMIN_PASSKEY_REQUIRED=true` (mandatory in production) — ADR-0019           |
+| SMS / e-mail OTP                                | Not offered        | Deliberately excluded                                                                                                            |
 
 MFA is **mandatory** for every account: a user without a confirmed factor cannot log in.
 Passkeys are added from _A minha conta_ after a step-up (`account.mfa.change`); challenges are
@@ -57,6 +67,27 @@ current password). Confirming enrolment revokes all sessions and replaces recove
 - Retention: ended sessions, used tokens and old idempotency rows are purged by
   `app_retention_purge` (ADR-0020).
 - No JWT, no bearer tokens in browser storage (ADR-0003).
+- **Concurrent sessions (ASVS 5.0 V7.1.2):** no fixed maximum — warehouse staff legitimately use a
+  desktop and a hand-held/tablet at the same time. Compensating controls: every session is
+  listed to its owner (_A minha conta_), ending another session needs step-up (V7.5.2),
+  administrators can end all sessions of a user or of the whole company (step-up, audited,
+  V7.4.5), and bursts of logins/failures raise security alerts (ADR-0026).
+- **Administrator session controls (v0.6.6):** `POST /api/admin/users/{id}/sessions/revoke` and
+  `POST /api/admin/sessions/revoke-all` (`admin.security` + step-up `users.sessions.revoke`;
+  the caller's current session is kept). Logout also sends `Clear-Site-Data: "cache", "storage"`.
+- **Fetch Metadata:** `Sec-Fetch-Site: cross-site` is refused on every API request, reads included.
+
+## 3a. Authentication pathways (ASVS 5.0 V6.1.3 / V6.3.4)
+
+| Pathway                          | Factors                                                                  | Throttling                               | Result                       |
+| -------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------- | ---------------------------- |
+| Login                            | password + TOTP, or password + passkey                                   | per account + per IP (DB), per-IP global | ACTIVE session after factor  |
+| Login with recovery code         | password + single-use recovery code                                      | same as login                            | ACTIVE session, alert raised |
+| Invitation / MFA-reset enrolment | one-time token (+ current password for reset) + new TOTP                 | per IP                                   | all sessions revoked         |
+| Administrator password reset     | one-time token (60 min) + new password; MFA still required at next login | per IP                                   | all sessions revoked         |
+| Step-up                          | fresh TOTP or passkey on an ACTIVE session                               | MFA attempt counter                      | 5-minute window              |
+
+There are no other pathways: the route-inventory test fails if a new public route appears.
 
 ## 4. Authorization model (default deny)
 

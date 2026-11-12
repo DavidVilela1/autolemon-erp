@@ -135,6 +135,46 @@ export class AdminService {
   }
 
   /**
+   * Ends every active session of one user of the company (ASVS 5.0 V7.4.5) — e.g. a lost
+   * tablet or a suspected account takeover. admin.security + step-up; audited with the count.
+   * The caller's own current session is never ended here (use logout).
+   */
+  async revokeUserSessions(actor: Actor, userId: string) {
+    requirePermission(actor, 'admin.security');
+    requireStepUp(actor, 'users.sessions.revoke', this.stepUpMinutes);
+    return this.database.systemTx(async (tx) => {
+      await this.requireUser(tx, actor, userId);
+      const r = await rows(
+        tx,
+        sql`UPDATE sessions SET revoked_at = now(), revoke_reason = 'admin_revoked'
+            WHERE user_id = ${userId} AND company_id = ${actor.companyId} AND revoked_at IS NULL AND id <> ${actor.sessionId}
+            RETURNING id`,
+      );
+      await this.auditTx(tx, actor, 'admin.user.sessions_revoked', 'user', userId, { revokedCount: r.length });
+      return { userId, revoked: r.length };
+    });
+  }
+
+  /**
+   * Ends every active session of the company except the caller's (incident response, ASVS 5.0
+   * V7.4.5 "all users"). admin.security + step-up; audited. Everyone must sign in again with
+   * their second factor.
+   */
+  async revokeAllSessions(actor: Actor) {
+    requirePermission(actor, 'admin.security');
+    requireStepUp(actor, 'users.sessions.revoke', this.stepUpMinutes);
+    return this.database.systemTx(async (tx) => {
+      const r = await rows(
+        tx,
+        sql`UPDATE sessions SET revoked_at = now(), revoke_reason = 'admin_revoked_all'
+            WHERE company_id = ${actor.companyId} AND revoked_at IS NULL AND id <> ${actor.sessionId} RETURNING id`,
+      );
+      await this.auditTx(tx, actor, 'admin.sessions.revoke_all', 'company', actor.companyId, { revokedCount: r.length });
+      return { revoked: r.length };
+    });
+  }
+
+  /**
    * MFA reset (lost authenticator or device): removes TOTP, recovery codes AND every passkey,
    * revokes sessions and returns a one-time MFA_RESET token (24 h) that the user redeems with
    * their password to enrol again.
