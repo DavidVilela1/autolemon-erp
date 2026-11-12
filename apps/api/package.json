@@ -1,6 +1,6 @@
 {
   "name": "@autolemon/api",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "private": true,
   "type": "module",
   "description": "AutoLemon ERP API: NestJS modular monolith (platform + autonomous WMS).",
@@ -12,6 +12,7 @@
     "start": "node dist/main.js",
     "db:migrate": "tsx src/db/cli/migrate.ts",
     "db:seed": "tsx src/db/cli/seed.ts",
+    "audit:digest": "tsx src/db/cli/audit-digest.ts",
     "db:reset:dev": "tsx src/db/cli/reset-dev.ts",
     "openapi": "tsx src/openapi/generate.ts"
   },

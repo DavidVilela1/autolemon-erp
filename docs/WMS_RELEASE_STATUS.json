@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "product": "AutoLemon ERP — WMS",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "updatedAt": "2026-11-12",
   "state": "WMS_IN_PROGRESS",
   "allowedStates": [
@@ -11,7 +11,7 @@
     "AWAITING_NEXT_MODULE_SELECTION",
     "NEXT_MODULE_AUTHORIZED"
   ],
-  "stateReason": "Code-level criteria still FAIL (S-03 external KMS, S-05 monitoring deployment/off-site digests, S-06 ASVS open items, O-02 signed artifacts/gated deployment) and infrastructure/independent criteria are BLOCKED; see openAction per criterion.",
+  "stateReason": "Code-level criteria still FAIL (S-03 external KMS, S-05 monitoring and digest storage deployment, S-06 ASVS open items, O-02 signed artifacts/gated deployment) and infrastructure/independent criteria are BLOCKED; see openAction per criterion.",
   "gateSource": "WMS Production Readiness Gate v0.6 (product owner, 2026-11-10) + Reusable Continuation Prompt v0.6 §0",
   "releaseOwnerApproval": null,
   "independentSecurityReview": null,
@@ -329,17 +329,19 @@
     {
       "id": "S-05",
       "requiredResult": "Audit logs, retention, tamper resistance and security monitoring verified",
-      "verificationMethod": "Hash-chained audit with tamper detection; bounded retention purge; in-app security monitor (threshold rules, event alerts, incremental + daily full chain verification, signed webhook, one-way acknowledgement)",
+      "verificationMethod": "Hash-chained audit with tamper detection; bounded retention purge; in-app security monitor (threshold rules, event alerts, incremental + daily full chain verification, signed webhook, one-way acknowledgement); Ed25519-signed off-site audit digests with verification that detects consistent rewrites and truncation",
       "evidence": [
         "tests/security/isolation.test.ts",
         "tests/security/retention.test.ts",
         "tests/security/security-monitoring.test.ts",
-        "docs/DECISIONS/ADR-0026-security-monitoring-and-alerts.md"
+        "docs/DECISIONS/ADR-0026-security-monitoring-and-alerts.md",
+        "tests/security/audit-digests.test.ts",
+        "docs/DECISIONS/ADR-0027-signed-audit-digests.md"
       ],
       "verifiedAt": "2026-11-12",
       "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
       "status": "FAIL",
-      "openAction": "Application-side alerting done (v0.6.4). Still open: log shipping and paging/on-call deployed and verified in the target environment (O-05), off-site audit digests (SEC-OPEN-008), independent review"
+      "openAction": "Application-side alerting (v0.6.4) and signed digest tooling (v0.6.5) done. Still open: daily digest job + write-once storage, log shipping and paging/on-call deployed and verified in the target environment (O-05), independent review"
     },
     {
       "id": "S-06",

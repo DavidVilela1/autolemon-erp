@@ -24,7 +24,9 @@ chain and reports the first broken sequence (tested by simulating a superuser ed
 history consistently. Production MUST add (NOT DEPLOYED):
 
 - periodic signed digest checkpoints (latest `seq` + `hash` per chain) exported to write-once
-  storage (S3 Object Lock compliance mode or equivalent) under a separate account;
+  storage (S3 Object Lock compliance mode or equivalent) under a separate account — **tooling
+  implemented in v0.6.5** (`pnpm audit:digest keygen|create|verify`, Ed25519, ADR-0027); the
+  schedule and the write-once storage are NOT DEPLOYED;
 - streaming of audit rows to an external SIEM/log store with independent administrators;
 - DBA access only via break-glass with its own audit trail.
 

@@ -1,7 +1,7 @@
-# Local setup and testing — AutoLemon ERP v0.6.4
+# Local setup and testing — AutoLemon ERP v0.6.5
 
-Owning module: repository. Archive: **`AutoLemon-ERP-v0.6.4-WMS.zip`**, root folder
-**`autolemon-erp/`**. Checksum file: `AutoLemon-ERP-v0.6.4-WMS.zip.sha256`.
+Owning module: repository. Archive: **`AutoLemon-ERP-v0.6.5-WMS.zip`**, root folder
+**`autolemon-erp/`**. Checksum file: `AutoLemon-ERP-v0.6.5-WMS.zip.sha256`.
 
 ## Prerequisites
 
@@ -19,18 +19,18 @@ If port 5432 is busy, change `POSTGRES_PORT` **and** the port in `DATABASE_URL` 
 ## Verify the archive
 
 ```bash
-sha256sum -c AutoLemon-ERP-v0.6.4-WMS.zip.sha256          # Linux
-shasum -a 256 -c AutoLemon-ERP-v0.6.4-WMS.zip.sha256      # macOS
+sha256sum -c AutoLemon-ERP-v0.6.5-WMS.zip.sha256          # Linux
+shasum -a 256 -c AutoLemon-ERP-v0.6.5-WMS.zip.sha256      # macOS
 ```
 
 ```powershell
-(Get-FileHash .\AutoLemon-ERP-v0.6.4-WMS.zip -Algorithm SHA256).Hash   # compare with the .sha256 file
+(Get-FileHash .\AutoLemon-ERP-v0.6.5-WMS.zip -Algorithm SHA256).Hash   # compare with the .sha256 file
 ```
 
 ## macOS / Linux
 
 ```bash
-unzip AutoLemon-ERP-v0.6.4-WMS.zip -d AutoLemon-ERP-extracted
+unzip AutoLemon-ERP-v0.6.5-WMS.zip -d AutoLemon-ERP-extracted
 cd AutoLemon-ERP-extracted/autolemon-erp
 node --version
 npm install --global pnpm@12.18.0
@@ -54,7 +54,7 @@ pnpm dev
 ## Windows PowerShell
 
 ```powershell
-Expand-Archive -Path .\AutoLemon-ERP-v0.6.4-WMS.zip -DestinationPath .\AutoLemon-ERP-extracted
+Expand-Archive -Path .\AutoLemon-ERP-v0.6.5-WMS.zip -DestinationPath .\AutoLemon-ERP-extracted
 Set-Location .\AutoLemon-ERP-extracted\autolemon-erp
 node --version
 npm install --global pnpm@12.18.0
@@ -135,6 +135,11 @@ the same secret rules as CI over the project files. Without it the scan reports 
    `WEB_ORIGIN` (`localhost`). After that, the login screen offers _Usar chave de acesso_. To try
    the production policy locally set `ADMIN_PASSKEY_REQUIRED=true` in `.env` and restart: an
    administrator without a passkey can then only reach _A minha conta_ until one is registered.
+
+7. Signed audit digests (ADR-0027), keys outside the repository:
+   `pnpm audit:digest keygen --out-dir ../digest-keys`, then
+   `pnpm audit:digest create --key ../digest-keys/audit-digest-<id>.private.pem --out-dir ../digests`
+   and `pnpm audit:digest verify --pub ../digest-keys/audit-digest-<id>.public.pem ../digests`.
 
 ## What each test command needs
 

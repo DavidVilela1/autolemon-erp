@@ -124,3 +124,15 @@ flowchart LR
 - Detection gap for old tampered entries: closed by the daily full pass from the genesis.
 - Residual: a database superuser can still rewrite the chain consistently and the checkpoints
   (SEC-OPEN-008 — off-site digests).
+
+## v0.6.5 changes (signed audit digests, ADR-0027)
+
+- New offline tool `pnpm audit:digest`. Assets: the Ed25519 signing key (operator-held, never
+  read by the API, refused inside the repository, 0600, not printed, `*.pem` ignored and excluded
+  from archives) and the digest files (no audit contents; read-only; to write-once storage).
+- Closes "superuser rewrites the chain consistently" for entries at or before the last stored
+  digest (`HASH_MISMATCH`) and "entries deleted" (`ENTRIES_MISSING`). Residual: the window after
+  the last digest; a compromised digest job host could sign a digest of an already-rewritten
+  chain (keep the job off the database host; compare digest series over time).
+- Untrusted input: digest files are size-bounded (16 MB) and strictly schema-validated before
+  their signature is checked.

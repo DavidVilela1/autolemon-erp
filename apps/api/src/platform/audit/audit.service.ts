@@ -144,7 +144,7 @@ export class AuditService {
     let prev: Buffer = after.hash;
     let expectedSeq = after.seq + 1n;
     for (const e of entries) {
-      const h = sha256(Buffer.concat([prev, Buffer.from(canonicalJson(entryOf(e)), 'utf8')]));
+      const h = computeEntryHash(prev, e);
       if (BigInt(e.seq) !== expectedSeq || !safeEqual(prev, e.prev_hash) || !safeEqual(h, e.hash)) {
         return { ok: false, checked: entries.length, lastSeq: expectedSeq - 1n, lastHash: prev, brokenAtSeq: e.seq };
       }
@@ -156,7 +156,7 @@ export class AuditService {
 }
 
 /** A stored audit row as read back for verification. */
-interface AuditRow {
+export interface AuditRow {
   chain_key: string;
   seq: string;
   company_id: string | null;
@@ -191,4 +191,12 @@ function entryOf(e: AuditRow) {
     clientIp: e.client_ip,
     details: e.details,
   };
+}
+
+/**
+ * Hash of a stored entry given the previous entry's hash — the exact formula of recordInTx.
+ * Exported for verification tools and for tests that simulate a consistent rewrite.
+ */
+export function computeEntryHash(prevHash: Buffer, e: AuditRow): Buffer {
+  return sha256(Buffer.concat([prevHash, Buffer.from(canonicalJson(entryOf(e)), 'utf8')]));
 }

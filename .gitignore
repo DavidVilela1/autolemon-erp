@@ -9,3 +9,6 @@ test-results/
 coverage/
 *.log
 invitations-dev.txt
+# Audit-digest signing keys and digests never belong in the repository (ADR-0027).
+*.pem
+audit-digest-*.json

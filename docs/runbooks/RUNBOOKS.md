@@ -68,7 +68,9 @@ Open item: a scripted, audited break-glass command (T-30).
 1. Do not restart or "fix" the table — the break is evidence. Snapshot: `pnpm backup:local`
    (development) / provider snapshot (production).
 2. Identify the first failing entry (Auditoria → _Verificar cadeia_ shows the id).
-3. Compare with the latest off-site digest (when deployed) and with the backup before the break.
+3. Compare with the off-site digests: `pnpm audit:digest verify --pub <public.pem> <digest dir>`
+   (ADR-0027). `HASH_MISMATCH` = entries rewritten consistently before that digest;
+   `ENTRIES_MISSING` = entries deleted. Compare with the backup taken before the break.
 4. Treat as tampering until proven otherwise (§1 for all admins + DB credential rotation).
 
 ## 5. Stock reconciliation mismatch (SEV-2)

@@ -2,6 +2,35 @@
 
 All notable changes. Owning module: repository. Format: Keep a Changelog; versioning: SemVer.
 
+## [0.6.5-WMS] — 2026-11-12
+
+Continuation (Reusable Continuation Prompt v0.6). Gate state stays **`WMS_IN_PROGRESS`**
+(PASS 20 · FAIL 4 · BLOCKED 9 · NOT_RUN 1); SEC-OPEN-008 tooling done (storage/schedule open).
+
+### Added
+
+- **Signed audit-chain digests** (ADR-0027): `pnpm audit:digest keygen|create|verify`. Ed25519
+  signatures over each chain head; `verify` walks each chain once and reports `HASH_MISMATCH`
+  (consistent superuser rewrite), `ENTRIES_MISSING` (deleted entries) and `CHAIN_BROKEN`; optional
+  `--chain` scope; exit codes 0/1/2. Keys refused inside the repository, private key 0600 and never
+  printed, digest files written once and read-only.
+- `*.pem` and `audit-digest-*.json` ignored by git, excluded from the archive and rejected by
+  `verify:handover`.
+- Tests: `audit-digests` (5).
+
+### Changed
+
+- `computeEntryHash()` exported from the audit service (single source of the hash formula).
+- The security-monitoring test no longer assumes it is the only file tampering with chains in
+  the shared test database (files now pass in shuffled order).
+
+### Fixed (re-issued archive, same version)
+
+- `audit-digests` CLI test failed on Windows (status `null`): it spawned the `node_modules/.bin/tsx`
+  shim, which is a `.cmd` file there. It now runs tsx's JS entry with the current Node, surfaces
+  spawn errors, and skips the POSIX 0600 check on Windows (no permission bits; use NTFS ACLs).
+- Removed a leftover debug `console.log` (`DBG …`) from the security-monitoring test (since v0.6.4).
+
 ## [0.6.4-WMS] — 2026-11-12
 
 Continuation (Reusable Continuation Prompt v0.6). Gate state stays **`WMS_IN_PROGRESS`**

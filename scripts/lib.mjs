@@ -29,7 +29,15 @@ export function authoredFiles(root = ROOT) {
       if (skip.has(e.name)) continue;
       const p = join(d, e.name);
       if (e.isDirectory()) walk(p);
-      else if (e.name !== '.env' && e.name !== 'invitations-dev.txt' && !e.name.endsWith('.zip')) out.push(p);
+      // Keys (*.pem) and digest files are local secrets/evidence, never authored content (ADR-0027).
+      else if (
+        e.name !== '.env' &&
+        e.name !== 'invitations-dev.txt' &&
+        !e.name.endsWith('.zip') &&
+        !e.name.endsWith('.pem') &&
+        !/^audit-digest-.*\.json$/.test(e.name)
+      )
+        out.push(p);
     }
   };
   walk(root);

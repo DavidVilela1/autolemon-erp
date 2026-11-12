@@ -1,4 +1,4 @@
-# API — AutoLemon ERP v0.6.4
+# API — AutoLemon ERP v0.6.5
 
 Owning module: platform/http. The machine-readable spec is **generated from the code**:
 `docs/api/openapi.json` (OpenAPI 3.1, 89 operations). Regenerate with

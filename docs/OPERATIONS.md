@@ -1,4 +1,4 @@
-# Operations — AutoLemon ERP v0.6.4
+# Operations — AutoLemon ERP v0.6.5
 
 Owning module: operations. **Production deployment is not configured and not approved.** This
 document describes how the system is configured and operated, and what must exist first.
@@ -77,6 +77,32 @@ status, request id. No stack traces in responses. Ship to central store; retenti
 
 Weekly base-image rebuild; monthly dependency review; emergency path for critical advisories
 (72 h). Re-run `pnpm test:all` + `security:scan` + restore smoke before every release.
+
+## 6a. Signed audit digests (ADR-0027)
+
+One-time: on the operator workstation or the job host (not the API host), outside the repository:
+
+```bash
+pnpm audit:digest keygen --out-dir /secure/autolemon-digest-keys
+```
+
+Keep the `*.private.pem` in the secrets manager of the digest job; give the `*.public.pem` to the
+auditor and store it next to the digests. Daily (cron / systemd timer / Task Scheduler), with the
+database variables of the API (read-only use of `APP_DATABASE_URL`):
+
+```bash
+pnpm audit:digest create --key /secure/autolemon-digest-keys/audit-digest-<id>.private.pem --out-dir /var/lib/autolemon/digests
+# then copy the new file to write-once storage (object lock, compliance mode, separate account)
+```
+
+Weekly and during any incident, from the write-once copy:
+
+```bash
+pnpm audit:digest verify --pub audit-digest-<id>.public.pem /path/to/digests
+```
+
+Exit 1 (`HASH_MISMATCH`, `ENTRIES_MISSING`, `CHAIN_BROKEN`) is a SEV-1 (RUNBOOKS §4). Windows
+Task Scheduler: run `pnpm` with "Start in" set to the repository folder and the same arguments.
 
 ## 6. Incident handling (outline)
 

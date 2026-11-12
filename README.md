@@ -1,4 +1,4 @@
-# AutoLemon ERP — v0.6.4 (WMS)
+# AutoLemon ERP — v0.6.5 (WMS)
 
 Secure TypeScript ERP foundation with a **fully autonomous Warehouse Management System** for
 automotive-parts shops and distributors in Portugal (UI in pt-PT). Modular monolith: NestJS 12 +
@@ -35,8 +35,8 @@ Fastify API, React 19 SPA, PostgreSQL.
 
 ## Quick start
 
-Release archive: `AutoLemon-ERP-v0.6.4-WMS.zip` (root folder `autolemon-erp/`, SHA-256 in
-`AutoLemon-ERP-v0.6.4-WMS.zip.sha256`).
+Release archive: `AutoLemon-ERP-v0.6.5-WMS.zip` (root folder `autolemon-erp/`, SHA-256 in
+`AutoLemon-ERP-v0.6.5-WMS.zip.sha256`).
 
 Prerequisites: Node.js ≥ 22.12 (Node 26 LTS recommended; verified on 22.23.4), pnpm **12.18.0**,
 Docker (Engine/Desktop) for PostgreSQL 18. Full commands for macOS/Linux and Windows PowerShell:

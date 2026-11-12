@@ -1,6 +1,6 @@
 {
   "name": "@autolemon/contracts",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "private": true,
   "type": "module",
   "description": "Shared Zod contracts (API DTOs, enums, permission names) used by API and web.",

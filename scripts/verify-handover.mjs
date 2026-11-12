@@ -80,8 +80,9 @@ if (existsSync(zip)) {
   if (!list.every((e) => e.startsWith('autolemon-erp/'))) problems.push('archive root is not autolemon-erp/');
   const forbidden = list.filter(
     (e) =>
-      /(^|\/)(\.env|\.local\/|backups\/|node_modules\/|dist\/|\.git\/|test-results\/|playwright-report\/|invitations-dev\.txt)/.test(e) &&
-      !e.endsWith('.env.example'),
+      /(^|\/)(\.env|\.local\/|backups\/|node_modules\/|dist\/|\.git\/|test-results\/|playwright-report\/|invitations-dev\.txt|[^/]*\.pem$|audit-digest-[^/]*\.json$)/.test(
+        e,
+      ) && !e.endsWith('.env.example'),
   );
   if (forbidden.length) problems.push(`forbidden paths in archive: ${forbidden.slice(0, 5).join(', ')}`);
   for (const must of [

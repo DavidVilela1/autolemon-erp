@@ -105,3 +105,13 @@ Abbreviations: PKY = `tests/security/passkeys-account.test.ts`; WMS =
 | Privacy       | Alert log line and webhook payload carry no e-mail/IP; job-failure alerts and audit store no error message                                | `security-monitoring.test.ts`                | Automated | PASS              |
 | Egress        | Webhook HMAC signature, no redirects, URL-free stored errors, bounded retries; unsafe webhook configuration refused                       | `security-monitoring.test.ts`                | Automated | PASS              |
 | Authorization | New `/api/admin/security/*` routes: anonymous, CSRF, staff and malformed-id checks                                                        | `tests/security/route-inventory.test.ts`     | Automated | PASS              |
+
+## Added in v0.6.5
+
+| Area      | Threat / requirement                                                                                            | Test                                   | Type      | Result (last run) |
+| --------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------- | --------- | ----------------- |
+| Integrity | Consistent superuser rewrite (all later hashes recomputed) passes the chain check but fails digest verification | `tests/security/audit-digests.test.ts` | Automated | PASS              |
+| Integrity | Deleted entries (truncation) and plain edits detected against a signed digest                                   | `audit-digests.test.ts`                | Automated | PASS              |
+| Integrity | Forged digest, other key, unknown fields, malformed chains and non-Ed25519 keys rejected                        | `audit-digests.test.ts`                | Automated | PASS              |
+| Secrets   | keygen refuses the repository, private key 0600 and never printed; digests read-only; exit codes 0/1/2          | `audit-digests.test.ts`                | Automated | PASS              |
+| Privacy   | Digests contain no audit contents (no IPs, actions)                                                             | `audit-digests.test.ts`                | Automated | PASS              |

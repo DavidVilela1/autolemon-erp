@@ -1,4 +1,4 @@
-# Next tasks — ordered roadmap (WMS hardening first) — updated v0.6.4
+# Next tasks — ordered roadmap (WMS hardening first) — updated v0.6.5
 
 Owning module: architecture. Each task lists dependencies and the acceptance test that closes it.
 **Product-owner rule (2026-11-10):** the entire autonomous WMS must be production-ready, verified
@@ -11,17 +11,21 @@ manual screen-reader pass still open), T-12 (retention), T-21 (units of measure)
 un-pack), T-24 (rename/deactivate; moving subtrees still unsupported), lots through transfers
 (part of T-20).
 
-## Next three WMS tasks (gate order) — after v0.6.4
+## Next three WMS tasks (gate order) — after v0.6.5
 
-1. **O-02** — owner confirms the `node-next` and `release-candidate` jobs; container image
-   signing (cosign keyless) and a deployment workflow gated on manual approval (no deployment).
-2. **SEC-OPEN-008 code part** — scheduled, signed audit-chain head digests for off-site
-   write-once storage and a `pnpm audit:verify-digests` command.
-3. **E-04** — once the owner agrees targets: reproducible load harness and results.
+1. **O-02** — owner reports the `node-next` and `release-candidate` results of the v0.6.3–v0.6.5
+   pushes; then container image signing (cosign keyless) and a deployment workflow gated on
+   manual approval (no deployment).
+2. **E-04** — once the owner agrees targets (SKUs, positions, documents/day, concurrent users,
+   p95 latency): reproducible load harness and results.
+3. **S-06 code items** — refresh the ASVS 5.0 L2 self-assessment line by line and close
+   remaining code-level gaps it finds (DAST itself needs a staging environment).
 
-Owner-side, in parallel: push v0.6.4; apply branch protection; KMS choice (S-03); staging with
-log shipping and paging for `securityAlert` lines (S-04/O-01/O-03…O-05); provision the
+Owner-side, in parallel: push v0.6.5; branch protection; KMS choice (S-03); staging with log
+shipping, paging and the daily digest job + write-once storage (S-04/S-05/O-01/O-03…O-05);
 breached-password corpus; penetration test (S-07); warehouse pilot (O-06).
+
+Done in v0.6.5: SEC-OPEN-008 tooling (signed audit digests, ADR-0027).
 
 Done in v0.6.4: S-05 code part (security monitoring and alerts, ADR-0026).
 Done in v0.6.3: T-26 (transfer reservations, near-expiry report), T-04 code part (offline corpus).
