@@ -413,6 +413,9 @@ export const LedgerExportQuery = z
     return to >= from && to - from <= 366 * 24 * 3600_000;
   }, 'Período inválido (máximo 366 dias)');
 
+/** Near-expiry report: lots on hand expiring within `days` (0–365, default 30), expired included. */
+export const ExpiryReportQuery = z.object({ days: z.coerce.number().int().min(0).max(365).default(30) }).strict();
+
 /**
  * Cross-document search inside one warehouse: document numbers and external references
  * (inbound, outbound, transfers touching the warehouse, returns, counts), SKUs (code,

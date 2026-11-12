@@ -85,3 +85,12 @@ Abbreviations: PKY = `tests/security/passkeys-account.test.ts`; WMS =
 | Data integrity | Serial duplicated across warehouses (incl. concurrent receipts, in-transit serial) refused | `tests/integration/lots-serials.test.ts` | Automated | PASS                         |
 | Data integrity | Expired lots never allocated; conflicting lot expiry refused                               | `lots-serials.test.ts`                   | Automated | PASS                         |
 | Supply chain   | Release archive has SLSA build provenance (attestation)                                    | CI `release-candidate` job               | CI        | NOT RUN (pending owner push) |
+
+## Added in v0.6.3
+
+| Area           | Threat / requirement                                                                                              | Test                                              | Type      | Result (last run) |
+| -------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | --------- | ----------------- |
+| Data integrity | Stock reserved for a transfer cannot be allocated to outbound or moved; concurrent allocations never over-reserve | `tests/integration/transfer-reservations.test.ts` | Automated | PASS              |
+| Isolation      | Destination sees reserved quantity but not source positions; non-source user cannot allocate (404)                | `transfer-reservations.test.ts`                   | Automated | PASS              |
+| Authorization  | Expiry report requires `wms.report` (403); window bounded 0–365 days (400)                                        | `transfer-reservations.test.ts`                   | Automated | PASS              |
+| Authentication | Passwords present in the offline breached corpus are refused; malformed/unsorted corpus file refuses start-up     | `apps/api/src/platform/auth/password.test.ts`     | Automated | PASS              |

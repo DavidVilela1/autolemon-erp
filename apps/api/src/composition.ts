@@ -19,6 +19,7 @@ import { ExternalKmsProvider, type KeyProvider, LocalDevKeyProvider } from './pl
 import { type ModuleDescriptor, resolveModules } from './platform/modules/registry.js';
 import { OutboxDispatcher } from './platform/outbox/outbox.dispatcher.js';
 import { RetentionService } from './platform/retention/retention.service.js';
+import { configureBreachedCorpus } from './platform/auth/breached-corpus.js';
 import { CountService } from './wms/count.service.js';
 import { InboundService } from './wms/inbound.service.js';
 import { OutboundService } from './wms/outbound.service.js';
@@ -68,6 +69,8 @@ export function keyProviderFor(cfg: AppConfig): KeyProvider {
 /** Builds the service graph. */
 export function buildServices(cfg: AppConfig): Services {
   const modules = resolveModules(cfg.ENABLED_MODULES);
+  // Fails fast at startup on a malformed corpus rather than silently skipping the check.
+  configureBreachedCorpus(cfg.BREACHED_PASSWORD_CORPUS);
   const database = new Database(cfg);
   const audit = new AuditService(database);
   const crypto = new FieldCrypto(database, keyProviderFor(cfg));

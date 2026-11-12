@@ -1,4 +1,4 @@
-# API — AutoLemon ERP v0.6.2
+# API — AutoLemon ERP v0.6.3
 
 Owning module: platform/http. The machine-readable spec is **generated from the code**:
 `docs/api/openapi.json` (OpenAPI 3.1, 89 operations). Regenerate with
@@ -75,3 +75,16 @@ Use the WMS application services (in-process) and subscribe to `domain_outbox` e
 - Serial SKUs: `409 SERIAL_QTY` (more than 1 unit per serial), `409 SERIAL_DUPLICATE` (already on
   hand or in transit).
 - `GET /stock` rows include `expiresOn` and `expired`; outbound `pickList` rows include `lot`.
+
+## Transfer reservations and expiry report (v0.6.3)
+
+- `POST /api/wms/w/{wh}/transfers/{id}/allocate` (source warehouse, `wms.transfer.dispatch`,
+  `Idempotency-Key`) reserves open quantity per line (FEFO; expired lots excluded). Response
+  `{ id, lines: [{ lineId, reserved, missing }] }`; shortages are reported, not refused.
+- `GET /transfers/{id}` lines include `qtyReserved`; the source also gets `pickList` (reserved
+  positions with path, container, lot and quantity). Dispatch consumes reservations first;
+  cancel releases them. Destination close while the source holds reservations →
+  `409 TRANSFER_RESERVED`.
+- `GET /api/wms/w/{wh}/reports/expiry?days=30` (`wms.report`, `days` 0–365) lists positions
+  whose lot expires within the window, including expired ones (`expired: true`), ordered by
+  expiry; at most 2000 rows.

@@ -25,6 +25,7 @@ import {
   CreateReturnInput,
   CreateSkuInput,
   CreateTransferInput,
+  ExpiryReportQuery,
   DispatchInput,
   DispatchTransferInput,
   ExecuteReplenishmentInput,
@@ -112,6 +113,13 @@ export class WmsCompanyController {
   @HttpCode(200)
   receiveTransfer(@Req() req: AppRequest, @Param('id') id: string, @Body() body: unknown) {
     return this.s.transfers.receive(actorOf(req), uuidParam(id), idemKey(req), parse(ReceiveTransferInput, body));
+  }
+
+  /** Source reserves stock for the transfer lines (FEFO; dispatch consumes the reservations). */
+  @Post('transfers/:id/allocate')
+  @HttpCode(200)
+  allocateTransfer(@Req() req: AppRequest, @Param('id') id: string) {
+    return this.s.transfers.allocate(actorOf(req), uuidParam(id), idemKey(req));
   }
 
   /** Source cancel of a DRAFT transfer (nothing shipped). */
@@ -430,6 +438,10 @@ export class WmsWarehouseController {
     const csv = await this.s.reports.exportLedgerCsv(actorOf(req), uuidParam(wh), parse(LedgerExportQuery, q));
     void reply.header('Content-Type', 'text/csv; charset=utf-8').header('Content-Disposition', 'attachment; filename="movimentos.csv"');
     return csv;
+  }
+  @Get('reports/expiry')
+  expiry(@Req() req: AppRequest, @Param('wh') wh: string, @Query() q: unknown) {
+    return this.s.reports.expiry(actorOf(req), uuidParam(wh), parse(ExpiryReportQuery, q));
   }
   @Get('search')
   search(@Req() req: AppRequest, @Param('wh') wh: string, @Query() q: unknown) {

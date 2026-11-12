@@ -1,4 +1,4 @@
-# Next tasks — ordered roadmap (WMS hardening first) — updated v0.6.0
+# Next tasks — ordered roadmap (WMS hardening first) — updated v0.6.3
 
 Owning module: architecture. Each task lists dependencies and the acceptance test that closes it.
 **Product-owner rule (2026-11-10):** the entire autonomous WMS must be production-ready, verified
@@ -11,19 +11,20 @@ manual screen-reader pass still open), T-12 (retention), T-21 (units of measure)
 un-pack), T-24 (rename/deactivate; moving subtrees still unsupported), lots through transfers
 (part of T-20).
 
-## Next three WMS tasks (gate order) — after v0.6.2
+## Next three WMS tasks (gate order) — after v0.6.3
 
-1. **T-26** — transfer reservations at the source (plan → reserve → dispatch from reservations),
-   with concurrency and cross-warehouse conservation tests; near-expiry report.
-2. **S-05/S-06 code parts** — security-event metrics endpoint (bounded, authenticated) and
-   alert hooks for audit-chain failure / purge failure / auth anomalies; breached-password
-   corpus check at enrolment and password change; ASVS self-assessment refresh.
+1. **S-05 code part** — security-event metrics endpoint (bounded, authenticated) and alert hooks
+   for audit-chain failure / purge failure / authentication anomalies; ASVS self-assessment
+   refresh.
+2. **O-02** — owner confirms the `node-next` and `release-candidate` jobs; container image
+   signing (cosign keyless) and a deployment workflow gated on manual approval (no deployment).
 3. **E-04** — once the owner agrees targets: reproducible load harness and results.
 
-Owner-side, in parallel: push v0.6.2 and confirm the `node-next` and `release-candidate` jobs;
-apply branch protection; KMS choice (S-03); staging (S-04/O-01/O-03…O-05); penetration test
-(S-07); warehouse pilot (O-06).
+Owner-side, in parallel: push v0.6.3; apply branch protection; KMS choice (S-03); staging
+(S-04/O-01/O-03…O-05); provision the breached-password corpus; penetration test (S-07);
+warehouse pilot (O-06).
 
+Done in v0.6.3: T-26 (transfer reservations, near-expiry report), T-04 code part (offline corpus).
 Done in v0.6.2: T-20 (FEFO, requested lots, serial uniqueness); O-02 workflow parts.
 Done in v0.6.1: F-12 (T-27), E-05 (T-31), F-05 replenishment scan prompt, local gitleaks.
 
@@ -34,7 +35,7 @@ Done in v0.6.1: F-12 (T-27), E-05 (T-31), F-05 replenishment scan prompt, local 
 | ~~T-01~~ | ✅ v0.6.0 — WebAuthn/passkeys (`@simplewebauthn/server` 14.x + browser 14.x): registration with step-up, login as second factor, admin policy "passkey required", credential list/revoke | —          | Playwright virtual-authenticator e2e (register, login, revoke); TOTP fallback still works; admins without passkey blocked from admin routes |
 | T-02     | Run CI on a protected GitHub repo (Node 26 + PG 18 matrix), branch protection, CODEOWNERS                                                                                                | —          | All jobs green incl. CodeQL/Trivy/gitleaks; evidence linked in PROJECT_STATE                                                                |
 | T-03     | External KMS provider (AWS KMS / Azure Key Vault / Vault Transit) behind `KeyProvider`                                                                                                   | T-02       | Integration test against a KMS emulator; rewrap job; app refuses start without KMS in production                                            |
-| T-04     | Breached-password corpus (offline k-anonymity range files or HIBP via egress proxy)                                                                                                      | —          | Unit tests with known-breached samples                                                                                                      |
+| T-04     | ✅ code v0.6.3 (provisioning open) — Breached-password corpus (offline k-anonymity range files or HIBP via egress proxy)                                                                 | —          | Unit tests with known-breached samples                                                                                                      |
 | T-05     | Staging deployment per NETWORK_AND_ZTNA (WAF, ZTNA, TLS 1.3, private DB, egress deny)                                                                                                    | T-02, T-03 | Verification checklist all ✔ with evidence                                                                                                  |
 | T-06     | Off-site immutable backups (pgBackRest + object lock), WAL PITR, alerting; first quarterly restore exercise with measured RPO/RTO                                                        | T-05       | Signed exercise log                                                                                                                         |
 | T-07     | DAST (ZAP baseline + authenticated full scan) in staging; fix findings                                                                                                                   | T-05       | Report with no high/critical                                                                                                                |
@@ -47,17 +48,17 @@ Done in v0.6.1: F-12 (T-27), E-05 (T-31), F-05 replenishment scan prompt, local 
 
 ## B. WMS functional hardening
 
-| Id       | Task                                                                                                                  | Acceptance                               |
-| -------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| T-20     | Lot/serial end-to-end (FEFO allocation, serial uniqueness, lot on pick/pack; transfer part done in v0.6.0) — **next** | Acceptance flow with LOT and SERIAL SKUs |
-| ~~T-21~~ | ✅ v0.6.0 — Unit-of-measure conversions on receipt/pick (box of 10 ⇒ base units via barcode `qty_per_uom`)            | Scan box barcode receives 10             |
-| ~~T-22~~ | ✅ v0.6.0 — "Unpick" (return PICKED stock to shelf) and package re-open                                               | Close order after unpick                 |
-| T-23     | Nested containers (pallet → boxes) with explicit rules, or keep unsupported                                           | ADR + tests                              |
-| T-24     | 🟡 rename/deactivate done in v0.6.0 — Topology editing: deactivate nodes, rename, move empty subtrees safely          | Tests: cannot deactivate with stock      |
-| T-25     | Printing: ZPL/PDF label templates, scanner-mode full-screen picking UI for tablets                                    | Field test on a real scanner             |
-| T-26     | Transfer pick lists with reservations at source (allocation before dispatch)                                          | Concurrency test with outbound           |
-| ~~T-27~~ | ✅ v0.6.1 (saved reports still open) — Activity search across documents; saved reports; CSV export of ledger          | Tests                                    |
-| T-28     | Event consumers SDK (typed event schemas, versioning policy, replay tool)                                             | Contract tests                           |
+| Id       | Task                                                                                                         | Acceptance                               |
+| -------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
+| ~~T-20~~ | ✅ v0.6.2 — Lot/serial end-to-end (FEFO allocation, serial uniqueness, lot on pick/pack)                     | Acceptance flow with LOT and SERIAL SKUs |
+| ~~T-21~~ | ✅ v0.6.0 — Unit-of-measure conversions on receipt/pick (box of 10 ⇒ base units via barcode `qty_per_uom`)   | Scan box barcode receives 10             |
+| ~~T-22~~ | ✅ v0.6.0 — "Unpick" (return PICKED stock to shelf) and package re-open                                      | Close order after unpick                 |
+| T-23     | Nested containers (pallet → boxes) with explicit rules, or keep unsupported                                  | ADR + tests                              |
+| T-24     | 🟡 rename/deactivate done in v0.6.0 — Topology editing: deactivate nodes, rename, move empty subtrees safely | Tests: cannot deactivate with stock      |
+| T-25     | Printing: ZPL/PDF label templates, scanner-mode full-screen picking UI for tablets                           | Field test on a real scanner             |
+| ~~T-26~~ | ✅ v0.6.3 — Transfer pick lists with reservations at source (allocation before dispatch)                     | Concurrency test with outbound           |
+| ~~T-27~~ | ✅ v0.6.1 (saved reports still open) — Activity search across documents; saved reports; CSV export of ledger | Tests                                    |
+| T-28     | Event consumers SDK (typed event schemas, versioning policy, replay tool)                                    | Contract tests                           |
 
 ## B2. Added by the v0.6.0 session
 

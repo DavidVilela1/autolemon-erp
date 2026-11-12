@@ -4,7 +4,7 @@
  */
 import { useState } from 'react';
 import { api, fmtDate, fmtQty } from '../api';
-import { Button, ErrorNotice, Field, Form, Notice, Page, Panel, Select, Table, useAction, useLoad } from '../components/ui';
+import { Button, ErrorNotice, Field, Form, Notice, Page, Panel, Pill, Select, Table, useAction, useLoad } from '../components/ui';
 import { useSession } from '../session';
 import { loadPositions, type Row, STATUS_PT, wp } from '../wms-data';
 
@@ -173,6 +173,11 @@ export function ReportsPage() {
   const disc = useLoad(() => api<{ inbound: Row[]; counts: Row[] }>('GET', `${wp(wh)}/reports/discrepancies`), [wh]);
   const transit = useLoad(() => api<Row[]>('GET', '/api/wms/reports/in-transit'), []);
   const rec = useLoad(() => api<{ ledgerMismatches: Row[]; reservationMismatches: Row[] }>('GET', `${wp(wh)}/stock/reconciliation`), [wh]);
+  const [days, setDays] = useState('30');
+  const expiry = useLoad(
+    () => api<Row[]>('GET', `${wp(wh)}/reports/expiry?days=${encodeURIComponent(/^\d{1,3}$/.test(days) ? days : '30')}`),
+    [wh, days],
+  );
   const a = useAction();
   return (
     <Page title="Relatórios" purpose="Discrepâncias, mercadoria em trânsito, reconciliação do razão e exportação autorizada.">
@@ -188,6 +193,30 @@ export function ReportsPage() {
               </Notice>
             )
           )}
+        </Panel>
+        <Panel title="Validades a expirar">
+          <Field label="Próximos dias (0–365)" value={days} onChange={setDays} inputMode="numeric" maxLength={3} />
+          {expiry.data && expiry.data.length === 0 ? (
+            <Notice kind="ok">Nenhum lote a expirar neste período.</Notice>
+          ) : (
+            <Table
+              rows={expiry.data ?? []}
+              rowKey={(r) => r.positionId!}
+              cols={[
+                {
+                  h: 'Validade',
+                  c: (r) =>
+                    String(r.expired) === 'true' ? <Pill tone="danger">Expirado {r.expiresOn}</Pill> : `${r.expiresOn} (${r.daysLeft} d)`,
+                },
+                { h: 'Artigo', c: (r) => r.skuCode },
+                { h: 'Lote', c: (r) => r.lot },
+                { h: 'Localização', c: (r) => `${r.nodePath}${r.containerCode ? ` / ${r.containerCode}` : ''}` },
+                { h: 'Estado', c: (r) => STATUS_PT[r.status!] ?? r.status },
+                { h: 'Existência', c: (r) => fmtQty(r.onHand), num: true },
+              ]}
+            />
+          )}
+          <ErrorNotice error={expiry.error} />
         </Panel>
         <Panel title="Exportação CSV de stock">
           {can('wms.export') ? (

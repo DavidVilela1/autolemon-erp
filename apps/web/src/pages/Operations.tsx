@@ -17,6 +17,8 @@ interface TransferDoc {
   sourceCode: string;
   destCode: string;
   lines: Array<Row & { lots?: Array<{ lot: string; qtyInTransit: string; qtyReceived: string }> }>;
+  /** Reserved positions to ship from — only returned to the source warehouse. */
+  pickList: Row[];
 }
 
 /** Inter-warehouse transfers. Each side only acts in its own warehouse. */
@@ -108,6 +110,7 @@ export function TransfersPage() {
                   { h: 'Expedido', c: (r) => fmtQty(r.qtyShipped), num: true },
                   { h: 'Recebido', c: (r) => fmtQty(r.qtyReceived), num: true },
                   { h: 'Em trânsito', c: (r) => fmtQty(r.qtyInTransit), num: true },
+                  { h: 'Reservado', c: (r) => fmtQty(r.qtyReserved), num: true },
                   { h: 'Perdido', c: (r) => fmtQty(r.qtyLost), num: true },
                   {
                     h: 'Lotes (em trânsito)',
@@ -144,6 +147,48 @@ export function TransfersPage() {
                     }
                   >
                     <h3 className="font-semibold">Expedir (origem)</h3>
+                    <p className="text-sm text-ink-soft">
+                      <em>Reservar stock</em> guarda as unidades (validade mais próxima primeiro) para que pedidos de saída não as usem.
+                    </p>
+                    <Button
+                      variant="secondary"
+                      disabled={a.busy}
+                      onClick={() =>
+                        void a.run(async () => {
+                          const r = await api<{ lines: Array<{ missing: string }> }>('POST', `/api/wms/transfers/${d.id}/allocate`);
+                          refresh();
+                          return r;
+                        }, 'Stock reservado na origem.')
+                      }
+                    >
+                      Reservar stock
+                    </Button>
+                    {d.pickList.length > 0 && (
+                      <Table
+                        rows={d.pickList}
+                        rowKey={(r) => r.reservationId!}
+                        cols={[
+                          { h: 'Localização', c: (r) => `${r.nodePath}${r.containerCode ? ` / ${r.containerCode}` : ''}` },
+                          { h: 'Artigo', c: (r) => r.skuCode },
+                          { h: 'Lote', c: (r) => r.lot ?? '—' },
+                          { h: 'Reservado', c: (r) => fmtQty(r.qtyOpen), num: true },
+                          {
+                            h: '',
+                            c: (r) => (
+                              <Button
+                                small
+                                variant="ghost"
+                                onClick={() =>
+                                  setDisp({ ...disp, [r.lineId!]: { positionId: r.positionId!, qty: String(Number(r.qtyOpen)) } })
+                                }
+                              >
+                                Expedir daqui
+                              </Button>
+                            ),
+                          },
+                        ]}
+                      />
+                    )}
                     {d.lines.map((l) => (
                       <div key={l.id} className="grid gap-2 md:grid-cols-2">
                         <Select

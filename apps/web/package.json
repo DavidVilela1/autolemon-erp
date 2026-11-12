@@ -1,6 +1,6 @@
 {
   "name": "@autolemon/web",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "private": true,
   "type": "module",
   "description": "AutoLemon ERP web client (React SPA, pt-PT, keyboard/scanner-first warehouse screens).",

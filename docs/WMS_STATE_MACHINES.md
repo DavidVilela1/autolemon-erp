@@ -1,4 +1,4 @@
-# WMS state machines and invariants — v0.6.2
+# WMS state machines and invariants — v0.6.3
 
 Owning module: WMS. Each transition below is implemented in the named service and covered by
 the tests listed in `docs/security/SECURITY_TEST_MATRIX.md`.
@@ -97,6 +97,13 @@ quantities and lot codes only. Lots: dispatch records the source position's lot 
 creating one RECEIVED position and putaway task per lot; close records the remaining in-transit
 quantity as lost per lot.
 
+**Source reservations (v0.6.3, ADR-0025).** In DRAFT or IN_TRANSIT the source may _allocate_:
+reservations with `transfer_line_id` hold `requested − shipped − reserved` per line (FEFO),
+so outbound allocation cannot take that stock. Dispatch consumes the line's reservation on the
+chosen position first; a fully shipped line releases leftovers; cancel releases all. Invariant:
+`transfer_lines.qty_reserved = Σ active reservations.qty_open` for the line. The destination
+cannot close while `Σ qty_reserved > 0` (`TRANSFER_RESERVED`).
+
 ## Returns (`returns.service.ts`)
 
 INSPECTION → (dispositions, partial) → CLOSED when every unit has a disposition.
@@ -143,7 +150,9 @@ trigger), and a serial in transit cannot be received elsewhere.
 
 ## Reservations
 
-ACTIVE (`qty_open > 0`) → CLOSED (picked fully, short-closed, order cancelled/closed).
+ACTIVE (`qty_open > 0`) → CLOSED (picked fully, short-closed, order cancelled/closed; for
+transfer reservations: dispatched, line fully shipped, transfer cancelled). Each reservation
+belongs to exactly one demand line (`reservations_one_demand`).
 
 ## Corrections
 

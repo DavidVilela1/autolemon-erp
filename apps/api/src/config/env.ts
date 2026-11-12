@@ -43,6 +43,8 @@ const EnvSchema = z.object({
   RETENTION_SESSION_DAYS: z.coerce.number().int().min(7).max(3650).default(30),
   RETENTION_TOKEN_DAYS: z.coerce.number().int().min(7).max(3650).default(30),
   RETENTION_OUTBOX_DAYS: z.coerce.number().int().min(7).max(3650).default(90),
+  /** Optional offline breached-password corpus (sorted SHA-1 lines); see breached-corpus.ts. */
+  BREACHED_PASSWORD_CORPUS: z.string().min(1).optional(),
   /** WebAuthn relying-party id (defaults to the WEB_ORIGIN hostname). */
   WEBAUTHN_RP_ID: z
     .string()

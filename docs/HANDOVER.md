@@ -47,7 +47,7 @@ TSDoc presence (last run: see `docs/PROJECT_STATE.md` §4); comment quality need
 ## 4. Where to start next
 
 `docs/WMS_RELEASE_GATE.md` — every criterion that is not PASS — in the order of
-`docs/NEXT_TASKS.md` "Next three WMS tasks", then T-20 (FEFO/serials), T-26 and the
+`docs/NEXT_TASKS.md` "Next three WMS tasks", then the
 infrastructure block (T-03, T-05…T-07, T-13), which needs the product owner's authorisation.
 
 ## 5. Release procedure

@@ -11,7 +11,7 @@ OWASP Password Storage / Session Management / CSRF cheat sheets.
   `ARGON2_MEMORY_KIB`/`ARGON2_ITERATIONS` on production hardware (target 100–500 ms).
 - `needsRehash()` upgrades stored hashes after a successful login when parameters increase.
 - Policy: 12–128 chars, any Unicode, no composition rules; rejected if in the local common/
-  breached list, containing the e-mail local part or app name, or trivially repetitive.
+  breached list (plus the optional offline corpus `BREACHED_PASSWORD_CORPUS`, ADR-0025), containing the e-mail local part or app name, or trivially repetitive.
 - Anti-enumeration: unknown accounts still run one Argon2 verification against a startup-generated
   dummy hash; one generic error for unknown user / wrong password / disabled / not enrolled.
 - Never logged: request body fields `password`, `token`, `code`, `recoveryCode` are redacted.

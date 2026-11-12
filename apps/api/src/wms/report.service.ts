@@ -8,7 +8,7 @@
  */
 import { sql } from 'drizzle-orm';
 import type { z } from 'zod';
-import type { LedgerExportQuery, LedgerQuery, SearchQuery } from '@autolemon/contracts';
+import type { ExpiryReportQuery, LedgerExportQuery, LedgerQuery, SearchQuery } from '@autolemon/contracts';
 import { toCsv } from '../common/csv.js';
 import type { Database } from '../db/database.js';
 import { rows } from '../db/database.js';
@@ -229,6 +229,31 @@ export class ReportService {
       );
       return { q: q.q, hits };
     });
+  }
+
+  /**
+   * Near-expiry report (wms.report): on-hand positions whose lot expires within `days` (expired
+   * lots included, flagged), earliest first, with free and reserved quantities and status, so
+   * supervisors can block, discount, return or dispose in time. Reads only this warehouse.
+   */
+  async expiry(actor: Actor, warehouseId: string, q: z.infer<typeof ExpiryReportQuery>) {
+    return this.runner.read(actor, warehouseId, 'wms.report', (ctx) =>
+      rows(
+        ctx.tx,
+        sql`SELECT p.id AS "positionId", s.code AS "skuCode", s.description, p.lot_code AS lot, sl.expires_on::text AS "expiresOn",
+              (sl.expires_on - current_date) AS "daysLeft", (sl.expires_on < current_date) AS expired,
+              p.stock_status AS status, p.qty_on_hand::text AS "onHand", p.qty_reserved::text AS reserved,
+              coalesce(n.path, cn.path) AS "nodePath", c.code AS "containerCode"
+            FROM stock_positions p
+            JOIN sku_lots sl ON sl.company_id = p.company_id AND sl.sku_id = p.sku_id AND sl.lot_code = p.lot_code
+            JOIN skus s ON s.id = p.sku_id
+            LEFT JOIN storage_nodes n ON n.id = p.holder_node_id LEFT JOIN containers c ON c.id = p.holder_container_id
+            LEFT JOIN storage_nodes cn ON cn.id = c.current_node_id
+            WHERE p.warehouse_id = ${warehouseId} AND p.qty_on_hand > 0
+              AND sl.expires_on <= current_date + ${q.days}::int
+            ORDER BY sl.expires_on, s.code, p.lot_code LIMIT 2000`,
+      ),
+    );
   }
 
   /** Stock summary report (same data as the stock overview). */

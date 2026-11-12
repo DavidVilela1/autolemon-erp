@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "product": "AutoLemon ERP — WMS",
-  "version": "0.6.2",
-  "updatedAt": "2026-11-10",
+  "version": "0.6.3",
+  "updatedAt": "2026-11-12",
   "state": "WMS_IN_PROGRESS",
   "allowedStates": [
     "WMS_IN_PROGRESS",
@@ -102,30 +102,32 @@
     {
       "id": "F-07",
       "requiredResult": "WMS-native outbound requests, picking across positions, packing and dispatch",
-      "verificationMethod": "Integration tests incl. short pick, partial dispatch, backorder, un-pick, un-pack, cancel after picking; FEFO lot allocation (expired lots never allocated), requested lot, serial uniqueness incl. concurrency",
+      "verificationMethod": "Integration tests incl. short pick, partial dispatch, backorder, un-pick, un-pack, cancel after picking; FEFO lot allocation (expired lots never allocated), requested lot, serial uniqueness incl. concurrency; transfer demand reserves source stock (FEFO) so outbound allocation cannot take it",
       "evidence": [
         "tests/integration/acceptance.test.ts #4–#5",
         "tests/integration/wms-completion.test.ts (R-04/R-10)",
-        "tests/integration/lots-serials.test.ts"
+        "tests/integration/lots-serials.test.ts",
+        "tests/integration/transfer-reservations.test.ts"
       ],
-      "verifiedAt": "2026-11-10",
+      "verifiedAt": "2026-11-12",
       "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
       "status": "PASS",
-      "openAction": "Transfer reservations at source (T-26)"
+      "openAction": "—"
     },
     {
       "id": "F-08",
       "requiredResult": "Inter-warehouse transfers with in-transit custody and independent source/destination roles",
-      "verificationMethod": "Integration tests incl. lots in transit, per-lot loss, source cancel, cross-warehouse refusals",
+      "verificationMethod": "Integration tests incl. lots in transit, per-lot loss, source cancel, cross-warehouse refusals; source-side reservations (allocate, consume on dispatch, release on cancel/full shipment, concurrent allocation never over-reserves), destination close refused while source holds reservations",
       "evidence": [
         "tests/integration/acceptance.test.ts #6",
         "tests/integration/wms-completion.test.ts (R-03/R-06)",
-        "tests/security/isolation.test.ts"
+        "tests/security/isolation.test.ts",
+        "tests/integration/transfer-reservations.test.ts"
       ],
-      "verifiedAt": "2026-11-10",
+      "verifiedAt": "2026-11-12",
       "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
       "status": "PASS",
-      "openAction": "Transfer reservations at source (T-26)"
+      "openAction": "—"
     },
     {
       "id": "F-09",
@@ -169,13 +171,14 @@
     {
       "id": "F-12",
       "requiredResult": "Operational reports, search/filter/export, barcode/print labels and pt-PT operator UX",
-      "verificationMethod": "Activity CSV export (bounded period, wms.export + step-up + audit, formula-safe), cross-document search (numbers, external refs, SKU/barcode, locations, containers; warehouse-scoped, literal matching), stock export, labels, axe on every screen",
+      "verificationMethod": "Activity CSV export (bounded period, wms.export + step-up + audit, formula-safe), cross-document search (numbers, external refs, SKU/barcode, locations, containers; warehouse-scoped, literal matching), stock export, labels, axe on every screen; near-expiry/expired lot report (bounded window, wms.report)",
       "evidence": [
         "tests/integration/reports-search.test.ts",
         "tests/security/isolation.test.ts (export)",
-        "tests/e2e/warehouse.spec.ts (search + axe sweep)"
+        "tests/e2e/warehouse.spec.ts (search + axe sweep)",
+        "tests/integration/transfer-reservations.test.ts (expiry report)"
       ],
-      "verifiedAt": "2026-11-10",
+      "verifiedAt": "2026-11-12",
       "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
       "status": "PASS",
       "openAction": "Operator sign-off of pt-PT UX in the pilot (O-06)"
@@ -342,12 +345,13 @@
       "verificationMethod": "Developer self-assessment + test matrix",
       "evidence": [
         "docs/security/ASVS_L2_ASSESSMENT.md",
-        "docs/security/SECURITY_TEST_MATRIX.md"
+        "docs/security/SECURITY_TEST_MATRIX.md",
+        "apps/api/src/platform/auth/password.test.ts (offline breached-password corpus)"
       ],
-      "verifiedAt": "2026-11-10",
+      "verifiedAt": "2026-11-12",
       "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
       "status": "FAIL",
-      "openAction": "Open chapters: breached-password corpus, DAST, deployment controls; independent verification"
+      "openAction": "Breached-password corpus done (offline, opt-in via BREACHED_PASSWORD_CORPUS; owner must supply the HIBP file). Still open: DAST, deployment controls; independent verification"
     },
     {
       "id": "S-07",

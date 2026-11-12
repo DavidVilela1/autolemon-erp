@@ -2,6 +2,33 @@
 
 All notable changes. Owning module: repository. Format: Keep a Changelog; versioning: SemVer.
 
+## [0.6.3-WMS] — 2026-11-12
+
+Continuation (Reusable Continuation Prompt v0.6). Gate state stays **`WMS_IN_PROGRESS`**
+(PASS 20 · FAIL 4 · BLOCKED 9 · NOT_RUN 1); F-07/F-08 open action (T-26) closed; S-06 open
+items narrowed (breached-password corpus).
+
+### Added
+
+- **Transfer reservations at the source** (ADR-0025, migration 0008): _Reservar stock_ reserves
+  the open quantity of each line (FEFO, expired lots excluded) so outbound allocation cannot
+  take it; pick list per reserved position with _Expedir daqui_; dispatch consumes reservations
+  first; fully shipped lines and cancel release them; destination close refused while the
+  source holds reservations (`409 TRANSFER_RESERVED`). New route
+  `POST /api/wms/w/{wh}/transfers/{id}/allocate`; lines expose `qtyReserved`.
+- **Near-expiry report** `GET /api/wms/w/{wh}/reports/expiry?days=` and the Relatórios panel
+  "Validades a expirar" (expired lots flagged).
+- **Offline breached-password corpus** (`BREACHED_PASSWORD_CORPUS`,
+  `scripts/prepare-breached-corpus.mjs`): binary search over a fixed-width SHA-1 file built from
+  the HIBP download; applied at enrolment, password change and reset completion.
+- Tests: `transfer-reservations` (6, incl. a concurrent-allocation race and conservation across
+  warehouses), corpus unit test.
+
+### Changed
+
+- Outbound and transfer allocation share one candidate query (`allocationCandidates()` in the
+  inventory engine).
+
 ## [0.6.2-WMS] — 2026-11-10
 
 Continuation (Reusable Continuation Prompt v0.6). Gate state stays **`WMS_IN_PROGRESS`**

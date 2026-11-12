@@ -88,15 +88,17 @@ Relatórios → _Reconciliação_ must show "Saldos e reservas coincidem". If no
 
 ## 6. Stuck documents
 
-| Symptom                                     | Action (all in the UI, audited)                                                                           |
-| ------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Order picked but customer cancelled         | Saídas → _Retirar_ / _Retirar do volume_ (un-pack) → _Anular separação_ (un-pick to a shelf) → _Cancelar_ |
-| Order cannot close: "picked not dispatched" | dispatch the packages or un-pack/un-pick the remainder, then _Fechar_                                     |
-| Transfer sent by mistake (not yet shipped)  | origin: Transferências → _Anular transferência_                                                           |
-| Transfer partly lost in transit             | destination: _Fechar_ — the remainder is recorded as lost per lot                                         |
-| Stock in quarantine that passed inspection  | Stock → _Estado_ → Disponível + destination shelf (step-up)                                               |
-| Location must be removed                    | move stock and boxes out, then Estrutura → _Desativar_                                                    |
-| Wrong movement posted                       | Histórico → _Reverter_ (step-up, once)                                                                    |
+| Symptom                                                 | Action (all in the UI, audited)                                                                           |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Order picked but customer cancelled                     | Saídas → _Retirar_ / _Retirar do volume_ (un-pack) → _Anular separação_ (un-pick to a shelf) → _Cancelar_ |
+| Order cannot close: "picked not dispatched"             | dispatch the packages or un-pack/un-pick the remainder, then _Fechar_                                     |
+| Transfer sent by mistake (not yet shipped)              | origin: Transferências → _Anular transferência_                                                           |
+| Transfer partly lost in transit                         | destination: _Fechar_ — the remainder is recorded as lost per lot                                         |
+| Destination close refused `TRANSFER_RESERVED`           | the source still holds reservations: source dispatches the rest or _Anular transferência_ (releases them) |
+| Outbound short because stock is reserved for a transfer | Transferências → the transfer's "Reservado" column shows it; source dispatches or cancels the transfer    |
+| Stock in quarantine that passed inspection              | Stock → _Estado_ → Disponível + destination shelf (step-up)                                               |
+| Location must be removed                                | move stock and boxes out, then Estrutura → _Desativar_                                                    |
+| Wrong movement posted                                   | Histórico → _Reverter_ (step-up, once)                                                                    |
 
 ## 7. Background jobs
 

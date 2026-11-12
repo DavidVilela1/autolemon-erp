@@ -39,3 +39,35 @@ describe('password screening (NIST 800-63B style)', () => {
     expect(screenPassword('cavalo correto bateria agrafo', ctx)).toBeUndefined();
   });
 });
+
+describe('breached-password corpus (offline, SHA-1, binary search)', () => {
+  it('rejects passwords present in the corpus and accepts others; refuses malformed files', async () => {
+    const { createHash } = await import('node:crypto');
+    const { mkdtempSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { BreachedPasswordCorpus, configureBreachedCorpus } = await import('./breached-corpus.js');
+    const breached = ['correct horse battery staple', 'Lisboa-Porto-2026!', 'armazem central norte'];
+    const filler = Array.from({ length: 500 }, (_, i) => `filler-password-${i}`);
+    const lines = [...breached, ...filler].map((p) => createHash('sha1').update(p).digest('hex').toUpperCase()).sort();
+    const dir = mkdtempSync(join(tmpdir(), 'corpus-'));
+    const file = join(dir, 'corpus.txt');
+    writeFileSync(file, lines.map((l) => `${l}\n`).join(''));
+    const c = configureBreachedCorpus(file)!;
+    expect(c.size).toBe(503);
+    for (const p of breached) expect(screenPassword(p, { email: 'x@example.test' })).toMatch(/fugas de dados/);
+    expect(screenPassword('uma frase nova e longa 81', { email: 'x@example.test' })).toBeUndefined();
+    configureBreachedCorpus(undefined);
+    expect(screenPassword('Lisboa-Porto-2026!', { email: 'x@example.test' })).toBeUndefined();
+    writeFileSync(join(dir, 'bad.txt'), 'ABC\n');
+    expect(() => new BreachedPasswordCorpus(join(dir, 'bad.txt'))).toThrow(/41-byte/);
+    writeFileSync(
+      join(dir, 'unsorted.txt'),
+      [...lines]
+        .reverse()
+        .map((l) => `${l}\n`)
+        .join(''),
+    );
+    expect(() => new BreachedPasswordCorpus(join(dir, 'unsorted.txt'))).toThrow(/not sorted/);
+  });
+});

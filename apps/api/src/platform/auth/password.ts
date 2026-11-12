@@ -11,6 +11,7 @@
  * for Argon2id; see docs/security/AUTH_AND_RBAC.md for the measured benchmark.
  */
 import { hash, verify } from '@node-rs/argon2';
+import { isBreached } from './breached-corpus.js';
 import { COMMON_PASSWORDS } from './common-passwords.js';
 
 /** Argon2id numeric algorithm id (const enum value 2 in @node-rs/argon2). */
@@ -61,7 +62,7 @@ export function screenPassword(password: string, context: { email: string; displ
   const lower = p.toLowerCase();
   if (p.length < 12) return 'A palavra-passe deve ter pelo menos 12 caracteres';
   if (p.length > 128) return 'A palavra-passe não pode exceder 128 caracteres';
-  if (COMMON_PASSWORDS.has(lower) || COMMON_PASSWORDS.has(lower.replace(/[0-9!@#$%^&*.]+$/, ''))) {
+  if (COMMON_PASSWORDS.has(lower) || COMMON_PASSWORDS.has(lower.replace(/[0-9!@#$%^&*.]+$/, '')) || isBreached(p)) {
     return 'Esta palavra-passe é demasiado comum ou consta de listas de fugas de dados';
   }
   const local = context.email.split('@')[0]?.toLowerCase() ?? '';

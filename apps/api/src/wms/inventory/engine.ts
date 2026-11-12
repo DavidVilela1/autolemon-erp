@@ -378,6 +378,53 @@ export async function registerLot(
   return code;
 }
 
+/** Locale-independent string order (codes, ISO dates, ids). */
+const byCode = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
+/**
+ * Positions that may be reserved for `skuId` in the warehouse, LOCKED and returned in allocation
+ * order (ADR-0024) — shared by outbound allocation and transfer allocation so both follow one
+ * policy:
+ *  1. FEFO — earliest expiry first; expired lots are never returned (they stay on hand for
+ *     quarantine/disposal); lots without expiry come after dated ones;
+ *  2. lot code ascending (FIFO when codes are date-based; neutral for untracked stock, lot '');
+ *  3. fullest free quantity first (fewer pick stops); id as a stable tie-breaker.
+ * Only AVAILABLE stock with free quantity in allocatable nodes (directly or in an ACTIVE
+ * container) qualifies. `lot` restricts to one lot/serial. Rows are locked in ascending id order
+ * (deadlock avoidance) and sorted in memory afterwards.
+ */
+export async function allocationCandidates(
+  ctx: Pick<OpCtx, 'tx'>,
+  warehouseId: string,
+  skuId: string,
+  lot: string | null,
+): Promise<PositionRow[]> {
+  const candidates = await rows<PositionRow & { expires_on: string | null }>(
+    ctx.tx,
+    sql`SELECT p.*, sl.expires_on::text AS expires_on FROM stock_positions p
+        LEFT JOIN storage_nodes n ON n.id = p.holder_node_id
+        LEFT JOIN containers c ON c.id = p.holder_container_id
+        LEFT JOIN storage_nodes cn ON cn.id = c.current_node_id
+        LEFT JOIN sku_lots sl ON sl.company_id = p.company_id AND sl.sku_id = p.sku_id AND sl.lot_code = p.lot_code
+        WHERE p.warehouse_id = ${warehouseId} AND p.sku_id = ${skuId} AND p.stock_status = 'AVAILABLE'
+          AND p.qty_on_hand > p.qty_reserved AND (c.id IS NULL OR c.status = 'ACTIVE')
+          AND coalesce(n.kind, cn.kind) IN (${sql.join(
+            ALLOCATABLE_NODE_KINDS.map((k) => sql`${k}`),
+            sql`, `,
+          )})
+          AND (sl.expires_on IS NULL OR sl.expires_on >= current_date)
+          AND (${lot}::text IS NULL OR p.lot_code = ${lot}::text)
+        ORDER BY p.id FOR UPDATE OF p`,
+  );
+  return candidates.sort(
+    (a, b) =>
+      byCode(a.expires_on ?? '9999-12-31', b.expires_on ?? '9999-12-31') ||
+      byCode(a.lot_code, b.lot_code) ||
+      cmp(sub(b.qty_on_hand, b.qty_reserved), sub(a.qty_on_hand, a.qty_reserved)) ||
+      byCode(a.id, b.id),
+  );
+}
+
 /** Resolves a barcode/SKU code to a SKU id, or undefined. */
 export async function skuIdForBarcode(ctx: Pick<OpCtx, 'tx' | 'companyId'>, scanned: string): Promise<string | undefined> {
   const r = await row<{ id: string }>(
