@@ -4,7 +4,7 @@
  * @module platform/http
  */
 import { randomUUID } from 'node:crypto';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { AppConfig } from '../config/env.js';
 
 /** Paths redacted from structured logs (never log secrets, cookies or tokens). */
@@ -36,8 +36,15 @@ export function loggerOptions(cfg: AppConfig) {
 /** Request id generator: server-generated UUID (client-supplied ids are ignored). */
 export const genReqId = () => randomUUID();
 
+/** Response statuses recorded as control-bypass signals. */
+export const SIGNAL_STATUSES: ReadonlySet<number> = new Set([400, 413, 415, 429]);
+
 /** Installs hooks on the Fastify instance. */
-export function installHardening(app: FastifyInstance, cfg: AppConfig): void {
+export function installHardening(
+  app: FastifyInstance,
+  cfg: AppConfig,
+  onSecuritySignal: (req: FastifyRequest, statusCode: number) => Promise<void> = async () => undefined,
+): void {
   // Simple fixed-window per-IP limiter for the whole API (auth endpoints also have DB throttles).
   const windowMs = 60_000;
   const limit = cfg.NODE_ENV === 'test' ? 100_000 : 600;
@@ -57,6 +64,13 @@ export function installHardening(app: FastifyInstance, cfg: AppConfig): void {
   });
 
   app.addHook('onSend', async (req, reply, payload) => {
+    // Control-bypass signals (ASVS 5.0 V16.3.3, ADR-0029): every 400/413/415/429 — whether it
+    // came from validation, the JSON/content-type parsers, the auth throttle or the limiter above —
+    // passes here before it is sent. The recorder is itself rate-limited; a failing audit write
+    // must never change the response.
+    if (SIGNAL_STATUSES.has(reply.statusCode)) {
+      await onSecuritySignal(req, reply.statusCode).catch((e: unknown) => req.log.error({ err: e }, 'security signal write failed'));
+    }
     reply.header('X-Request-Id', String(req.id));
     reply.header('Cache-Control', 'no-store');
     reply.header('X-Content-Type-Options', 'nosniff');

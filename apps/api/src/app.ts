@@ -7,6 +7,7 @@
  * register their controllers here only if enabled in the module registry.
  */
 import 'reflect-metadata';
+import { STATUS_CODES } from 'node:http';
 import cookie from '@fastify/cookie';
 import { Module, type DynamicModule } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, NestFactory } from '@nestjs/core';
@@ -18,6 +19,7 @@ import { AuthController } from './http/auth.controller.js';
 import { AuthGuard } from './http/auth.guard.js';
 import { AllExceptionsFilter } from './http/exception.filter.js';
 import { genReqId, installHardening, loggerOptions } from './http/hardening.js';
+import type { AppRequest } from './http/http-util.js';
 import { WmsCompanyController, WmsWarehouseController } from './http/wms.controller.js';
 
 @Module({})
@@ -60,7 +62,17 @@ export async function createApp(cfg: AppConfig, services: Services = buildServic
   });
   const fastify = app.getHttpAdapter().getInstance();
   await fastify.register(cookie as never);
-  installHardening(fastify, cfg);
+  installHardening(fastify, cfg, (req, status) => {
+    const r = req as AppRequest;
+    return services.signals.record(status === 429 ? 'rate_limited' : 'input_rejected', {
+      companyId: r.actor?.companyId ?? null,
+      actorUserId: r.actor?.userId ?? null,
+      clientIp: req.ip,
+      route: `${req.method} ${req.routeOptions?.url ?? '(unrouted)'}`,
+      code: r.errorCode ?? STATUS_CODES[status] ?? String(status),
+      requestId: String(req.id),
+    });
+  });
   app.enableShutdownHooks();
   await app.init();
   return { app, services };

@@ -57,6 +57,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         })
         .catch((e: unknown) => req.log.error({ err: e }, 'audit write failed'));
     }
+    req.errorCode = err.code; // read by the security-signal hook in hardening.ts (ADR-0029)
     if (err instanceof RateLimited) void reply.header('Retry-After', String(err.retryAfterSeconds));
     const body: Record<string, unknown> = { error: { code: err.code, message: err.message }, requestId };
     if (err.details !== undefined) (body.error as Record<string, unknown>).details = err.details;

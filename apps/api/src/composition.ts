@@ -20,6 +20,7 @@ import { type ModuleDescriptor, resolveModules } from './platform/modules/regist
 import { OutboxDispatcher } from './platform/outbox/outbox.dispatcher.js';
 import { RetentionService } from './platform/retention/retention.service.js';
 import { SecurityMonitor } from './platform/monitoring/security-monitor.js';
+import { SecuritySignals } from './platform/audit/security-signals.js';
 import { configureBreachedCorpus } from './platform/auth/breached-corpus.js';
 import { CountService } from './wms/count.service.js';
 import { InboundService } from './wms/inbound.service.js';
@@ -50,6 +51,7 @@ export interface Services {
   outbox: OutboxDispatcher;
   retention: RetentionService;
   monitor: SecurityMonitor;
+  signals: SecuritySignals;
   topology: TopologyService;
   skus: SkuService;
   stock: StockService;
@@ -93,6 +95,7 @@ export function buildServices(cfg: AppConfig): Services {
     outbox: new OutboxDispatcher(database),
     retention: new RetentionService(database, cfg, audit),
     monitor: new SecurityMonitor(database, audit, cfg),
+    signals: new SecuritySignals(audit),
     topology: new TopologyService(runner),
     skus: new SkuService(database, audit),
     stock: new StockService(runner, audit, step),

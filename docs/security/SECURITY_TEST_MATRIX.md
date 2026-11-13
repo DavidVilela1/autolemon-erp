@@ -127,3 +127,14 @@ Abbreviations: PKY = `tests/security/passkeys-account.test.ts`; WMS =
 | Authentication  | Top-5000 policy-length common passwords, context-dominated passwords, 64+ chars accepted                         | `apps/api/src/platform/auth/password.test.ts` | Automated | PASS              |
 | Configuration   | Production refuses `DB_SSL` other than verify-full                                                               | `apps/api/src/config/env.test.ts`             | Automated | PASS              |
 | Assurance       | ASVS assessment covers all 253 L1+L2 ids, evidence exists, I+T cites tests, report current; checker fails closed | `tests/security/asvs-assessment.test.ts`      | Automated | PASS              |
+
+## Added in v0.6.7
+
+| Area       | Threat / requirement                                                                                      | Test                                                   | Type      | Result (last run) |
+| ---------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | --------- | ----------------- |
+| Logging    | Rejected input, parser rejections and throttling audited once per source/window with summary, no payloads | `tests/security/recovery-and-signals.test.ts`          | Automated | PASS              |
+| Logging    | Recorder windows, source separation, memory bound and overflow                                            | `apps/api/src/platform/audit/security-signals.test.ts` | Automated | PASS              |
+| Monitoring | `security.probing` raised for many rejected sources                                                       | `recovery-and-signals.test.ts`                         | Automated | PASS              |
+| Recovery   | MFA/password reset require a recorded identity check; self-recovery refused; cross-company 404            | `recovery-and-signals.test.ts`                         | Automated | PASS              |
+| Recovery   | Admin-issued password reset end to end: single use, policy, sessions revoked, MFA still required          | `recovery-and-signals.test.ts`                         | Automated | PASS              |
+| Headers    | frame-ancestors/X-Frame-Options; generic errors with request id and no internals                          | `recovery-and-signals.test.ts`                         | Automated | PASS              |

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "product": "AutoLemon ERP — WMS",
-  "version": "0.6.6",
-  "updatedAt": "2026-11-12",
+  "version": "0.6.7",
+  "updatedAt": "2026-11-13",
   "state": "WMS_IN_PROGRESS",
   "allowedStates": [
     "WMS_IN_PROGRESS",
@@ -11,7 +11,7 @@
     "AWAITING_NEXT_MODULE_SELECTION",
     "NEXT_MODULE_AUTHORIZED"
   ],
-  "stateReason": "Code-level criteria still FAIL (S-03 external KMS, S-05 monitoring and digest storage deployment, S-06 ASVS open items, O-02 signed artifacts/gated deployment) and infrastructure/independent criteria are BLOCKED; see openAction per criterion.",
+  "stateReason": "Code-level criteria still FAIL (S-03 external KMS, S-05 monitoring and digest storage deployment, O-02 signed artifacts/gated deployment) and infrastructure/independent criteria are BLOCKED (S-06 now waits only for an environment for DAST/ENV items and for independent verification); see openAction per criterion.",
   "gateSource": "WMS Production Readiness Gate v0.6 (product owner, 2026-11-10) + Reusable Continuation Prompt v0.6 §0",
   "releaseOwnerApproval": null,
   "independentSecurityReview": null,
@@ -352,12 +352,14 @@
         "docs/security/asvs/assessment.json",
         "tests/security/asvs-assessment.test.ts",
         "tests/security/session-controls.test.ts",
-        "docs/DECISIONS/ADR-0028-asvs-l2-requirement-level-review.md"
+        "docs/DECISIONS/ADR-0028-asvs-l2-requirement-level-review.md",
+        "tests/security/recovery-and-signals.test.ts",
+        "docs/DECISIONS/ADR-0029-control-bypass-signals-and-recovery-proofing.md"
       ],
-      "verifiedAt": "2026-11-12",
+      "verifiedAt": "2026-11-13",
       "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
-      "status": "FAIL",
-      "openAction": "Self-assessment v0.6.6: I+T 91, I 67, P 4 (V6.4.4, V12.3.1, V13.2.4, V16.3.3), O 0, ENV 13, N/A 78. Still open: DAST against staging, the 13 ENV items on the target environment, the 4 partial items, independent verification (S-07)"
+      "status": "BLOCKED",
+      "openAction": "No code-level ASVS L2 gap known (self-assessment v0.6.7: I+T 93, I 67, P 2, O 0, ENV 13, N/A 78). Blocked on an approved staging/target environment for DAST and the 13 ENV + 2 partial items (T-05), then independent verification (S-07)"
     },
     {
       "id": "S-07",

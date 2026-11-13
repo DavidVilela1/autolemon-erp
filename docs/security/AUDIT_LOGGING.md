@@ -42,6 +42,17 @@ envelopes, shown to users on errors for support. Hosts must use NTP (chrony) —
   inventory history: life of the company records (legal/tax requirements to confirm).
 - Logs must not be used to reconstruct personal data beyond the stated purpose (GDPR minimisation).
 
+## 4a. Control-bypass signals (v0.6.7, ADR-0029)
+
+`security.input_rejected` (400/413/415) and `security.rate_limited` (429): the first event per
+(signal, company, user, client IP) in a 5-minute window, then one summary
+(`details.summary = true`, `suppressedEvents`); `security.signals_overflow` if more than 10 000
+sources are open. Details: route template and `errorCode` only (never URL, query or body).
+Rejections before the session is resolved (parsers, per-IP limiter) are on the
+pre-authentication chain without an actor. Account recovery entries
+(`admin.user.mfa_reset`, `admin.user.password_reset_issued`) carry `identityVerification` and
+`verificationReference`.
+
 ## 5. Alerting
 
 **Implemented in the application (v0.6.4, ADR-0026):** rules, dedupe, log/webhook delivery,

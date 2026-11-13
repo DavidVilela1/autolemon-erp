@@ -6,6 +6,7 @@ import { Body, Controller, Get, HttpCode, Inject, Param, Post, Put, Query, Req }
 import {
   AcknowledgeAlertInput,
   CreateUserInput,
+  IdentityVerificationInput,
   SecurityAlertsQuery,
   SecurityOverviewQuery,
   CreateWarehouseInput,
@@ -95,15 +96,15 @@ export class AdminController {
   /** MFA reset (step-up). */
   @Post('admin/users/:id/mfa-reset')
   @HttpCode(200)
-  mfaReset(@Req() req: AppRequest, @Param('id') id: string) {
-    return this.s.admin.resetMfa(actorOf(req), uuidParam(id));
+  mfaReset(@Req() req: AppRequest, @Param('id') id: string, @Body() body: unknown) {
+    return this.s.admin.resetMfa(actorOf(req), uuidParam(id), parse(IdentityVerificationInput, body));
   }
 
   /** Password reset token (step-up). */
   @Post('admin/users/:id/password-reset')
   @HttpCode(200)
-  passwordReset(@Req() req: AppRequest, @Param('id') id: string) {
-    return this.s.admin.issuePasswordReset(actorOf(req), uuidParam(id));
+  passwordReset(@Req() req: AppRequest, @Param('id') id: string, @Body() body: unknown) {
+    return this.s.admin.issuePasswordReset(actorOf(req), uuidParam(id), parse(IdentityVerificationInput, body));
   }
 
   /** Decrypt PII (pii.read + step-up + audit). */

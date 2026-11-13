@@ -155,3 +155,15 @@ export const SecurityAlertsQuery = z
 
 /** Acknowledging an alert (one-way; requires step-up). */
 export const AcknowledgeAlertInput = z.object({ note: SafeText(300).optional() }).strict();
+
+/**
+ * How the administrator verified the person before an account recovery (MFA reset or password
+ * reset) — ASVS 5.0 V6.4.4. Recorded in the audit trail; `reference` is a short, non-personal
+ * note (e.g. "chamada de volta, 13/11 09:10, confirmado pelo chefe de turno").
+ */
+export const IdentityVerificationInput = z
+  .object({
+    method: z.enum(['IN_PERSON', 'VIDEO_CALL', 'KNOWN_PHONE_CALLBACK', 'MANAGER_CONFIRMATION']),
+    reference: SafeLine(120).refine((s) => s.trim().length >= 5, 'Descreva a verificação (mínimo 5 caracteres)'),
+  })
+  .strict();

@@ -55,6 +55,27 @@ export function AdminPage() {
   const [edit, setEdit] = useState<UserRow | null>(null);
   const a = useAction();
   const link = (kind: string, tok: string) => `${window.location.origin}/#/${kind}/${tok}`;
+  // Account recovery needs a recorded identity check (ASVS 5.0 V6.4.4, ADR-0029).
+  const [recovery, setRecovery] = useState<{ user: UserRow; kind: 'mfa' | 'password' } | null>(null);
+  const [method, setMethod] = useState('IN_PERSON');
+  const [reference, setReference] = useState('');
+  const runRecovery = () =>
+    void a.run(async () => {
+      if (!recovery) return;
+      const body = { method, reference };
+      if (recovery.kind === 'mfa') {
+        const r = await withStepUp(() => api<{ mfaResetToken: string }>('POST', `/api/admin/users/${recovery.user.id}/mfa-reset`, body));
+        setSecretOut({ label: 'Ligação de reposição MFA', value: link('convite', r.mfaResetToken) });
+        users.reload();
+      } else {
+        const r = await withStepUp(() =>
+          api<{ passwordResetToken: string }>('POST', `/api/admin/users/${recovery.user.id}/password-reset`, body),
+        );
+        setSecretOut({ label: 'Ligação de redefinição de palavra-passe (60 min)', value: link('redefinir', r.passwordResetToken) });
+      }
+      setRecovery(null);
+      setReference('');
+    });
   return (
     <Page
       title="Administração"
@@ -68,6 +89,31 @@ export function AdminPage() {
             Ocultar
           </Button>
         </Notice>
+      )}
+      {recovery && (
+        <Panel title={`${recovery.kind === 'mfa' ? 'Repor MFA' : 'Repor palavra-passe'} — ${recovery.user.displayName}`}>
+          <Form onSubmit={runRecovery} className="flex flex-wrap items-end gap-3">
+            <p className="w-full text-sm">
+              Confirme primeiro a identidade da pessoa. A verificação fica registada na auditoria; não escreva dados pessoais.
+            </p>
+            <Select
+              label="Como verificou a identidade"
+              value={method}
+              onChange={(v) => setMethod(v || 'IN_PERSON')}
+              options={[
+                { value: 'IN_PERSON', label: 'Presencialmente' },
+                { value: 'VIDEO_CALL', label: 'Videochamada' },
+                { value: 'KNOWN_PHONE_CALLBACK', label: 'Chamada de volta para o número da ficha' },
+                { value: 'MANAGER_CONFIRMATION', label: 'Confirmação pelo responsável direto' },
+              ]}
+            />
+            <Field label="Referência da verificação" value={reference} onChange={setReference} required />
+            <Button type="submit">Confirmar</Button>
+            <Button variant="ghost" onClick={() => setRecovery(null)}>
+              Cancelar
+            </Button>
+          </Form>
+        </Panel>
       )}
       <Panel title="Utilizadores">
         <Table<UserRow>
@@ -92,34 +138,10 @@ export function AdminPage() {
                       Permissões
                     </Button>
                   )}
-                  <Button
-                    small
-                    variant="secondary"
-                    onClick={() =>
-                      void a.run(async () => {
-                        const r = await withStepUp(() => api<{ mfaResetToken: string }>('POST', `/api/admin/users/${u.id}/mfa-reset`));
-                        setSecretOut({ label: 'Ligação de reposição MFA', value: link('convite', r.mfaResetToken) });
-                        users.reload();
-                      })
-                    }
-                  >
+                  <Button small variant="secondary" onClick={() => setRecovery({ user: u, kind: 'mfa' })}>
                     Repor MFA
                   </Button>
-                  <Button
-                    small
-                    variant="secondary"
-                    onClick={() =>
-                      void a.run(async () => {
-                        const r = await withStepUp(() =>
-                          api<{ passwordResetToken: string }>('POST', `/api/admin/users/${u.id}/password-reset`),
-                        );
-                        setSecretOut({
-                          label: 'Ligação de redefinição de palavra-passe (60 min)',
-                          value: link('redefinir', r.passwordResetToken),
-                        });
-                      })
-                    }
-                  >
+                  <Button small variant="secondary" onClick={() => setRecovery({ user: u, kind: 'password' })}>
                     Repor palavra-passe
                   </Button>
                   <Button
@@ -363,6 +385,7 @@ const COUNTER_LABELS: Record<string, string> = {
   export: 'Exportações',
   keyRotation: 'Rotações de chaves',
   privilegeChange: 'Alterações de utilizadores/permissões',
+  controlBypass: 'Pedidos rejeitados ou limitados (registos agregados)',
 };
 
 /** pt-PT descriptions of alert rules (rule id → text). Unknown ids are shown as-is. */
@@ -377,6 +400,7 @@ const RULE_LABELS: Record<string, string> = {
   'wms.export_burst': 'Muitas exportações',
   'audit.chain_broken': 'Cadeia de auditoria quebrada — iniciar incidente',
   'system.outbox_stuck': 'Eventos por publicar há demasiado tempo',
+  'security.probing': 'Muitos pedidos rejeitados ou limitados (sondagem)',
 };
 
 const SEVERITY_LABEL: Record<string, { text: string; tone: 'neutral' | 'warn' | 'danger' }> = {

@@ -10,7 +10,13 @@
 import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import type { z } from 'zod';
-import { ADMIN_ONLY_PERMISSIONS, type CreateUserInput, type CreateWarehouseInput, type Permission } from '@autolemon/contracts';
+import {
+  ADMIN_ONLY_PERMISSIONS,
+  type CreateUserInput,
+  type CreateWarehouseInput,
+  type IdentityVerificationInput,
+  type Permission,
+} from '@autolemon/contracts';
 import { Conflict, NotFound } from '../../common/errors.js';
 import type { Database, Tx } from '../../db/database.js';
 import { one, row, rows } from '../../db/database.js';
@@ -179,9 +185,10 @@ export class AdminService {
    * revokes sessions and returns a one-time MFA_RESET token (24 h) that the user redeems with
    * their password to enrol again.
    */
-  async resetMfa(actor: Actor, userId: string) {
+  async resetMfa(actor: Actor, userId: string, verification: z.infer<typeof IdentityVerificationInput>) {
     requirePermission(actor, 'admin.security');
     requireStepUp(actor, 'users.mfa.reset', this.stepUpMinutes);
+    refuseSelfRecovery(actor, userId);
     return this.database.systemTx(async (tx) => {
       await this.requireUser(tx, actor, userId);
       await tx.execute(sql`UPDATE users SET mfa_enrolled_at = NULL, updated_at = now() WHERE id = ${userId}`);
@@ -191,19 +198,28 @@ export class AdminService {
       const pk = await tx.execute(sql`UPDATE webauthn_credentials SET revoked_at = now() WHERE user_id = ${userId} AND revoked_at IS NULL`);
       await this.auth.revokeAllSessionsInTx(tx, userId, 'mfa_reset');
       const token = await this.auth.issueToken(tx, userId, actor.companyId, 'MFA_RESET', actor.userId);
-      await this.auditTx(tx, actor, 'admin.user.mfa_reset', 'user', userId, { alert: true, passkeysRevoked: pk.rowCount ?? 0 });
+      await this.auditTx(tx, actor, 'admin.user.mfa_reset', 'user', userId, {
+        alert: true,
+        passkeysRevoked: pk.rowCount ?? 0,
+        identityVerification: verification.method,
+        verificationReference: verification.reference,
+      });
       return { id: userId, mfaResetToken: token, expiresInHours: 24 };
     });
   }
 
   /** Issues a one-time password reset token (60 min). */
-  async issuePasswordReset(actor: Actor, userId: string) {
+  async issuePasswordReset(actor: Actor, userId: string, verification: z.infer<typeof IdentityVerificationInput>) {
     requirePermission(actor, 'admin.security');
     requireStepUp(actor, 'users.password.reset', this.stepUpMinutes);
+    refuseSelfRecovery(actor, userId);
     return this.database.systemTx(async (tx) => {
       await this.requireUser(tx, actor, userId);
       const token = await this.auth.issueToken(tx, userId, actor.companyId, 'PASSWORD_RESET', actor.userId);
-      await this.auditTx(tx, actor, 'admin.user.password_reset_issued', 'user', userId, {});
+      await this.auditTx(tx, actor, 'admin.user.password_reset_issued', 'user', userId, {
+        identityVerification: verification.method,
+        verificationReference: verification.reference,
+      });
       return { id: userId, passwordResetToken: token, expiresInMinutes: 60 };
     });
   }
@@ -331,5 +347,16 @@ export class AdminService {
       clientIp: actor.clientIp,
       details,
     });
+  }
+}
+
+/**
+ * Account recovery must be done by ANOTHER administrator (ASVS 5.0 V6.4.4: recovery at the same
+ * assurance as enrolment, which is always done by an administrator for someone else). An admin
+ * who lost their own factor asks a second admin, or follows RUNBOOKS §3 (last administrator).
+ */
+function refuseSelfRecovery(actor: Actor, userId: string): void {
+  if (actor.userId === userId) {
+    throw new Conflict('Peça a outro administrador para repor o seu acesso', 'SELF_RECOVERY_FORBIDDEN');
   }
 }

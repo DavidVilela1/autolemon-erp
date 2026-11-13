@@ -30,7 +30,10 @@ Write the incident record (§9) before closing.
    session while you investigate, or _Desativar_ to also block new logins. Several accounts or
    unknown scope: Segurança → _Terminar todas as sessões_ (everyone except you signs in again).
    If the account is an administrator and you are the only one, use §3.
-2. **MFA reset** — Administração → _Repor MFA_ (step-up). This removes TOTP, recovery codes and
+2. **MFA reset** — Administração → _Repor MFA_ (step-up). First verify the person (in person,
+   video call, call-back to the number on file, or confirmation by their manager) and record
+   the method and a short reference — the app requires it (v0.6.7) and you cannot reset your own
+   account. This removes TOTP, recovery codes and
    **all passkeys** (v0.6.1) and revokes sessions. Give the new enrolment link only through a
    verified channel (in person / known phone number).
 3. **Scope** — Auditoria: filter by the user; look for `auth.login.success` from unusual IPs,
@@ -106,15 +109,16 @@ Relatórios → _Reconciliação_ must show "Saldos e reservas coincidem". If no
 
 ## 6a. Security alerts (Segurança page, log `securityAlert: true`, optional webhook)
 
-| Alert                                                    | First response                                                                                     |
-| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `audit.chain_broken` (CRITICAL)                          | SEV-1 — §4; do not acknowledge until the incident record exists                                    |
-| `auth.login_failures`, `auth.mfa_failures` (HIGH)        | check Auditoria for the accounts/IPs; if one account: §1; if spraying: block at the WAF/ZTNA       |
-| `auth.unknown_account_failures` (HIGH, log/webhook only) | credential stuffing against non-existent accounts: block sources at the WAF                        |
-| `auth.recovery_code_used`, `auth.mfa_reset` (MEDIUM)     | confirm with the user by a known channel that it was them; otherwise §1                            |
-| `admin.pii_read_burst`, `wms.export_burst` (MEDIUM)      | confirm the business reason with the administrator/operator; otherwise §1 and restrict permissions |
-| `authz.denied_spike` (MEDIUM)                            | look for probing (Auditoria → `authz.denied` resources); a misconfigured scanner/tablet is common  |
-| `system.outbox_stuck`, `system.*_failed` (MEDIUM/HIGH)   | §7                                                                                                 |
+| Alert                                                           | First response                                                                                                                                         |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `audit.chain_broken` (CRITICAL)                                 | SEV-1 — §4; do not acknowledge until the incident record exists                                                                                        |
+| `auth.login_failures`, `auth.mfa_failures` (HIGH)               | check Auditoria for the accounts/IPs; if one account: §1; if spraying: block at the WAF/ZTNA                                                           |
+| `auth.unknown_account_failures` (HIGH, log/webhook only)        | credential stuffing against non-existent accounts: block sources at the WAF                                                                            |
+| `auth.recovery_code_used`, `auth.mfa_reset` (MEDIUM)            | confirm with the user by a known channel that it was them; otherwise §1                                                                                |
+| `admin.pii_read_burst`, `wms.export_burst` (MEDIUM)             | confirm the business reason with the administrator/operator; otherwise §1 and restrict permissions                                                     |
+| `security.probing`, `security.unauthenticated_probing` (MEDIUM) | Auditoria → filter `security.input_rejected` / `security.rate_limited`: one source → block at the WAF; many → likely a scanner or misconfigured client |
+| `authz.denied_spike` (MEDIUM)                                   | look for probing (Auditoria → `authz.denied` resources); a misconfigured scanner/tablet is common                                                      |
+| `system.outbox_stuck`, `system.*_failed` (MEDIUM/HIGH)          | §7                                                                                                                                                     |
 
 Acknowledge (_Marcar como visto_) only after the response is recorded; it is one-way and audited.
 

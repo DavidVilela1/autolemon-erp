@@ -147,3 +147,11 @@ flowchart LR
 - Cross-site reads refused by Fetch Metadata (defence in depth on top of SameSite=Strict).
 - Password screening now rejects the top 5000 policy-length common passwords and
   context-dominated passwords; recovery codes 120 bits.
+
+## v0.6.7 changes (ADR-0029)
+
+- Audit flooding via rejected requests: bounded by per-source windows, a 10 000-key cap and an
+  overflow summary; payloads are never stored (no log injection, no PII from bodies).
+- Social engineering of account recovery: a verification method and reference are mandatory and
+  audited; self-recovery is refused, so a hijacked admin session cannot silently re-enrol its own
+  second factor.

@@ -1,4 +1,4 @@
-# API — AutoLemon ERP v0.6.6
+# API — AutoLemon ERP v0.6.7
 
 Owning module: platform/http. The machine-readable spec is **generated from the code**:
 `docs/api/openapi.json` (OpenAPI 3.1, 89 operations). Regenerate with
@@ -122,3 +122,13 @@ STEP_UP_REQUIRED`); revoking the current session needs none.
 - `POST /api/auth/logout` adds `Clear-Site-Data: "cache", "storage"`.
 - Recovery codes are now `XXXX-XXXX-XXXX-XXXX-XXXX-XXXX` (120 bits); the 4-group format is still
   accepted for codes issued before v0.6.6.
+
+## Recovery proofing and control-bypass signals (v0.6.7, ADR-0029)
+
+- `POST /api/admin/users/{id}/mfa-reset` and `POST /api/admin/users/{id}/password-reset` now
+  **require** a body `{ "method": "IN_PERSON" | "VIDEO_CALL" | "KNOWN_PHONE_CALLBACK" |
+"MANAGER_CONFIRMATION", "reference": "5–120 characters, no personal data" }`. Errors: `400`
+  (missing/invalid), `409 SELF_RECOVERY_FORBIDDEN` (own account), `403 STEP_UP_REQUIRED`, `404`.
+- Responses 400/413/415/429 are recorded as audit actions `security.input_rejected` /
+  `security.rate_limited` (first per source and 5-minute window + summary); nothing changes for
+  clients.

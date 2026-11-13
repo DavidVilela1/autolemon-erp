@@ -20,6 +20,7 @@ const alertOnFailure = (job: 'retention' | 'outbox', msg: string) => (e: unknown
 services.outbox.start(5000, alertOnFailure('outbox', 'outbox dispatch failed'));
 services.retention.start(undefined, alertOnFailure('retention', 'retention purge failed'));
 services.monitor.start(log);
+services.signals.start((e) => log.error({ err: e }, 'security signal flush failed'));
 await app.listen({ host: cfg.API_HOST, port: cfg.API_PORT });
 app
   .getHttpAdapter()
@@ -30,6 +31,7 @@ const shutdown = async () => {
   services.outbox.stop();
   services.retention.stop();
   services.monitor.stop();
+  await services.signals.stop();
   await app.close();
   await services.database.close();
   process.exit(0);

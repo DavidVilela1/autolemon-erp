@@ -23,7 +23,11 @@ export const ACCOUNT_SECURITY_ROUTE = 'autolemon:account-security';
 export const AccountSecurity = () => SetMetadata(ACCOUNT_SECURITY_ROUTE, true);
 
 /** Fastify request augmented with the authenticated actor. */
-export type AppRequest = FastifyRequest & { actor?: Actor };
+/**
+ * Fastify request with the resolved actor and, after an error, its domain error code (used by the
+ * security-signal hook, ADR-0029).
+ */
+export type AppRequest = FastifyRequest & { actor?: Actor; errorCode?: string };
 
 /**
  * Validates untrusted input with a Zod schema. Issues are reported by path and message only;

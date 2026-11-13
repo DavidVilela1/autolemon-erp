@@ -1,6 +1,6 @@
 {
-  "assessedVersion": "0.6.6",
-  "assessedAt": "2026-11-12",
+  "assessedVersion": "0.6.7",
+  "assessedAt": "2026-11-13",
   "assessor": "AI-assisted developer self-assessment (not an independent verification)",
   "statuses": {
     "I+T": "implemented and covered by an automated test",
@@ -240,8 +240,8 @@
     {
       "id": "V2.4.1",
       "status": "I+T",
-      "evidence": ["tests/security/attacks.test.ts", "tests/integration/reports-search.test.ts"],
-      "note": "Per-IP rate limit, per-account/IP auth throttles, export caps and step-up for bulk exports."
+      "evidence": ["tests/security/attacks.test.ts", "tests/security/recovery-and-signals.test.ts"],
+      "note": "Per-IP rate limit, per-account/IP auth throttles (audited, v0.6.7), export caps and step-up for bulk exports."
     },
     {
       "id": "V3.2.1",
@@ -312,7 +312,7 @@
     {
       "id": "V3.4.6",
       "status": "I+T",
-      "evidence": ["tests/security/attacks.test.ts", "infra/nginx/autolemon.conf"],
+      "evidence": ["tests/security/recovery-and-signals.test.ts", "infra/nginx/autolemon.conf"],
       "note": "frame-ancestors 'none' on API responses and in the SPA policy; X-Frame-Options DENY as fallback."
     },
     {
@@ -432,8 +432,8 @@
     {
       "id": "V5.2.2",
       "status": "I+T",
-      "evidence": ["tests/security/attacks.test.ts"],
-      "note": "Content is parsed as CSV with required headers; binary/NUL content and bad headers rejected (no file extension is involved)."
+      "evidence": ["tests/security/attacks.test.ts", "tests/security/recovery-and-signals.test.ts"],
+      "note": "Content is parsed as CSV with required headers; binary/NUL content and bad headers rejected; other media types get 415 (tested v0.6.7)."
     },
     {
       "id": "V5.2.3",
@@ -588,8 +588,8 @@
     {
       "id": "V6.4.1",
       "status": "I+T",
-      "evidence": ["tests/security/attacks.test.ts"],
-      "note": "Invitation/reset tokens: 256-bit CSPRNG, hashed, single use, 72 h / 24 h / 60 min."
+      "evidence": ["tests/security/recovery-and-signals.test.ts", "tests/security/attacks.test.ts"],
+      "note": "Invitation/reset tokens: 256-bit CSPRNG, hashed, single use (reset single use tested), 72 h / 24 h / 60 min."
     },
     {
       "id": "V6.4.2",
@@ -600,14 +600,14 @@
     {
       "id": "V6.4.3",
       "status": "I+T",
-      "evidence": ["tests/security/attacks.test.ts"],
-      "note": "Administrator-issued reset sets a new password only; MFA is still required at the next login; all sessions revoked."
+      "evidence": ["tests/security/recovery-and-signals.test.ts"],
+      "note": "Administrator-issued reset: single-use 60-minute token, password policy applies, all sessions revoked, MFA still required at the next login — end-to-end test added in v0.6.7 (previously claimed without a dedicated test)."
     },
     {
       "id": "V6.4.4",
-      "status": "P",
-      "evidence": ["docs/runbooks/RUNBOOKS.md", "docs/MANUAL_OPERADOR_E_ADMIN.md"],
-      "note": "MFA reset is admin-only with step-up and audit; identity proofing is procedural (verified channel), not enforced by code."
+      "status": "I+T",
+      "evidence": ["tests/security/recovery-and-signals.test.ts", "docs/runbooks/RUNBOOKS.md"],
+      "note": "MFA and password resets require a recorded identity-verification method + reference (audited) and are refused for the administrator's own account (v0.6.7, ADR-0029)."
     },
     {
       "id": "V6.5.1",
@@ -1445,9 +1445,13 @@
     },
     {
       "id": "V16.3.3",
-      "status": "P",
-      "evidence": ["docs/security/AUDIT_LOGGING.md", "tests/security/security-monitoring.test.ts"],
-      "note": "Authorization denials, throttling of authentication and alert rules are logged; generic input-validation failures and per-IP 429s are only in the application log, not the audit trail."
+      "status": "I+T",
+      "evidence": [
+        "tests/security/recovery-and-signals.test.ts",
+        "apps/api/src/platform/audit/security-signals.test.ts",
+        "tests/security/security-monitoring.test.ts"
+      ],
+      "note": "Rejected input (400/413/415) and throttling (429) are audited as security.input_rejected / security.rate_limited: first event per source and 5-minute window + summary, bounded memory, no request contents; authorization denials audited per event; monitor rules security.probing / unauthenticated_probing (v0.6.7, ADR-0029)."
     },
     {
       "id": "V16.3.4",
@@ -1476,7 +1480,7 @@
     {
       "id": "V16.5.1",
       "status": "I+T",
-      "evidence": ["tests/security/attacks.test.ts"],
+      "evidence": ["tests/security/recovery-and-signals.test.ts", "tests/security/attacks.test.ts"],
       "note": "Generic error envelope with request id; no stack traces or SQL."
     },
     {

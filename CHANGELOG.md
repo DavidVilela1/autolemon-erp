@@ -2,6 +2,32 @@
 
 All notable changes. Owning module: repository. Format: Keep a Changelog; versioning: SemVer.
 
+## [0.6.7-WMS] — 2026-11-13
+
+Continuation (Reusable Continuation Prompt v0.6). Gate state stays **`WMS_IN_PROGRESS`**
+(PASS 20 · FAIL 3 · BLOCKED 10 · NOT_RUN 1): S-06 moved from FAIL to BLOCKED — no code-level ASVS
+L2 gap is known; DAST and environment items need a staging environment, then independent review.
+
+### Added
+
+- **Control-bypass signals in the audit trail** (ASVS V16.3.3, ADR-0029): every 400/413/415/429
+  is recorded as `security.input_rejected` / `security.rate_limited` — first event per source and
+  5-minute window plus a summary, bounded memory, no request contents. Monitor rules
+  `security.probing` and `security.unauthenticated_probing`; overview counter `controlBypass`.
+- **Recorded identity check for account recovery** (V6.4.4): MFA and password resets require a
+  verification method and reference (audited); self-recovery refused
+  (`409 SELF_RECOVERY_FORBIDDEN`); form in Administração.
+- Tests: `recovery-and-signals` (7, incl. the first end-to-end test of the administrator-issued
+  password reset), `security-signals` unit (3).
+
+### Changed
+
+- **Breaking (API):** `POST /api/admin/users/{id}/mfa-reset` and `…/password-reset` require a
+  body (the bundled UI is updated).
+- OpenAPI now documents the request bodies of the reset and alert-acknowledgement endpoints.
+- ASVS assessment v0.6.7: I+T 93 · I 67 · P 2 · O 0 · ENV 13 · N/A 78. V6.4.3 had been marked I+T
+  without a dedicated test — corrected with the new test; V3.4.6 and V16.5.1 got explicit tests.
+
 ## [0.6.6-WMS] — 2026-11-12
 
 Continuation (Reusable Continuation Prompt v0.6). Gate state stays **`WMS_IN_PROGRESS`**

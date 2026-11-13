@@ -1,4 +1,4 @@
-# Manual do operador e do administrador — AutoLemon WMS v0.6.6
+# Manual do operador e do administrador — AutoLemon WMS v0.6.7
 
 Módulo responsável: WMS / formação. Público: operadores de armazém, chefes de armazém e
 administradores da empresa. Este manual descreve o que a aplicação faz **hoje**; não substitui a
@@ -71,7 +71,9 @@ chefe de armazém.
 
 - **Utilizadores**: criar (um armazém por operador, permissões mínimas necessárias), desativar,
   _Terminar sessões_ (termina todas as sessões dessa pessoa, por exemplo um tablet perdido),
-  _Repor MFA_ quando alguém perde o telemóvel/chave (remove códigos, autenticador **e chaves de
+  _Repor MFA_ quando alguém perde o telemóvel/chave (antes, confirme a identidade da pessoa e
+  registe como o fez — presencialmente, videochamada, chamada de volta para o número da ficha ou
+  confirmação pelo responsável; não pode repor o seu próprio acesso) (remove códigos, autenticador **e chaves de
   acesso**; entregue o novo link por um canal verificado), _Repor palavra-passe_.
 - **Auditoria**: consulta e _Verificar cadeia_ (deve dar OK). Uma falha é um incidente grave —
   ver `docs/runbooks/RUNBOOKS.md` §4.

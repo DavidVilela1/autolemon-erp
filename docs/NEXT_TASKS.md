@@ -1,4 +1,4 @@
-# Next tasks — ordered roadmap (WMS hardening first) — updated v0.6.6
+# Next tasks — ordered roadmap (WMS hardening first) — updated v0.6.7
 
 Owning module: architecture. Each task lists dependencies and the acceptance test that closes it.
 **Product-owner rule (2026-11-10):** the entire autonomous WMS must be production-ready, verified
@@ -11,20 +11,22 @@ manual screen-reader pass still open), T-12 (retention), T-21 (units of measure)
 un-pack), T-24 (rename/deactivate; moving subtrees still unsupported), lots through transfers
 (part of T-20).
 
-## Next three WMS tasks (gate order) — after v0.6.6
+## Next three WMS tasks (gate order) — after v0.6.7
 
-1. **O-02** — owner reports the `node-next` and `release-candidate` results of the v0.6.3–v0.6.6
+1. **O-02** — owner reports the `node-next` and `release-candidate` results of the v0.6.3–v0.6.7
    pushes; then container image signing (cosign keyless) and a deployment workflow gated on
    manual approval (no deployment).
 2. **E-04** — once the owner agrees targets (SKUs, positions, documents/day, concurrent users,
    p95 latency): reproducible load harness and results.
-3. **S-06 residue** — V16.3.3 (security-relevant validation failures and throttling into the
-   audit trail with rate-limited entries), V6.4.4 (in-app identity-check record for MFA resets);
-   then DAST once a staging environment exists.
+3. **Staging readiness pack (T-05)** — a single, reviewed checklist + scripts to bring up a
+   private staging environment on the owner's chosen provider (no spending without approval),
+   so DAST (S-06), the ENV items, KMS (S-03), monitoring/digests (S-05) and O-01…O-05 can be
+   verified there.
 
-Owner-side, in parallel: push v0.6.6; branch protection; KMS choice (S-03); staging with log
-shipping, paging and the daily digest job + write-once storage (S-04/S-05/O-01/O-03…O-05);
+Owner-side, in parallel: push v0.6.7; branch protection; KMS choice; staging environment;
 breached-password corpus; penetration test (S-07); warehouse pilot (O-06).
+
+Done in v0.6.7: ASVS V16.3.3 and V6.4.4 (ADR-0029); S-06 now has no known code-level gap.
 
 Done in v0.6.6: S-06 requirement-level ASVS review and its code-level gaps (ADR-0028).
 

@@ -34,6 +34,9 @@ const BODIES: Record<string, z.ZodType> = {
   'AdminController.permissions': C.UpdatePermissionsInput,
   'AdminController.warehouse': C.UpdateWarehouseAssignmentInput,
   'AdminController.switchWarehouse': C.SwitchWarehouseInput,
+  'AdminController.mfaReset': C.IdentityVerificationInput,
+  'AdminController.passwordReset': C.IdentityVerificationInput,
+  'AdminController.acknowledgeAlert': C.AcknowledgeAlertInput,
   'WmsCompanyController.createSku': C.CreateSkuInput,
   'WmsCompanyController.createTransfer': C.CreateTransferInput,
   'WmsCompanyController.dispatchTransfer': C.DispatchTransferInput,
@@ -135,7 +138,7 @@ export function buildOpenApi(): Record<string, unknown> {
     openapi: '3.1.0',
     info: {
       title: 'AutoLemon ERP API (platform + autonomous WMS)',
-      version: '0.6.6',
+      version: '0.6.7',
       description:
         'Cookie-session API. All writes require X-Requested-With: autolemon and X-CSRF-Token; WMS commands require Idempotency-Key. Generated from code — see docs/API.md.',
     },

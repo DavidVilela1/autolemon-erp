@@ -103,6 +103,24 @@ export const COUNT_RULES: readonly CountRule[] = [
     scope: 'company',
   },
   { id: 'admin.pii_read_burst', severity: 'MEDIUM', actions: ['admin.pii.read'], threshold: 5, windowMinutes: 60, scope: 'company' },
+  {
+    // Rows are already rate-limited per source and window (ADR-0029), so 10 rows mean many
+    // distinct sources or a sustained run of rejected/throttled requests.
+    id: 'security.probing',
+    severity: 'MEDIUM',
+    actions: ['security.input_rejected', 'security.rate_limited'],
+    threshold: 10,
+    windowMinutes: 15,
+    scope: 'company',
+  },
+  {
+    id: 'security.unauthenticated_probing',
+    severity: 'MEDIUM',
+    actions: ['security.input_rejected', 'security.rate_limited'],
+    threshold: 20,
+    windowMinutes: 15,
+    scope: 'system',
+  },
   { id: 'admin.key_rotation', severity: 'LOW', actions: ['admin.keys.rotate'], threshold: 1, windowMinutes: 60, scope: 'company' },
   {
     id: 'wms.export_burst',
@@ -127,6 +145,7 @@ const OVERVIEW_GROUPS: ReadonlyArray<{ key: string; actions: readonly string[]; 
   { key: 'piiRead', actions: ['admin.pii.read'] },
   { key: 'export', actions: ['wms.export.ledger_csv', 'wms.export.stock_csv'] },
   { key: 'keyRotation', actions: ['admin.keys.rotate'] },
+  { key: 'controlBypass', actions: ['security.input_rejected', 'security.rate_limited'] },
   { key: 'privilegeChange', actions: ['admin.user.create', 'admin.user.permissions', 'admin.user.warehouse', 'admin.user.deactivate'] },
 ];
 

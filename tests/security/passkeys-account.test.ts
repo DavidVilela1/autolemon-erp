@@ -129,7 +129,7 @@ describe('Passkeys (WebAuthn)', () => {
     const lost = new SoftAuthenticator();
     await registerPasskey(victim, lost, 'Telemóvel perdido');
     await A.admin.stepUp();
-    ok(await A.admin.post(`/api/admin/users/${victim.userId}/mfa-reset`));
+    ok(await A.admin.post(`/api/admin/users/${victim.userId}/mfa-reset`, { method: 'IN_PERSON', reference: 'verificado presencialmente' }));
     const pk = await t.owner.query('SELECT count(*)::int AS n FROM webauthn_credentials WHERE user_id = $1 AND revoked_at IS NULL', [
       victim.userId,
     ]);
