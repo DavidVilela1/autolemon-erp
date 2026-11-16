@@ -2,6 +2,26 @@
 
 All notable changes. Owning module: repository. Format: Keep a Changelog; versioning: SemVer.
 
+## [0.6.8-WMS] — 2026-11-16
+
+Continuation (Reusable Continuation Prompt v0.6). Gate state stays **`WMS_IN_PROGRESS`**
+(PASS 20 · FAIL 3 · BLOCKED 10 · NOT_RUN 1). E-04 now has a harness and a measured baseline;
+it stays BLOCKED until the owner agrees the targets and the run is repeated on
+production-equivalent hardware.
+
+### Added
+
+- **Load/performance harness** (ADR-0030): `pnpm test:load [-- --profile smoke|representative|stress]`
+  on a disposable database; dataset seeded through the real opening-stock command; weighted
+  operator mix (stock by SKU, SKU search, global search, ledger page, stock move) through the full
+  HTTP stack; stock conservation and reconciliation checked after every run; JSON results in
+  `artifacts/perf/`, generated reports in `docs/perf/LAST_RUN_*.md`.
+- **Provisional targets** in `docs/perf/targets.json` for the owner to confirm.
+- Baseline (2 vCPU, generator on the same machine): representative 20 000 SKUs / 100 000
+  positions / 25 users — 275 req/s, 0 errors, p95 101–156 ms (all targets met); stress 60 users —
+  250 req/s, 0 errors, p95 283–328 ms (degrades, invariants hold).
+- CI `verify` job runs `pnpm asvs:check` and the load smoke profile; uploads `artifacts/perf/`.
+
 ## [0.6.7-WMS] — 2026-11-13
 
 Continuation (Reusable Continuation Prompt v0.6). Gate state stays **`WMS_IN_PROGRESS`**

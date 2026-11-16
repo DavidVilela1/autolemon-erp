@@ -1,0 +1,57 @@
+{
+  "status": "PROVISIONAL",
+  "note": "Proposed by the developer (v0.6.8) for the product owner to confirm or change. Gate E-04 stays BLOCKED until status is AGREED with an approver and date.",
+  "agreedBy": null,
+  "agreedAt": null,
+  "profiles": {
+    "smoke": {
+      "description": "Fast sanity run (CI-sized): small catalogue, few users",
+      "warehouses": 1,
+      "skus": 500,
+      "bins": 50,
+      "positionsPerSku": 4,
+      "virtualUsers": 8,
+      "warmupSeconds": 3,
+      "durationSeconds": 20
+    },
+    "representative": {
+      "description": "One busy auto-parts distribution warehouse: 20 000 SKUs, 1 000 bins, 100 000 stock positions, 25 concurrent operators/tablets",
+      "warehouses": 1,
+      "skus": 20000,
+      "bins": 1000,
+      "positionsPerSku": 5,
+      "virtualUsers": 25,
+      "warmupSeconds": 15,
+      "durationSeconds": 120
+    },
+    "stress": {
+      "description": "Representative dataset at more than twice the concurrency (60 virtual users) to see how latency degrades; reported, never enforced",
+      "warehouses": 1,
+      "skus": 20000,
+      "bins": 1000,
+      "positionsPerSku": 5,
+      "virtualUsers": 60,
+      "warmupSeconds": 10,
+      "durationSeconds": 60,
+      "enforce": false
+    }
+  },
+  "mix": {
+    "stock_by_sku": 40,
+    "sku_search": 20,
+    "global_search": 10,
+    "ledger_page": 5,
+    "stock_move": 25
+  },
+  "targets": {
+    "p95Ms": {
+      "stock_by_sku": 150,
+      "sku_search": 200,
+      "global_search": 300,
+      "ledger_page": 300,
+      "stock_move": 300
+    },
+    "maxErrorRate": 0.001,
+    "minThroughputRps": 50
+  }
+}

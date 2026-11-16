@@ -1,4 +1,4 @@
-# WMS state machines and invariants — v0.6.7
+# WMS state machines and invariants — v0.6.8
 
 Owning module: WMS. Each transition below is implemented in the named service and covered by
 the tests listed in `docs/security/SECURITY_TEST_MATRIX.md`.

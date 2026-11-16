@@ -1,4 +1,4 @@
-# WMS release evidence — v0.6.7
+# WMS release evidence — v0.6.8
 
 Owning module: release management. Companion of `docs/WMS_RELEASE_GATE.md` (criteria and
 status, generated from `docs/WMS_RELEASE_STATUS.json`). This file records **how** each piece of
@@ -18,7 +18,7 @@ Node 22.x) for the v0.5 code after the CI fixes; those logs are not attached.
 | Command                                    | Result                                                                                                                                                                      | Gate criteria                                  |
 | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
 | `pnpm format:check`                        | all files formatted                                                                                                                                                         | E-05                                           |
-| `pnpm lint`                                | 0 problems incl. module-boundary rules; documentation gate 140 files / 383 exported symbols                                                                                 | E-05, S-02                                     |
+| `pnpm lint`                                | 0 problems incl. module-boundary rules; documentation gate 141 files / 383 exported symbols                                                                                 | E-05, S-02                                     |
 | `pnpm typecheck`                           | 0 errors                                                                                                                                                                    | —                                              |
 | `pnpm api:check`                           | OpenAPI matches code (107 paths / 117 operations)                                                                                                                           | E-05                                           |
 | `pnpm gate:check`                          | state `WMS_IN_PROGRESS`; PASS 20 · FAIL 3 · BLOCKED 10 · NOT_RUN 1                                                                                                          | all                                            |
@@ -28,9 +28,21 @@ Node 22.x) for the v0.5 code after the CI fixes; those logs are not attached.
 | `pnpm test:e2e`                            | 2 passed (enrolment/TOTP login, structure, SKU, scan receipt, scan-verified putaway, quality block, search; passkey register/sign-in/step-up; axe on every screen)          | F-05, F-12, S-01                               |
 | `pnpm test:all`                            | exit 0 (see `docs/PROJECT_STATE.md` §4)                                                                                                                                     | E-01                                           |
 | `pnpm security:scan`                       | secrets, **gitleaks 8.24.3 with CI rules** , SAST-lite/raw-SQL/licences PASS; audit 0 critical, 0 high, 1 moderate (dev-only, SEC-OPEN-009); SBOM 122 production components | S-02, S-08                                     |
-| `pnpm backup:local` + `pnpm restore:smoke` | backup of the current schema restored + verified (1.9 s); no migration in v0.6.7                                                                                            | E-03, S-03 (local key only), O-03 (local only) |
+| `pnpm backup:local` + `pnpm restore:smoke` | backup of the current schema restored + verified (1.8 s); no migration in v0.6.8                                                                                            | E-03, S-03 (local key only), O-03 (local only) |
 | `pnpm build`                               | contracts + API + web (390 kB JS / 109 kB gzip)                                                                                                                             | —                                              |
 | Clean room from the ZIP                    | see `docs/PROJECT_STATE.md` §5                                                                                                                                              | E-06                                           |
+
+## 2a. Load and performance (E-04, v0.6.8, ADR-0030)
+
+| Profile        | Dataset / users                          | Throughput | Errors | p95 (ms) stock · sku search · global search · ledger · move | Invariants | Result                    |
+| -------------- | ---------------------------------------- | ---------- | ------ | ----------------------------------------------------------- | ---------- | ------------------------- |
+| smoke          | 500 SKUs, 2 000 positions, 8 users       | 439 req/s  | 0      | ≤ 110 (all)                                                 | clean      | PASSED (provisional)      |
+| representative | 20 000 SKUs, 100 000 positions, 25 users | 275 req/s  | 0      | 101 · 156 · 146 · 111 · 130                                 | clean      | PASSED (provisional)      |
+| stress         | same dataset, 60 users                   | 250 req/s  | 0      | 276 · 328 · 313 · 283 · 308                                 | clean      | report only (degradation) |
+
+2 vCPU / 7.8 GB workspace, generator in the same process, no network; targets PROVISIONAL —
+E-04 stays BLOCKED until they are agreed and repeated on production-equivalent hardware.
+Details: `docs/perf/LAST_RUN_*.md`.
 
 ## 3. Test files → criteria
 

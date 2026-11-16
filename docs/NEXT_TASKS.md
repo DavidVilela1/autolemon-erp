@@ -1,4 +1,4 @@
-# Next tasks — ordered roadmap (WMS hardening first) — updated v0.6.7
+# Next tasks — ordered roadmap (WMS hardening first) — updated v0.6.8
 
 Owning module: architecture. Each task lists dependencies and the acceptance test that closes it.
 **Product-owner rule (2026-11-10):** the entire autonomous WMS must be production-ready, verified
@@ -11,20 +11,21 @@ manual screen-reader pass still open), T-12 (retention), T-21 (units of measure)
 un-pack), T-24 (rename/deactivate; moving subtrees still unsupported), lots through transfers
 (part of T-20).
 
-## Next three WMS tasks (gate order) — after v0.6.7
+## Next three WMS tasks (gate order) — after v0.6.8
 
-1. **O-02** — owner reports the `node-next` and `release-candidate` results of the v0.6.3–v0.6.7
+1. **O-02** — owner reports the `node-next` and `release-candidate` results of the v0.6.3–v0.6.8
    pushes; then container image signing (cosign keyless) and a deployment workflow gated on
    manual approval (no deployment).
-2. **E-04** — once the owner agrees targets (SKUs, positions, documents/day, concurrent users,
-   p95 latency): reproducible load harness and results.
-3. **Staging readiness pack (T-05)** — a single, reviewed checklist + scripts to bring up a
-   private staging environment on the owner's chosen provider (no spending without approval),
-   so DAST (S-06), the ENV items, KMS (S-03), monitoring/digests (S-05) and O-01…O-05 can be
-   verified there.
+2. **E-04 sign-off** — owner confirms or changes `docs/perf/targets.json` (status AGREED); then
+   the representative profile is repeated on staging hardware.
+3. **Staging readiness pack (T-05)** — reviewed checklist + scripts for a private staging
+   environment on the owner's chosen provider (no spending without approval), to verify DAST,
+   ENV items, KMS, monitoring/digests, O-01…O-05 and the load profile on real hardware.
 
-Owner-side, in parallel: push v0.6.7; branch protection; KMS choice; staging environment;
+Owner-side, in parallel: push v0.6.8; branch protection; KMS choice; staging environment;
 breached-password corpus; penetration test (S-07); warehouse pilot (O-06).
+
+Done in v0.6.8: T-11 load harness and baseline (ADR-0030).
 
 Done in v0.6.7: ASVS V16.3.3 and V6.4.4 (ADR-0029); S-06 now has no known code-level gap.
 
@@ -39,21 +40,21 @@ Done in v0.6.1: F-12 (T-27), E-05 (T-31), F-05 replenishment scan prompt, local 
 
 ## A. Security and production-readiness (release blockers)
 
-| Id       | Task                                                                                                                                                                                     | Depends on | Acceptance                                                                                                                                  |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| ~~T-01~~ | ✅ v0.6.0 — WebAuthn/passkeys (`@simplewebauthn/server` 14.x + browser 14.x): registration with step-up, login as second factor, admin policy "passkey required", credential list/revoke | —          | Playwright virtual-authenticator e2e (register, login, revoke); TOTP fallback still works; admins without passkey blocked from admin routes |
-| T-02     | Run CI on a protected GitHub repo (Node 26 + PG 18 matrix), branch protection, CODEOWNERS                                                                                                | —          | All jobs green incl. CodeQL/Trivy/gitleaks; evidence linked in PROJECT_STATE                                                                |
-| T-03     | External KMS provider (AWS KMS / Azure Key Vault / Vault Transit) behind `KeyProvider`                                                                                                   | T-02       | Integration test against a KMS emulator; rewrap job; app refuses start without KMS in production                                            |
-| T-04     | ✅ code v0.6.3 (provisioning open) — Breached-password corpus (offline k-anonymity range files or HIBP via egress proxy)                                                                 | —          | Unit tests with known-breached samples                                                                                                      |
-| T-05     | Staging deployment per NETWORK_AND_ZTNA (WAF, ZTNA, TLS 1.3, private DB, egress deny)                                                                                                    | T-02, T-03 | Verification checklist all ✔ with evidence                                                                                                  |
-| T-06     | Off-site immutable backups (pgBackRest + object lock), WAL PITR, alerting; first quarterly restore exercise with measured RPO/RTO                                                        | T-05       | Signed exercise log                                                                                                                         |
-| T-07     | DAST (ZAP baseline + authenticated full scan) in staging; fix findings                                                                                                                   | T-05       | Report with no high/critical                                                                                                                |
-| ~~T-08~~ | ✅ v0.6.0 — Lint-enforced module boundaries (no imports from wms → other modules' internals; only engine writes stock tables)                                                            | —          | ESLint rule + failing fixture test                                                                                                          |
-| ~~T-09~~ | ✅ v0.6.0 — Negative test: counter self-approval; reversal of already-consumed stock; replenishment over-target                                                                          | —          | New tests pass                                                                                                                              |
-| T-10     | 🟡 axe done in v0.6.0 — axe checks on every screen; manual screen-reader pass (NVDA/VoiceOver); keyboard-only walkthrough                                                                | —          | No violations; findings documented in DESIGN_SYSTEM                                                                                         |
-| T-11     | Load/concurrency benchmarks (k6): 50 concurrent pickers, allocation contention, ledger growth to 10 M rows                                                                               | T-02       | p95 targets documented; indexes tuned                                                                                                       |
-| ~~T-12~~ | ✅ v0.6.0 — Retention jobs: command_log (90 d), expired sessions/tokens, outbox (published > 30 d)                                                                                       | —          | Scheduled job + tests                                                                                                                       |
-| T-13     | Independent pentest + human security review sign-off                                                                                                                                     | T-01…T-07  | Report, all high/critical closed                                                                                                            |
+| Id       | Task                                                                                                                                                                                                                                                           | Depends on | Acceptance                                                                                                                                  |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~T-01~~ | ✅ v0.6.0 — WebAuthn/passkeys (`@simplewebauthn/server` 14.x + browser 14.x): registration with step-up, login as second factor, admin policy "passkey required", credential list/revoke                                                                       | —          | Playwright virtual-authenticator e2e (register, login, revoke); TOTP fallback still works; admins without passkey blocked from admin routes |
+| T-02     | Run CI on a protected GitHub repo (Node 26 + PG 18 matrix), branch protection, CODEOWNERS                                                                                                                                                                      | —          | All jobs green incl. CodeQL/Trivy/gitleaks; evidence linked in PROJECT_STATE                                                                |
+| T-03     | External KMS provider (AWS KMS / Azure Key Vault / Vault Transit) behind `KeyProvider`                                                                                                                                                                         | T-02       | Integration test against a KMS emulator; rewrap job; app refuses start without KMS in production                                            |
+| T-04     | ✅ code v0.6.3 (provisioning open) — Breached-password corpus (offline k-anonymity range files or HIBP via egress proxy)                                                                                                                                       | —          | Unit tests with known-breached samples                                                                                                      |
+| T-05     | Staging deployment per NETWORK_AND_ZTNA (WAF, ZTNA, TLS 1.3, private DB, egress deny)                                                                                                                                                                          | T-02, T-03 | Verification checklist all ✔ with evidence                                                                                                  |
+| T-06     | Off-site immutable backups (pgBackRest + object lock), WAL PITR, alerting; first quarterly restore exercise with measured RPO/RTO                                                                                                                              | T-05       | Signed exercise log                                                                                                                         |
+| T-07     | DAST (ZAP baseline + authenticated full scan) in staging; fix findings                                                                                                                                                                                         | T-05       | Report with no high/critical                                                                                                                |
+| ~~T-08~~ | ✅ v0.6.0 — Lint-enforced module boundaries (no imports from wms → other modules' internals; only engine writes stock tables)                                                                                                                                  | —          | ESLint rule + failing fixture test                                                                                                          |
+| ~~T-09~~ | ✅ v0.6.0 — Negative test: counter self-approval; reversal of already-consumed stock; replenishment over-target                                                                                                                                                | —          | New tests pass                                                                                                                              |
+| T-10     | 🟡 axe done in v0.6.0 — axe checks on every screen; manual screen-reader pass (NVDA/VoiceOver); keyboard-only walkthrough                                                                                                                                      | —          | No violations; findings documented in DESIGN_SYSTEM                                                                                         |
+| T-11     | ◐ v0.6.8: harness + baseline (ADR-0030; 25/60 users, 100 000 positions). Open: allocation/picking contention scenario, ledger growth to 10 M rows — Load/concurrency benchmarks (k6): 50 concurrent pickers, allocation contention, ledger growth to 10 M rows | T-02       | p95 targets documented; indexes tuned                                                                                                       |
+| ~~T-12~~ | ✅ v0.6.0 — Retention jobs: command_log (90 d), expired sessions/tokens, outbox (published > 30 d)                                                                                                                                                             | —          | Scheduled job + tests                                                                                                                       |
+| T-13     | Independent pentest + human security review sign-off                                                                                                                                                                                                           | T-01…T-07  | Report, all high/critical closed                                                                                                            |
 
 ## B. WMS functional hardening
 

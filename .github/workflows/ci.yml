@@ -56,6 +56,9 @@ jobs:
         run: SKIP_DOTENV=1 pnpm db:migrate && SKIP_DOTENV=1 pnpm db:migrate
       - run: SKIP_DOTENV=1 pnpm test:integration
       - run: SKIP_DOTENV=1 pnpm test:security
+      - run: pnpm asvs:check # ASVS 5.0 L2 assessment complete and current (ADR-0028)
+      - name: Load smoke (E-04, provisional targets; ADR-0030)
+        run: SKIP_DOTENV=1 pnpm test:load
       - run: pnpm exec playwright install --with-deps chromium
       - run: SKIP_DOTENV=1 pnpm test:e2e
       - run: pnpm security:scan
@@ -67,6 +70,7 @@ jobs:
           name: evidence
           path: |
             artifacts/sbom.cdx.json
+            artifacts/perf/
             playwright-report/
           retention-days: 30
 

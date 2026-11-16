@@ -138,7 +138,7 @@ export function buildOpenApi(): Record<string, unknown> {
     openapi: '3.1.0',
     info: {
       title: 'AutoLemon ERP API (platform + autonomous WMS)',
-      version: '0.6.7',
+      version: '0.6.8',
       description:
         'Cookie-session API. All writes require X-Requested-With: autolemon and X-CSRF-Token; WMS commands require Idempotency-Key. Generated from code — see docs/API.md.',
     },

@@ -13,3 +13,4 @@ docs/WMS_RELEASE_GATE.md
 docs/WMS_RELEASE_STATUS.json
 apps/api/src/platform/auth/policy-common-passwords.ts
 docs/security/ASVS_L2_ASSESSMENT.md
+docs/perf/LAST_RUN_*.md

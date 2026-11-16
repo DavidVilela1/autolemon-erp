@@ -26,7 +26,7 @@ export interface ModuleDescriptor {
 export const INSTALLED_MODULES: readonly ModuleDescriptor[] = [
   {
     id: 'wms',
-    version: '0.6.7',
+    version: '0.6.8',
     description: 'Autonomous Warehouse Management System',
     requires: [],
     core: true,

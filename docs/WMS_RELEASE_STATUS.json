@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "product": "AutoLemon ERP — WMS",
-  "version": "0.6.7",
-  "updatedAt": "2026-11-13",
+  "version": "0.6.8",
+  "updatedAt": "2026-11-16",
   "state": "WMS_IN_PROGRESS",
   "allowedStates": [
     "WMS_IN_PROGRESS",
@@ -237,12 +237,18 @@
     {
       "id": "E-04",
       "requiredResult": "Representative load, stress, availability and performance targets agreed and met",
-      "verificationMethod": "—",
-      "evidence": [],
-      "verifiedAt": null,
+      "verificationMethod": "pnpm test:load (tests/load/load-harness.ts): real opening-stock seeding, weighted operator mix through the full HTTP stack, stock conservation + reconciliation after each run; smoke in CI",
+      "evidence": [
+        "docs/perf/targets.json",
+        "docs/perf/LAST_RUN_representative.md",
+        "docs/perf/LAST_RUN_stress.md",
+        "docs/perf/LAST_RUN_smoke.md",
+        "docs/DECISIONS/ADR-0030-load-test-harness.md"
+      ],
+      "verifiedAt": "2026-11-16",
       "reviewer": null,
       "status": "BLOCKED",
-      "openAction": "Product owner to agree targets (warehouse sizes, concurrent users, p95); then k6/load harness (T-11)"
+      "openAction": "Harness and baseline done (v0.6.8): representative profile (20 000 SKUs, 100 000 positions, 25 users) met all PROVISIONAL targets on a 2-vCPU workspace; stress (60 users) degrades without errors. Owner to agree targets (targets.json status AGREED), then repeat on production-equivalent hardware and add availability/soak tests in the target environment"
     },
     {
       "id": "E-05",
