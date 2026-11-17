@@ -425,6 +425,68 @@ export async function allocationCandidates(
   );
 }
 
+/**
+ * Locks, in ONE statement and in ascending id order, every allocation candidate of all the given
+ * SKUs (same filter as {@link allocationCandidates}, without the lot restriction). Commands that
+ * allocate several lines MUST call this first: locking line by line acquires rows in line order,
+ * and two orders with the same SKUs in a different order deadlock (found by the load harness,
+ * ADR-0031). The per-line candidate query afterwards only re-reads rows already held.
+ */
+export async function lockAllocationCandidates(ctx: Pick<OpCtx, 'tx'>, warehouseId: string, skuIds: string[]): Promise<void> {
+  const unique = [...new Set(skuIds)];
+  if (!unique.length) return;
+  await ctx.tx.execute(
+    sql`SELECT p.id FROM stock_positions p
+        LEFT JOIN storage_nodes n ON n.id = p.holder_node_id
+        LEFT JOIN containers c ON c.id = p.holder_container_id
+        LEFT JOIN storage_nodes cn ON cn.id = c.current_node_id
+        WHERE p.warehouse_id = ${warehouseId}
+          AND p.sku_id IN (${sql.join(
+            unique.map((s) => sql`${s}::uuid`),
+            sql`, `,
+          )})
+          AND p.stock_status = 'AVAILABLE' AND p.qty_on_hand > p.qty_reserved AND (c.id IS NULL OR c.status = 'ACTIVE')
+          AND coalesce(n.kind, cn.kind) IN (${sql.join(
+            ALLOCATABLE_NODE_KINDS.map((k) => sql`${k}`),
+            sql`, `,
+          )})
+        ORDER BY p.id FOR UPDATE OF p`,
+  );
+}
+
+/**
+ * Locks a move's source position and, when it already exists, its target position together in
+ * ascending id order (two moves in opposite directions, or a move racing an allocation of the
+ * same SKU, would otherwise deadlock). Returns the locked source.
+ * @throws Conflict CONCURRENT_CHANGE if the source changed status/lot between the read and the lock.
+ */
+export async function lockMoveSourceAndTarget(
+  ctx: OpCtx,
+  positionId: string,
+  target: (src: { sku_id: string; stock_status: StockStatus; lot_code: string }) => Promise<Pick<Holder, 'nodeId' | 'containerId'>>,
+): Promise<{ src: PositionRow; holder: Pick<Holder, 'nodeId' | 'containerId'> }> {
+  const peek = await one<{ sku_id: string; stock_status: StockStatus; lot_code: string }>(
+    ctx.tx,
+    sql`SELECT sku_id, stock_status, lot_code FROM stock_positions WHERE id = ${positionId} AND warehouse_id = ${ctx.warehouseId}`,
+    'Posição de stock',
+  );
+  const holder = await target(peek);
+  const existing = await row<{ id: string }>(
+    ctx.tx,
+    sql`SELECT id FROM stock_positions
+        WHERE warehouse_id = ${ctx.warehouseId} AND sku_id = ${peek.sku_id} AND stock_status = ${peek.stock_status}
+          AND lot_code = ${peek.lot_code}
+          AND holder_node_id IS NOT DISTINCT FROM ${holder.nodeId ?? null}::uuid
+          AND holder_container_id IS NOT DISTINCT FROM ${holder.containerId ?? null}::uuid`,
+  );
+  const locked = await lockPositions(ctx, existing ? [positionId, existing.id] : [positionId]);
+  const src = locked.get(positionId)!;
+  if (src.stock_status !== peek.stock_status || src.lot_code !== peek.lot_code) {
+    throw new Conflict('A posição foi alterada entretanto; tente novamente', 'CONCURRENT_CHANGE');
+  }
+  return { src, holder };
+}
+
 /** Resolves a barcode/SKU code to a SKU id, or undefined. */
 export async function skuIdForBarcode(ctx: Pick<OpCtx, 'tx' | 'companyId'>, scanned: string): Promise<string | undefined> {
   const r = await row<{ id: string }>(
@@ -471,17 +533,20 @@ export async function warehouseCode(ctx: Pick<OpCtx, 'tx' | 'companyId' | 'wareh
 
 /**
  * Ledger reconciliation (INVARIANT L1): positions whose balance differs from the ledger sum.
- * Must always return an empty list; exposed through reports and asserted by tests.
+ * Must always return an empty list; exposed through reports and asserted by tests. The ledger is
+ * aggregated per position first and then joined (one pass over the ledger, no per-position
+ * nested loop): about 1.7x faster at 2 M rows (ADR-0031). Still linear in ledger size.
  */
 export async function reconcile(
   ctx: Pick<OpCtx, 'tx'> & { warehouseId: string },
 ): Promise<Array<{ position_id: string; on_hand: string; ledger: string }>> {
   return rows(
     ctx.tx,
-    sql`SELECT p.id AS position_id, p.qty_on_hand::text AS on_hand, coalesce(sum(l.qty_delta), 0.000)::text AS ledger
-        FROM stock_positions p LEFT JOIN inventory_ledger l ON l.position_id = p.id
-        WHERE p.warehouse_id = ${ctx.warehouseId}
-        GROUP BY p.id HAVING p.qty_on_hand <> coalesce(sum(l.qty_delta), 0)`,
+    sql`SELECT p.id AS position_id, p.qty_on_hand::text AS on_hand, coalesce(s.total, 0.000)::text AS ledger
+        FROM stock_positions p
+        LEFT JOIN (SELECT position_id, sum(qty_delta) AS total FROM inventory_ledger
+                    WHERE warehouse_id = ${ctx.warehouseId} GROUP BY position_id) s ON s.position_id = p.id
+        WHERE p.warehouse_id = ${ctx.warehouseId} AND p.qty_on_hand <> coalesce(s.total, 0)`,
   );
 }
 

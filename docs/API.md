@@ -1,4 +1,4 @@
-# API — AutoLemon ERP v0.6.8
+# API — AutoLemon ERP v0.6.12
 
 Owning module: platform/http. The machine-readable spec is **generated from the code**:
 `docs/api/openapi.json` (OpenAPI 3.1, 89 operations). Regenerate with
@@ -6,17 +6,18 @@ Owning module: platform/http. The machine-readable spec is **generated from the 
 
 ## Conventions
 
-| Concern     | Rule                                                                                                                                                                                        |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Transport   | Same-origin `/api/*` behind the web origin (Vite proxy in dev, reverse proxy in prod)                                                                                                       |
-| Auth        | Opaque session cookie `__Host-al_sid` (HttpOnly, Secure, SameSite=Strict)                                                                                                                   |
-| CSRF        | Every non-GET: `X-Requested-With: autolemon`, matching `Origin`, `X-CSRF-Token` (from login/verify/session responses)                                                                       |
-| Idempotency | Every mutating `/api/wms/*` call: `Idempotency-Key` (8–80 `[A-Za-z0-9_-]`). Same key + same payload ⇒ stored result with `replayed: true`; different payload ⇒ 409 `IDEMPOTENCY_KEY_REUSED` |
-| Validation  | Strict Zod schemas; unknown fields ⇒ 400 `VALIDATION_FAILED` with `details[{path,message}]` (values never echoed)                                                                           |
-| Quantities  | JSON number or decimal string, ≤ 3 decimals, returned as decimal strings (`"12.000"`)                                                                                                       |
-| IDs         | lower-case UUIDs; invalid ⇒ 400; out of scope ⇒ 404 (indistinguishable from missing)                                                                                                        |
-| Errors      | `{ "error": { "code", "message", "details?" }, "requestId" }` — no stack traces                                                                                                             |
-| Step-up     | 403 `STEP_UP_REQUIRED` with `error.action`; call `POST /api/auth/step-up` then retry                                                                                                        |
+| Concern     | Rule                                                                                                                                                                                                                                                                  |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Transport   | Same-origin `/api/*` behind the web origin (Vite proxy in dev, reverse proxy in prod)                                                                                                                                                                                 |
+| Auth        | Opaque session cookie `__Host-al_sid` (HttpOnly, Secure, SameSite=Strict)                                                                                                                                                                                             |
+| CSRF        | Every non-GET: `X-Requested-With: autolemon`, matching `Origin`, `X-CSRF-Token` (from login/verify/session responses)                                                                                                                                                 |
+| Idempotency | Every mutating `/api/wms/*` call: `Idempotency-Key` (8–80 `[A-Za-z0-9_-]`). Same key + same payload ⇒ stored result with `replayed: true`; different payload ⇒ 409 `IDEMPOTENCY_KEY_REUSED`                                                                           |
+| Validation  | Strict Zod schemas; unknown fields ⇒ 400 `VALIDATION_FAILED` with `details[{path,message}]` (values never echoed)                                                                                                                                                     |
+| Quantities  | JSON number or decimal string, ≤ 3 decimals, returned as decimal strings (`"12.000"`)                                                                                                                                                                                 |
+| IDs         | lower-case UUIDs; invalid ⇒ 400; out of scope ⇒ 404 (indistinguishable from missing)                                                                                                                                                                                  |
+| Errors      | `{ "error": { "code", "message", "details?" }, "requestId" }` — no stack traces                                                                                                                                                                                       |
+| Step-up     | 403 `STEP_UP_REQUIRED` with `error.action`; call `POST /api/auth/step-up` then retry                                                                                                                                                                                  |
+| Time limits | 503 `QUERY_TIMEOUT` when a statement exceeds `DB_STATEMENT_TIMEOUT_MS` (retry later or narrow the filter); `GET …/stock/reconciliation` has a 60 s budget and returns 409 `RECONCILIATION_RUNNING` while another run for the same warehouse is in progress (ADR-0031) |
 
 ## Endpoint groups (see OpenAPI for schemas)
 

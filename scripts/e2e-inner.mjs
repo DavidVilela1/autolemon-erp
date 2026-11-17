@@ -2,10 +2,10 @@
  * @file Starts API + Vite against the disposable DB, provisions a tenant, runs Playwright,
  * then stops everything (owning module: repository tooling). Invoked via run-e2e.mjs.
  */
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
-import { ROOT } from './dev-env.mjs';
+import { killTree, ROOT, shellSafe, startTree } from './dev-env.mjs';
 
 const bin = (n) => resolve(ROOT, 'node_modules/.bin', process.platform === 'win32' ? `${n}.cmd` : n);
 const API_PORT = process.env.E2E_API_PORT ?? '3901';
@@ -23,10 +23,20 @@ const env = {
 };
 const procs = [];
 const start = (cmd, args, cwd) => {
-  const p = spawn(cmd, args, { cwd, env, stdio: ['ignore', 'inherit', 'inherit'], shell: process.platform === 'win32' });
+  const p = startTree(cmd, args, { cwd, env, stdio: ['ignore', 'inherit', 'inherit'] });
   procs.push(p);
   return p;
 };
+// Stop the API and Vite (and everything they started) however this script ends.
+function stopAll() {
+  for (const p of procs) killTree(p);
+}
+for (const sig of ['SIGINT', 'SIGTERM']) {
+  process.on(sig, () => {
+    stopAll();
+    process.exit(130);
+  });
+}
 async function waitFor(url, ms = 60_000) {
   const until = Date.now() + ms;
   while (Date.now() < until) {
@@ -46,24 +56,21 @@ try {
   start(bin('vite'), ['--logLevel', 'warn'], resolve(ROOT, 'apps/web'));
   await waitFor(`http://127.0.0.1:${API_PORT}/api/health`);
   await waitFor(`http://localhost:${WEB_PORT}/`);
-  const prov = spawnSync(bin('tsx'), ['--tsconfig', 'apps/api/tsconfig.json', 'tests/e2e/provision.ts'], {
-    cwd: ROOT,
-    env,
-    encoding: 'utf8',
-    shell: process.platform === 'win32',
-  });
+  const pv = shellSafe(bin('tsx'), ['--tsconfig', 'apps/api/tsconfig.json', 'tests/e2e/provision.ts']);
+  const prov = spawnSync(pv.cmd, pv.args, { cwd: ROOT, env, encoding: 'utf8', shell: pv.shell });
   if (prov.status !== 0) throw new Error(`provision failed: ${prov.stderr}`);
   const { token, email } = JSON.parse(prov.stdout.trim().split('\n').pop());
-  const r = spawnSync(bin('playwright'), ['test', '-c', 'tests/e2e/playwright.config.ts'], {
+  const pw = shellSafe(bin('playwright'), ['test', '-c', 'tests/e2e/playwright.config.ts']);
+  const r = spawnSync(pw.cmd, pw.args, {
     cwd: ROOT,
     env: { ...env, E2E_INVITE: token, E2E_EMAIL: email, E2E_BASE_URL: `http://localhost:${WEB_PORT}` },
     stdio: 'inherit',
-    shell: process.platform === 'win32',
+    shell: pw.shell,
   });
   status = r.status ?? 1;
 } catch (e) {
   console.error(String(e));
 } finally {
-  for (const p of procs) p.kill('SIGTERM');
+  stopAll();
 }
 process.exit(status);

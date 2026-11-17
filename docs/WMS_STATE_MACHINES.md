@@ -1,4 +1,4 @@
-# WMS state machines and invariants — v0.6.8
+# WMS state machines and invariants — v0.6.12
 
 Owning module: WMS. Each transition below is implemented in the named service and covered by
 the tests listed in `docs/security/SECURITY_TEST_MATRIX.md`.
@@ -153,6 +153,25 @@ trigger), and a serial in transit cannot be received elsewhere.
 ACTIVE (`qty_open > 0`) → CLOSED (picked fully, short-closed, order cancelled/closed; for
 transfer reservations: dispatched, line fully shipped, transfer cancelled). Each reservation
 belongs to exactly one demand line (`reservations_one_demand`).
+
+## Concurrency and lock ordering (ADR-0031)
+
+Every command runs in one READ COMMITTED transaction that row-locks (`FOR UPDATE`) what it
+changes. Locks on `stock_positions` are always taken **in ascending id order, in one statement**,
+so two commands touching the same positions queue instead of deadlocking:
+
+- `lockPositions(ids)` — any set of known positions (moves, picks, counts).
+- `lockAllocationCandidates(warehouse, skuIds)` — outbound and transfer allocation lock every
+  allocatable candidate of every SKU of the document up front, before the per-line loop; order
+  lines in any order can no longer interleave.
+- `lockMoveSourceAndTarget(position, target)` — a move resolves its target first, then locks
+  source and existing target together; opposite moves between the same two positions queue.
+- New positions are created with `ensurePosition` (upsert) after the ordered lock, so a new row
+  cannot be part of a cycle.
+
+Deadlocks would still be retried (`40P01`, `database.ts`), but a retried deadlock costs a
+`deadlock_timeout` (1 s) per occurrence. `tests/integration/lock-ordering.test.ts` reads
+PostgreSQL's own deadlock counter, so it fails even when the retry hides the error.
 
 ## Corrections
 

@@ -20,6 +20,8 @@ const EnvSchema = z.object({
   DB_SSL: z.enum(['disable', 'require', 'verify-full']).default('disable'),
   DB_SSL_CA_FILE: z.string().optional(),
   DB_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
+  /** Per-statement time limit of the API pool (ms); 0 disables it (offline tools only). Long reports set their own budget. */
+  DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(0).max(600_000).default(15_000),
   API_HOST: z.string().default('127.0.0.1'),
   API_PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   /** Exact browser origin allowed to call the API (CSRF origin check + CORS). */

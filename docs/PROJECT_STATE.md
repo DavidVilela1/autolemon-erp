@@ -1,18 +1,42 @@
-# Project state — AutoLemon ERP v0.6.8-WMS
+# Project state — AutoLemon ERP v0.6.12-WMS
 
 Owning module: repository. Last updated: 2026-11-16 (Europe/Lisbon). Archive:
-`AutoLemon-ERP-v0.6.8-WMS.zip` (root `autolemon-erp/`); its SHA-256 is in the adjacent
-`AutoLemon-ERP-v0.6.8-WMS.zip.sha256` (a file cannot contain its own hash).
+`AutoLemon-ERP-v0.6.12-WMS.zip` (root `autolemon-erp/`); its SHA-256 is in the adjacent
+`AutoLemon-ERP-v0.6.12-WMS.zip.sha256` (a file cannot contain its own hash).
 
 ## 1. Summary
 
 Continuation of v0.5.0 (nothing restarted). Governing instructions: the product owner's
 Development Priority Update (WMS first), **Reusable Continuation Prompt v0.6** and **WMS
 Production Readiness Gate v0.6**. WMS release gate state: **`WMS_IN_PROGRESS`**
-(`docs/WMS_RELEASE_GATE.md`: PASS 20 · FAIL 4 · BLOCKED 9 · NOT_RUN 1). **Not production-ready.**
+(`docs/WMS_RELEASE_GATE.md`: PASS 20 · FAIL 3 · BLOCKED 10 · NOT_RUN 1). **Not production-ready.**
 No other ERP business module has been started.
 
-v0.6.8 session (continuation): reproducible load harness (`pnpm test:load`, ADR-0030) with
+v0.6.12 (2026-11-17, owner report): after e2e on Windows the API server kept running (only its
+`cmd.exe` wrapper was stopped) and logged errors against the dropped test database every 5 s.
+e2e now stops the whole process tree (`killTree`, `taskkill /T` on Windows). The owner commits
+only releases that pass `pnpm test:all` on the Windows workstation (`docs/HANDOVER.md`).
+
+v0.6.11 (2026-11-17, owner report): on Windows `pnpm test:all` passed everything except e2e,
+which did not start — the test scripts ran `C:\Program Files\nodejs\node.exe` through the shell
+unquoted. All scripts now spawn through `shellSafe` (regression test runs cmd.exe on Windows).
+Tooling only.
+
+v0.6.10 (2026-11-16, owner report): the `ledger-growth` reconciliation returned HTTP 500 on the
+owner's Windows workstation — it exceeded the API's 15 s statement limit. Reconciliation now
+aggregates first, has its own 60 s budget with one run per warehouse (409 otherwise), and every
+statement timeout returns 503 `QUERY_TIMEOUT`. New setting `DB_STATEMENT_TIMEOUT_MS`. No
+migration.
+
+v0.6.9 session (continuation): the load harness gained the contended write path (create +
+allocate outbound orders on the hottest SKUs), which exposed **deadlocks** in allocation and
+stock moves, hidden from users by the retry but costing ~1 s each. Fixed with ordered row
+locking (ADR-0031) and a regression test that reads PostgreSQL's deadlock counter (verified to
+fail without the fix). New `ledger-growth` profile (10 M ledger rows), which found the activity
+(ledger) page joining the whole ledger before limiting (4.1 s at 300 000 rows → 2.5 ms after
+the fix). No migration.
+
+v0.6.8 session: reproducible load harness (`pnpm test:load`, ADR-0030) with
 provisional targets and a measured baseline — representative profile (20 000 SKUs, 100 000
 positions, 25 users) met all provisional targets; stress (60 users) degraded without errors.
 E-04 stays BLOCKED until the owner agrees the targets. No migration.
@@ -135,9 +159,11 @@ Windows run (owner), any production control.
 
 ## 5. Clean-room verification from the ZIP
 
-Run 2026-11-16 on the v0.6.8 archive: copied only the ZIP + `.sha256` into an empty directory and
-followed `README-LOCAL-TESTING.md` "Without Docker (native PostgreSQL)" (local PostgreSQL 16.15,
-fresh database; Playwright via `PLAYWRIGHT_CHROME_PATH`).
+Run 2026-11-17 on the v0.6.12 archive: copied only the ZIP + `.sha256` into an empty directory
+**whose path contains a space** (`/tmp/cr 18`) and followed `README-LOCAL-TESTING.md` "Without
+Docker (native PostgreSQL)" (local PostgreSQL 16.15, fresh database; Playwright via
+`PLAYWRIGHT_CHROME_PATH`). Linux only: the Windows shell and `taskkill` paths are exercised when
+the suite runs on Windows.
 
 | Step                                                        | Result                                                                                                |
 | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -145,11 +171,11 @@ fresh database; Playwright via `PLAYWRIGHT_CHROME_PATH`).
 | extract → `autolemon-erp/`                                  | OK — no `.env`, `node_modules`, `.git`, `invitations-dev.txt`, backups, artifacts, `*.pem` or digests |
 | `pnpm install --frozen-lockfile`                            | OK (Node 22.23.4, pnpm 12.18.0)                                                                       |
 | `cp .env.example .env` → `pnpm db:migrate` → `pnpm db:seed` | 9 migrations applied (0001…0009); seed OK                                                             |
-| `pnpm typecheck` / `pnpm lint` / `pnpm asvs:check`          | exit 0 / exit 0 / 253 requirements OK                                                                 |
-| `pnpm test:all`                                             | **exit 0** — unit 52, integration 52, security 107, e2e 2; gate check OK                              |
-| `pnpm test:load` (smoke)                                    | PASSED — 389 req/s, 0 errors                                                                          |
+| `pnpm asvs:check`                                           | 253 requirements OK                                                                                   |
+| `pnpm test:all` (format, lint, typecheck, OpenAPI, gate…)   | **exit 0** — unit 52, integration 56, security 110, e2e 2; no API/Vite process left afterwards        |
+| `pnpm test:load` (smoke)                                    | PASSED — 294 req/s, 0 errors, 0 deadlocks                                                             |
 | `pnpm security:scan` (with `GITLEAKS_BIN`)                  | exit 0                                                                                                |
-| `pnpm restore:smoke`                                        | PASSED (1.8 s)                                                                                        |
+| `pnpm restore:smoke`                                        | PASSED (2.5 s)                                                                                        |
 | `pnpm build`                                                | exit 0                                                                                                |
 | `pnpm dev`                                                  | web :5173 → 200; `/api/health` → 200; `/api/auth/session` without cookie → 401                        |
 
@@ -169,13 +195,19 @@ The final archive differs from the clean-room archive only in this section.
   latest stored digest are not detected until compared with the next one (digest interval =
   exposure window); ASVS partial items V12.3.1, V13.2.4 and 13 environment items (ADR-0028/0029); control-bypass
   signal counts are per API process; parser-level rejections carry no actor; load
-  baseline measured on 2 vCPU with the generator on the same machine, targets provisional; no fixed cap on concurrent sessions per user (documented compensating controls).
+  baseline measured on 2 vCPU with the generator on the same machine, targets provisional;
+  allocation now locks all candidate positions of the document's SKUs up front, so two orders for
+  the same hot SKU serialise for the whole allocation (ADR-0031); lock-ordering regression covers
+  positions only (not documents/containers); full reconciliation is linear in ledger size (60 s
+  budget, one run per warehouse; incremental reconciliation not built yet); no fixed cap on concurrent sessions per user (documented compensating controls).
 
 ## 7. Next three WMS tasks
 
-1. O-02: owner reports the CI results of the v0.6.3–v0.6.8 pushes; then container image signing
+1. O-02: owner reports the CI results of the v0.6.3–v0.6.9 pushes; then container image signing
    (cosign keyless) and a deployment workflow gated on manual approval (no deployment).
-2. E-04 sign-off: owner agrees `docs/perf/targets.json`; representative profile repeated on
-   staging hardware.
-3. Staging readiness pack (T-05): reviewed checklist + scripts for a private staging environment on
-   the owner's chosen provider (no spending without approval).
+2. E-04 sign-off: owner agrees `docs/perf/targets.json`; representative and ledger-growth
+   profiles repeated on staging hardware.
+3. T-11 remainder (no owner input needed): picking-contention scenario (pick + confirm on shared
+   bins) with the deadlock counter, lock-ordering coverage for documents/containers, and an
+   incremental reconciliation (checkpointed like the audit chain) so it stays flat as the ledger
+   grows. In parallel when the owner chooses a provider: staging readiness pack (T-05).

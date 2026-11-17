@@ -111,6 +111,37 @@ describe('Activity (ledger) CSV export', () => {
   });
 });
 
+describe('Activity (ledger) page filters (ADR-0031: page selected before joins)', () => {
+  it('returns newest first and applies SKU, type, period and limit to the ledger rows', async () => {
+    const other = ok(await A.admin.post('/api/wms/skus', { code: 'RPT-OTHER', description: 'Outra peça' })).id;
+    ok(await A.admin.post(`/api/wms/w/${w1}/stock/opening`, { lines: [{ skuId: other, to: { nodeId: N.l1 }, qty: 3 }] }));
+    type Row = { id: string; at: string; type: string; skuCode: string };
+    const all = ok(await A.admin.get(`/api/wms/w/${w1}/reports/ledger`)) as Row[];
+    expect(all.length).toBeGreaterThanOrEqual(4);
+    const ids = all.map((r) => BigInt(r.id));
+    expect(ids).toEqual([...ids].sort((a, b) => (a > b ? -1 : a < b ? 1 : 0)));
+    expect(all[0]!.skuCode).toBe('RPT-OTHER');
+
+    const bySku = ok(await A.admin.get(`/api/wms/w/${w1}/reports/ledger?skuId=${sku}`)) as Row[];
+    expect(bySku.length).toBe(all.length - 1);
+    expect(bySku.every((r) => r.skuCode === 'RPT-50_PCT')).toBe(true);
+
+    const moves = ok(await A.admin.get(`/api/wms/w/${w1}/reports/ledger?skuId=${sku}&type=MOVE`)) as Row[];
+    expect(moves.length).toBe(2);
+    expect(moves.every((r) => r.type === 'MOVE')).toBe(true);
+
+    expect(ok(await A.admin.get(`/api/wms/w/${w1}/reports/ledger?limit=2`))).toHaveLength(2);
+    const future = new Date(Date.now() + 3600_000).toISOString();
+    expect(ok(await A.admin.get(`/api/wms/w/${w1}/reports/ledger?from=${encodeURIComponent(future)}`))).toHaveLength(0);
+    const upToNow = ok(
+      await A.admin.get(
+        `/api/wms/w/${w1}/reports/ledger?from=${encodeURIComponent(since)}&to=${encodeURIComponent(new Date().toISOString())}`,
+      ),
+    ) as Row[];
+    expect(upToNow.length).toBe(all.length);
+  });
+});
+
 describe('Cross-document search', () => {
   const search = (q: string, wh = w1) => A.admin.get(`/api/wms/w/${wh}/search?q=${encodeURIComponent(q)}`);
   const kinds = (body: { hits: Array<{ kind: string }> }) => body.hits.map((h) => h.kind).sort();

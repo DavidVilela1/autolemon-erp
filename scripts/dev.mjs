@@ -4,14 +4,14 @@
  * `pnpm db:seed`) beforehand and a running PostgreSQL (docker compose up -d).
  */
 import { spawn } from 'node:child_process';
-import { ensureDevEnv } from './dev-env.mjs';
+import { ensureDevEnv, shellSafe } from './dev-env.mjs';
 
 ensureDevEnv();
-const shell = process.platform === 'win32';
-const procs = [
-  spawn('pnpm', ['--filter', '@autolemon/api', 'dev'], { stdio: 'inherit', env: process.env, shell }),
-  spawn('pnpm', ['--filter', '@autolemon/web', 'dev'], { stdio: 'inherit', env: process.env, shell }),
-];
+const pnpm = (pkg) => {
+  const s = shellSafe('pnpm', ['--filter', pkg, 'dev']);
+  return spawn(s.cmd, s.args, { stdio: 'inherit', env: process.env, shell: s.shell });
+};
+const procs = [pnpm('@autolemon/api'), pnpm('@autolemon/web')];
 console.log(`\nAutoLemon dev: web http://localhost:5173  (API http://127.0.0.1:${process.env.API_PORT ?? 3000}, proxied under /api)\n`);
 const stop = () => {
   for (const p of procs) p.kill('SIGTERM');

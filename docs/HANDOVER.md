@@ -47,6 +47,10 @@ Owning module: repository. A continuation developer should be able to start from
   touched, rollback and what remains open. ASCII only, wrapped at about 80 columns. **No
   `Co-Authored-By` or other attribution trailers.** Hand them over as a PowerShell here-string
   written to a file and committed with `git commit -F`.
+- **The owner commits only what passes `pnpm test:all` on the Windows workstation.** A release
+  that fails there is not committed, so the next commit message must cover every change since the
+  owner's last passing commit, and must be used only after `pnpm test:all` passes. Never hand
+  over code (ZIP or snippet) that has not passed the full suite in the workspace first.
 
 ## 3. Documentation standard (enforced partly by `pnpm lint`)
 

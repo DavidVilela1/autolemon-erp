@@ -12,7 +12,7 @@ import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import pg from 'pg';
-import { ensureDevEnv, ROOT } from './dev-env.mjs';
+import { ensureDevEnv, ROOT, shellSafe } from './dev-env.mjs';
 
 if (existsSync(resolve(ROOT, '.env'))) ensureDevEnv();
 const owner = process.env.DATABASE_URL;
@@ -46,18 +46,12 @@ const env = {
 };
 let status = 1;
 try {
-  const mig = spawnSync('pnpm', ['--filter', '@autolemon/api', 'db:migrate'], {
-    env,
-    stdio: 'inherit',
-    shell: process.platform === 'win32',
-  });
+  const m = shellSafe('pnpm', ['--filter', '@autolemon/api', 'db:migrate']);
+  const mig = spawnSync(m.cmd, m.args, { env, stdio: 'inherit', shell: m.shell });
   if (mig.status !== 0) throw new Error('migration failed');
   const [cmd, ...args] = process.argv.slice(2);
-  const r = spawnSync(cmd === 'vitest' ? resolve(ROOT, 'node_modules/.bin/vitest') : cmd, args, {
-    env,
-    stdio: 'inherit',
-    shell: process.platform === 'win32',
-  });
+  const run = shellSafe(cmd === 'vitest' ? resolve(ROOT, 'node_modules/.bin/vitest') : cmd, args);
+  const r = spawnSync(run.cmd, run.args, { env, stdio: 'inherit', shell: run.shell });
   status = r.status ?? 1;
 } catch (e) {
   console.error(String(e));

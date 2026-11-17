@@ -47,6 +47,7 @@ import {
   scannedBaseQty,
   warehouseCode,
   type OpCtx,
+  lockAllocationCandidates,
 } from './inventory/engine.js';
 import { cmp, fromMilli, isPositive, min, sub, toMilli } from './inventory/qty.js';
 import type { WmsRunner } from './runner.js';
@@ -195,6 +196,12 @@ export class OutboundService {
       const o = await this.lockOrder(ctx, id);
       if (!['DRAFT', 'ALLOCATED', 'IN_PROGRESS'].includes(o.status)) throw new Conflict('Pedido não pode ser alocado', 'INVALID_STATE');
       const lines = await rows<LineRow>(ctx.tx, sql`SELECT * FROM outbound_lines WHERE outbound_id = ${id} ORDER BY line_no FOR UPDATE`);
+      // All candidate rows of all lines, once, in id order — never line by line (deadlocks, ADR-0031).
+      await lockAllocationCandidates(
+        ctx,
+        warehouseId,
+        lines.map((l) => l.sku_id),
+      );
       let allocatedTotal = 0n;
       const result: Array<{ lineId: string; allocated: string; missing: string }> = [];
       for (const line of lines) {

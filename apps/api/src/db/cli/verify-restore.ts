@@ -17,7 +17,9 @@ import { ENCRYPTED_FIELDS, FieldCrypto } from '../../platform/crypto/field-crypt
 const url = process.env.RESTORE_DATABASE_URL;
 if (!url) throw new Error('RESTORE_DATABASE_URL required');
 const cfg = loadConfig({ ...process.env, APP_DATABASE_URL: url } as Record<string, string>);
-const db = new Database({ ...cfg, APP_DATABASE_URL: url });
+// Offline check of a whole restored database: no per-statement time limit (the reconciliation
+// reads the entire ledger; 10 M rows take longer than the API's 15 s).
+const db = new Database({ ...cfg, APP_DATABASE_URL: url, DB_STATEMENT_TIMEOUT_MS: 0 });
 const failures: string[] = [];
 try {
   const applied = await rows<{ version: string; checksum: string }>(
@@ -30,8 +32,9 @@ try {
   }
   const ledger = await rows(
     db.db,
-    sql`SELECT p.id FROM stock_positions p LEFT JOIN inventory_ledger l ON l.position_id = p.id
-        GROUP BY p.id HAVING p.qty_on_hand <> coalesce(sum(l.qty_delta), 0)`,
+    sql`SELECT p.id FROM stock_positions p
+        LEFT JOIN (SELECT position_id, sum(qty_delta) AS total FROM inventory_ledger GROUP BY position_id) s ON s.position_id = p.id
+        WHERE p.qty_on_hand <> coalesce(s.total, 0)`,
   );
   if (ledger.length) failures.push(`${ledger.length} positions do not reconcile with the ledger`);
   const res = await rows(

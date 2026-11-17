@@ -1,6 +1,6 @@
 {
   "status": "PROVISIONAL",
-  "note": "Proposed by the developer (v0.6.8) for the product owner to confirm or change. Gate E-04 stays BLOCKED until status is AGREED with an approver and date.",
+  "note": "Proposed by the developer (v0.6.8, extended v0.6.9) for the product owner to confirm or change. Gate E-04 stays BLOCKED until status is AGREED with an approver and date. order_allocate = create an outbound order (1-3 lines from the 20 hottest SKUs) + allocate it, measured end to end; half are cancelled again.",
   "agreedBy": null,
   "agreedAt": null,
   "profiles": {
@@ -34,14 +34,26 @@
       "warmupSeconds": 10,
       "durationSeconds": 60,
       "enforce": false
+    },
+    "ledger-growth": {
+      "description": "Representative dataset plus 10 000 000 synthetic historical ledger rows (net-zero pairs over the last 365 days) to show the effect of a large ledger on reads, writes, reconciliation and exports",
+      "warehouses": 1,
+      "skus": 20000,
+      "bins": 1000,
+      "positionsPerSku": 5,
+      "virtualUsers": 25,
+      "warmupSeconds": 15,
+      "durationSeconds": 120,
+      "ledgerHistoryRows": 10000000
     }
   },
   "mix": {
-    "stock_by_sku": 40,
+    "stock_by_sku": 35,
     "sku_search": 20,
     "global_search": 10,
     "ledger_page": 5,
-    "stock_move": 25
+    "stock_move": 20,
+    "order_allocate": 10
   },
   "targets": {
     "p95Ms": {
@@ -49,9 +61,16 @@
       "sku_search": 200,
       "global_search": 300,
       "ledger_page": 300,
-      "stock_move": 300
+      "stock_move": 300,
+      "order_allocate": 500
     },
     "maxErrorRate": 0.001,
     "minThroughputRps": 50
+  },
+  "oneOffTargetsMs": {
+    "reconciliation": 60000,
+    "ledger_csv_run_window": 10000,
+    "ledger_csv_over_cap_refused": 10000,
+    "ledger_by_sku": 1000
   }
 }

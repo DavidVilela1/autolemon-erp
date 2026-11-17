@@ -35,6 +35,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         status === 404 ? 'Recurso não encontrado' : 'Pedido inválido',
       );
     }
+    if (err?.code === 'QUERY_TIMEOUT') req.log.warn({ requestId, route: req.routeOptions?.url }, 'database statement timeout');
     if (!err) {
       req.log.error({ err: exception, requestId }, 'unhandled error');
       err = new DomainError(500, 'INTERNAL', 'Erro interno. Indique o código do pedido ao suporte.');

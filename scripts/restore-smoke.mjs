@@ -21,7 +21,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import pg from 'pg';
 import { backupKey, pgToolMode, runPgTool } from './backup-local.mjs';
-import { ensureDevEnv, ROOT } from './dev-env.mjs';
+import { ensureDevEnv, ROOT, shellSafe } from './dev-env.mjs';
 
 const t0 = Date.now();
 ensureDevEnv();
@@ -68,24 +68,22 @@ try {
   const mode = await pgToolMode(owner);
   runPgTool(mode, 'pg_restore', ['--no-owner', '--no-acl', '--exit-on-error', '-d', target], owner, dump);
   const tsx = resolve(ROOT, 'node_modules/.bin', process.platform === 'win32' ? 'tsx.cmd' : 'tsx');
-  const m = spawnSync(tsx, ['--tsconfig', 'apps/api/tsconfig.json', 'apps/api/src/db/cli/migrate.ts'], {
+  const mg = shellSafe(tsx, ['--tsconfig', 'apps/api/tsconfig.json', 'apps/api/src/db/cli/migrate.ts']);
+  const m = spawnSync(mg.cmd, mg.args, {
     cwd: ROOT,
     env: { ...process.env, SKIP_DOTENV: '1', DATABASE_URL: targetUrl },
     encoding: 'utf8',
-    shell: process.platform === 'win32',
+    shell: mg.shell,
   });
   if (m.status !== 0) throw new Error(`forward upgrade of the restored backup failed: ${m.stderr || m.stdout}`);
   console.log(`[restore] forward upgrade of the restored schema: ${(m.stdout.trim().split('\n').pop() ?? '').trim()}`);
-  const v = spawnSync(
-    resolve(ROOT, 'node_modules/.bin', process.platform === 'win32' ? 'tsx.cmd' : 'tsx'),
-    ['--tsconfig', 'apps/api/tsconfig.json', 'apps/api/src/db/cli/verify-restore.ts'],
-    {
-      cwd: ROOT,
-      env: { ...process.env, SKIP_DOTENV: '1', RESTORE_DATABASE_URL: targetUrl },
-      stdio: 'inherit',
-      shell: process.platform === 'win32',
-    },
-  );
+  const vr = shellSafe(tsx, ['--tsconfig', 'apps/api/tsconfig.json', 'apps/api/src/db/cli/verify-restore.ts']);
+  const v = spawnSync(vr.cmd, vr.args, {
+    cwd: ROOT,
+    env: { ...process.env, SKIP_DOTENV: '1', RESTORE_DATABASE_URL: targetUrl },
+    stdio: 'inherit',
+    shell: vr.shell,
+  });
   ok = v.status === 0;
 } finally {
   const c = new pg.Client({ connectionString: owner });

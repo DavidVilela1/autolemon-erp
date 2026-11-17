@@ -24,7 +24,12 @@ beforeAll(async () => {
   t = await startApp();
   A = await tenant(t, 'ENC-A', ['W']);
   B = await tenant(t, 'ENC-B', ['W']);
-  db = new Database({ APP_DATABASE_URL: process.env.APP_DATABASE_URL!, DB_SSL: 'disable', DB_POOL_MAX: 3 });
+  db = new Database({
+    APP_DATABASE_URL: process.env.APP_DATABASE_URL!,
+    DB_SSL: 'disable',
+    DB_POOL_MAX: 3,
+    DB_STATEMENT_TIMEOUT_MS: 15_000,
+  });
 });
 afterAll(async () => {
   delete process.env.TEST_KEKS;

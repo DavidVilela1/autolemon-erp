@@ -2,6 +2,103 @@
 
 All notable changes. Owning module: repository. Format: Keep a Changelog; versioning: SemVer.
 
+## [0.6.12-WMS] — 2026-11-17
+
+Follow-up to v0.6.11 from the owner's Windows run. Gate state stays **`WMS_IN_PROGRESS`**
+(PASS 20 · FAIL 3 · BLOCKED 10 · NOT_RUN 1). Test tooling only; no product code or migration.
+
+### Fixed
+
+- **e2e left the API server running on Windows.** After e2e, the API kept logging "database
+  … does not exist" every 5 s: the script stopped only the `cmd.exe` wrapper, and `tsx` runs the
+  server in a child Node process, so the server survived and its jobs hit the dropped test
+  database. New `startTree()` / `killTree()` in `scripts/dev-env.mjs` stop the whole process
+  tree (`taskkill /T /F` on Windows, process group on POSIX); `e2e-inner.mjs` uses them, also on
+  Ctrl+C.
+- **`script-spawn.test.ts` flagged the helper file itself** (the new `killTree` checks the
+  platform); `dev-env.mjs` is exempt from that guard.
+- **Typed import instead of a suppression:** new `scripts/dev-env.d.mts` declares the helpers, so
+  the test imports them with real types (no `@ts-expect-error`).
+
+## [0.6.11-WMS] — 2026-11-17
+
+Fix found by the owner running `pnpm test:all` (v0.6.10) on Windows: every check passed except
+e2e, which did not start (`'C:\Program' is not recognized as an internal or external command`).
+Gate state stays **`WMS_IN_PROGRESS`** (PASS 20 · FAIL 3 · BLOCKED 10 · NOT_RUN 1). Test tooling
+only; no product code or migration.
+
+### Fixed
+
+- **Repository scripts on Windows when a path contains a space.** The scripts use a shell on
+  Windows (the `pnpm`/`tsx`/`vitest` shims are `.cmd` files), and Node joins command and arguments
+  unquoted, so `C:\Program Files\nodejs\node.exe` (passed by `run-e2e.mjs`) broke at the space.
+  This bug dates back to the v0.5.0 baseline. The same pattern would also break `restore:smoke`, `security:scan` (e.g. `GITLEAKS_BIN`
+  under Program Files) and every disposable-DB test run for a repository under a folder with a
+  space (`C:\Users\Ana Silva\…`). New `shellSafe()` in `scripts/dev-env.mjs` quotes command and
+  arguments on Windows and uses no shell elsewhere; all 13 spawn sites in `with-test-db`,
+  `e2e-inner`, `restore-smoke`, `security-scan` and `dev` use it.
+
+### Added
+
+- `tests/security/script-spawn.test.ts`: runs a script in a folder with a space through the real
+  shell (cmd.exe on Windows), shows the old unquoted form fails, and fails if any script spawns a
+  Windows shell without `shellSafe`.
+
+## [0.6.10-WMS] — 2026-11-16
+
+Fix found by the owner running the v0.6.9 `ledger-growth` profile on a Windows workstation. Gate
+state stays **`WMS_IN_PROGRESS`** (PASS 20 · FAIL 3 · BLOCKED 10 · NOT_RUN 1). No migration.
+
+### Fixed
+
+- **Reconciliation returned HTTP 500 at 10 M ledger rows** (ADR-0031 addendum): it exceeded the
+  API's 15 s statement limit on slower hardware, and the cancelled statement surfaced as
+  "Erro interno". Reconciliation now aggregates the ledger first (1.7× faster at 2 M rows; 11.2 → 9.6 s at 10 M), runs with its own
+  60 s budget, and allows one run per warehouse at a time (409 `RECONCILIATION_RUNNING`).
+- **Any statement timeout now returns 503 `QUERY_TIMEOUT`** with a clear message instead of 500.
+
+### Added
+
+- `DB_STATEMENT_TIMEOUT_MS` (default 15 000) — the pool's per-statement limit, previously
+  hard-coded. The restore verifier runs without a limit and uses the aggregate-first query.
+- `tests/integration/query-limits.test.ts` (fails on v0.6.9, passes now).
+
+## [0.6.9-WMS] — 2026-11-16
+
+Continuation (Reusable Continuation Prompt v0.6). Gate state stays **`WMS_IN_PROGRESS`**
+(PASS 20 · FAIL 3 · BLOCKED 10 · NOT_RUN 1). Extending the load harness to the contended write
+path and to a 10 M-row ledger found two real defects (deadlocks; a ledger query that grew with
+history); both are fixed and covered by tests. E-04 stays BLOCKED
+(targets not agreed; no production-equivalent hardware).
+
+### Fixed
+
+- **Deadlocks in allocation and stock moves** (ADR-0031). Outbound and transfer allocation
+  locked candidate positions line by line, and a move locked source before target, so
+  concurrent orders with SKUs in opposite order, or opposite moves between two positions,
+  deadlocked. The API's retry hid the errors; each cost ~1 s (`deadlock_timeout`), seen as a 2–3 s
+  allocation tail. Positions are now always locked in ascending id order in one statement:
+  `lockAllocationCandidates` (all candidates of the document's SKUs, before the line loop) and
+  `lockMoveSourceAndTarget` (source + existing target together; `CONCURRENT_CHANGE` 409 if the
+  source changed in between). Smoke: 10 deadlocks → 0; slowest allocation 2.1 s → 113 ms.
+- **Activity (ledger) page and CSV export slowed down linearly with history** (ADR-0031). The
+  RLS predicates defeat the planner's row estimates, so it joined the whole ledger before
+  keeping the newest 50 rows (4.1 s with 300 000 history rows). Both queries now select the
+  ledger page first and join only those rows: 4 146 ms → 2.5 ms on the same data. No migration.
+
+### Added
+
+- `tests/integration/lock-ordering.test.ts`: concurrent opposite-order outbound and transfer
+  allocations plus opposite moves; asserts PostgreSQL's `pg_stat_database.deadlocks` is
+  unchanged, stock conserved and reconciliation clean. Verified to fail without the fix.
+- `reports-search.test.ts`: ledger page ordering and SKU/type/period/limit filters (passes on
+  the old and the new query, so the rewrite returns the same rows).
+- Load harness: `order_allocate` scenario (create + allocate an order on the 20 hottest SKUs,
+  half cancelled) with per-step timings; deadlock count per run (non-zero fails the run);
+  `overReserved` invariant; one-off timings (reconciliation, CSV export of the run window,
+  over-cap export refused with 409, ledger by SKU).
+- `ledger-growth` profile: representative dataset plus 10 000 000 synthetic ledger rows.
+
 ## [0.6.8-WMS] — 2026-11-16
 
 Continuation (Reusable Continuation Prompt v0.6). Gate state stays **`WMS_IN_PROGRESS`**

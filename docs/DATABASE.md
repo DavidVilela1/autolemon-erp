@@ -1,4 +1,4 @@
-# Database — AutoLemon ERP v0.6.8
+# Database — AutoLemon ERP v0.6.12
 
 Owning module: platform/db. Engine: PostgreSQL 18 (target; Docker Compose) — the automated test
 evidence in this build was produced on PostgreSQL **16.15** because the build environment could
@@ -112,8 +112,13 @@ erDiagram
 
 Partial indexes on non-empty positions (`stock_positions_sku`, `stock_positions_holder`),
 ledger by position / sku+time / txn, active reservations by position, pending outbox, audit by
-company+time, sessions by user (active). Performance at scale is **not yet measured**
-(`docs/NEXT_TASKS.md` T-11).
+company+time, sessions by user (active). Measured with the load harness (ADR-0030/0031) up to
+100 000 positions and 10 M ledger rows: `docs/perf/LAST_RUN_*.md`.
+
+**Query rule under RLS (ADR-0031).** RLS predicates use `current_setting()`, so the planner
+cannot estimate their selectivity and badly underestimates rows of RLS-protected tables. A
+query that joins a large table (ledger, audit) and then applies `ORDER BY … LIMIT` must limit
+that table first in a sub-select and join only the selected rows.
 
 ## 6. Row-Level Security (defence in depth)
 

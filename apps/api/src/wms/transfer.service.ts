@@ -33,6 +33,7 @@ import {
   requireNodeKind,
   requireSku,
   warehouseCode,
+  lockAllocationCandidates,
 } from './inventory/engine.js';
 import { cmp, fromMilli, min, neg, sub, toMilli } from './inventory/qty.js';
 import type { WmsRunner } from './runner.js';
@@ -151,6 +152,11 @@ export class TransferService {
             WHERE transfer_id = ${id} ORDER BY line_no FOR UPDATE`,
       );
       const result: Array<{ lineId: string; reserved: string; missing: string }> = [];
+      await lockAllocationCandidates(
+        ctx,
+        t.source_warehouse_id,
+        lines.map((l) => l.sku_id),
+      );
       for (const line of lines) {
         let need = toMilli(line.need);
         let got = 0n;

@@ -52,12 +52,12 @@ export class Database {
   readonly db: Db;
 
   /** @param cfg Runtime configuration (uses APP_DATABASE_URL — the least-privileged role). */
-  constructor(cfg: Pick<AppConfig, 'APP_DATABASE_URL' | 'DB_SSL' | 'DB_SSL_CA_FILE' | 'DB_POOL_MAX'>) {
+  constructor(cfg: Pick<AppConfig, 'APP_DATABASE_URL' | 'DB_SSL' | 'DB_SSL_CA_FILE' | 'DB_POOL_MAX' | 'DB_STATEMENT_TIMEOUT_MS'>) {
     this.pool = new pg.Pool({
       connectionString: cfg.APP_DATABASE_URL,
       max: cfg.DB_POOL_MAX,
       ssl: sslOptions(cfg),
-      statement_timeout: 15_000,
+      statement_timeout: cfg.DB_STATEMENT_TIMEOUT_MS,
       idle_in_transaction_session_timeout: 30_000,
       application_name: 'autolemon-api',
     });

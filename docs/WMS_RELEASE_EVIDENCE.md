@@ -1,4 +1,4 @@
-# WMS release evidence — v0.6.8
+# WMS release evidence — v0.6.12
 
 Owning module: release management. Companion of `docs/WMS_RELEASE_GATE.md` (criteria and
 status, generated from `docs/WMS_RELEASE_STATUS.json`). This file records **how** each piece of
@@ -32,7 +32,10 @@ Node 22.x) for the v0.5 code after the CI fixes; those logs are not attached.
 | `pnpm build`                               | contracts + API + web (390 kB JS / 109 kB gzip)                                                                                                                             | —                                              |
 | Clean room from the ZIP                    | see `docs/PROJECT_STATE.md` §5                                                                                                                                              | E-06                                           |
 
-## 2a. Load and performance (E-04, v0.6.8, ADR-0030)
+## 2a. Load and performance (E-04, v0.6.8–v0.6.9, ADR-0030/0031)
+
+v0.6.8 (ADR-0030) — read/move mix only; superseded by the v0.6.9 runs below, kept for history
+(the stress profile was not re-run in v0.6.9):
 
 | Profile        | Dataset / users                          | Throughput | Errors | p95 (ms) stock · sku search · global search · ledger · move | Invariants | Result                    |
 | -------------- | ---------------------------------------- | ---------- | ------ | ----------------------------------------------------------- | ---------- | ------------------------- |
@@ -40,9 +43,42 @@ Node 22.x) for the v0.5 code after the CI fixes; those logs are not attached.
 | representative | 20 000 SKUs, 100 000 positions, 25 users | 275 req/s  | 0      | 101 · 156 · 146 · 111 · 130                                 | clean      | PASSED (provisional)      |
 | stress         | same dataset, 60 users                   | 250 req/s  | 0      | 276 · 328 · 313 · 283 · 308                                 | clean      | report only (degradation) |
 
+v0.6.9 (ADR-0031) — mix now includes `order_allocate` (create + allocate an order on the 20
+hottest SKUs, 10 %); deadlocks counted per run:
+
+| Profile        | Dataset / users                             | Throughput | Errors | p95 (ms) stock · sku · global · ledger · move · allocate | Deadlocks | One-offs (ms)                                                                 | Result               |
+| -------------- | ------------------------------------------- | ---------- | ------ | -------------------------------------------------------- | --------- | ----------------------------------------------------------------------------- | -------------------- |
+| smoke          | 500 SKUs, 2 000 positions, 8 users          | 257 req/s  | 0      | all ≤ 177                                                | 0         | all OK                                                                        | PASSED (provisional) |
+| representative | 20 000 SKUs, 100 000 positions, 25 users    | 196 req/s  | 0      | 120 · 191 · 185 · 129 · 155 · 442                        | 0         | reconciliation 509 · CSV run window 116 · by SKU 16                           | PASSED (provisional) |
+| ledger-growth  | same + **10 100 000 ledger rows**, 25 users | 191 req/s  | 0      | 123 · 193 · 185 · 132 · 161 · 457                        | 0         | reconciliation 11 232 · CSV run window 709 · over-cap 409 in 1 920 · by SKU 7 | PASSED (provisional) |
+
+v0.6.10 re-run of `ledger-growth` (after the reconciliation fix): 198 req/s, 0 errors, 0
+deadlocks, p95 118 · 180 · 176 · 123 · 151 · 432 ms, reconciliation 9 603 ms (budget 60 s), CSV run
+window 618 ms, over-cap 409 in 1 931 ms, by SKU 24 ms — PASSED (provisional). On the owner's
+Windows workstation the v0.6.9 reconciliation exceeded the 15 s statement limit (HTTP 500);
+fixed in v0.6.10 (`tests/integration/query-limits.test.ts`), owner re-run pending.
+
+Found and fixed during these runs: deadlocks in allocation/moves (10 per smoke run before the
+fix, 0 after; `tests/integration/lock-ordering.test.ts`) and the ledger page joining the whole
+ledger before limiting (4.1 s at 300 000 rows before, 132 ms p95 at 10 M rows after).
+
 2 vCPU / 7.8 GB workspace, generator in the same process, no network; targets PROVISIONAL —
 E-04 stays BLOCKED until they are agreed and repeated on production-equivalent hardware.
 Details: `docs/perf/LAST_RUN_*.md`.
+
+## 2b. Owner workstation runs (Windows, PostgreSQL 18)
+
+Reported by the owner (console output pasted into the session; not re-run by the assistant):
+
+| Date       | Version | Command         | Result                                                                                                                                                                                                      |
+| ---------- | ------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-11-16 | v0.6.9  | `ledger-growth` | Seeded 10 M rows; reconciliation returned HTTP 500 (statement timeout) → fixed in v0.6.10                                                                                                                   |
+| 2026-11-17 | v0.6.10 | `pnpm test:all` | format, lint, typecheck, OpenAPI, gate: OK; unit 52/52, integration 56/56 (incl. lock-ordering, query-limits), security 107/107; **e2e did not start**: `'C:\Program' is not recognized` → fixed in v0.6.11 |
+| 2026-11-17 | v0.6.11 | `pnpm test:all` | e2e started; afterwards the API server kept running and logged "database does not exist" every 5 s (orphaned process) → fixed in v0.6.12                                                                    |
+
+The e2e failure was in the test tooling, not the product: `scripts/with-test-db.mjs` ran Node's own
+path through the Windows shell unquoted. All repository scripts now spawn through `shellSafe`
+(`tests/security/script-spawn.test.ts`). Owner re-run of `pnpm test:all` and `ledger-growth` on v0.6.12 pending.
 
 ## 3. Test files → criteria
 

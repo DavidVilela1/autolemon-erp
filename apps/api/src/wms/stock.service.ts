@@ -37,9 +37,14 @@ import {
   registerLot,
   requireSku,
   resolveHolder,
+  lockMoveSourceAndTarget,
+  type Holder,
 } from './inventory/engine.js';
 import { neg } from './inventory/qty.js';
 import type { WmsRunner } from './runner.js';
+
+/** Time budget of one reconciliation (reads the whole ledger; 10 M rows ≈ 10 s on 2 vCPU). */
+export const RECONCILIATION_TIMEOUT_MS = 60_000;
 
 /** Transaction types eligible for automatic reversal. */
 export const REVERSIBLE_TYPES = ['OPENING', 'MOVE', 'ADJUST', 'REPLENISH', 'CONTAINER_MOVE'] as const;
@@ -103,15 +108,20 @@ export class StockService {
   /** Internal move of unreserved stock to another holder (status unchanged). */
   async move(actor: Actor, warehouseId: string, key: string, input: z.infer<typeof MoveStockInput>) {
     return this.runner.command(actor, warehouseId, 'wms.putaway', key, 'stock.move', input, async (ctx) => {
-      const src = await lockPosition(ctx, input.positionId);
-      if (src.stock_status !== 'AVAILABLE' && src.stock_status !== 'QUARANTINE' && src.stock_status !== 'DAMAGED') {
-        throw new Conflict('Este stock está em processamento e não pode ser movido livremente', 'STATUS_NOT_MOVABLE');
-      }
-      assertFree(src, input.qty);
-      const holder = await resolveHolder(ctx, input.to, {
-        allowedKinds:
-          src.stock_status === 'AVAILABLE' ? ['SHELF', 'BIN', 'LOCATION'] : ['QUARANTINE', 'INSPECTION', 'SHELF', 'BIN', 'LOCATION'],
+      // Source and existing target are locked together in id order (deadlock avoidance, ADR-0031).
+      let resolved: Holder | undefined;
+      const { src } = await lockMoveSourceAndTarget(ctx, input.positionId, async (peek) => {
+        if (peek.stock_status !== 'AVAILABLE' && peek.stock_status !== 'QUARANTINE' && peek.stock_status !== 'DAMAGED') {
+          throw new Conflict('Este stock está em processamento e não pode ser movido livremente', 'STATUS_NOT_MOVABLE');
+        }
+        resolved = await resolveHolder(ctx, input.to, {
+          allowedKinds:
+            peek.stock_status === 'AVAILABLE' ? ['SHELF', 'BIN', 'LOCATION'] : ['QUARANTINE', 'INSPECTION', 'SHELF', 'BIN', 'LOCATION'],
+        });
+        return resolved;
       });
+      const holder = resolved!;
+      assertFree(src, input.qty);
       await assertScanMatches(ctx, input.to, input.scan);
       const txnId = await newTxn(ctx, 'MOVE', { note: input.reason, idempotencyKey: key });
       const r = await relocate(ctx, txnId, src, input.qty, { holder, status: src.stock_status });
@@ -264,12 +274,25 @@ export class StockService {
     });
   }
 
-  /** Ledger and reservation reconciliation for a warehouse (both lists must be empty). */
+  /**
+   * Ledger and reservation reconciliation for a warehouse (both lists must be empty). It reads
+   * the whole ledger, so it gets its own time budget (RECONCILIATION_TIMEOUT_MS instead of the
+   * pool's 15 s) and at most one runs per warehouse at a time — a second request gets 409
+   * RECONCILIATION_RUNNING instead of holding another connection (ADR-0031).
+   */
   async reconciliation(actor: Actor, warehouseId: string) {
-    return this.runner.read(actor, warehouseId, 'wms.report', async (ctx) => ({
-      ledgerMismatches: await reconcile({ tx: ctx.tx, warehouseId }),
-      reservationMismatches: await reconcileReservations({ tx: ctx.tx, warehouseId }),
-    }));
+    return this.runner.read(actor, warehouseId, 'wms.report', async (ctx) => {
+      const lock = await one<{ ok: boolean }>(
+        ctx.tx,
+        sql`SELECT pg_try_advisory_xact_lock(hashtextextended(${`wms.reconcile:${warehouseId}`}, 0)) AS ok`,
+      );
+      if (!lock.ok) throw new Conflict('Já está a decorrer uma reconciliação deste armazém; tente daqui a pouco', 'RECONCILIATION_RUNNING');
+      await one(ctx.tx, sql`SELECT set_config('statement_timeout', ${String(RECONCILIATION_TIMEOUT_MS)}, true)`);
+      return {
+        ledgerMismatches: await reconcile({ tx: ctx.tx, warehouseId }),
+        reservationMismatches: await reconcileReservations({ tx: ctx.tx, warehouseId }),
+      };
+    });
   }
 }
 

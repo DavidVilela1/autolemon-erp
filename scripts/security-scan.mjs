@@ -21,6 +21,7 @@ import { spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
+import { shellSafe } from './dev-env.mjs';
 import { authoredFiles, scanSecrets } from './lib.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -36,7 +37,8 @@ record('Secret scan', secrets.length === 0, secrets.join('\n'));
 // 1b. gitleaks over the authored files only (a staged copy, so node_modules/build output are excluded)
 {
   const bin = process.env.GITLEAKS_BIN ?? 'gitleaks';
-  const probe = spawnSync(bin, ['version'], { encoding: 'utf8', shell: process.platform === 'win32' });
+  const pb = shellSafe(bin, ['version']);
+  const probe = spawnSync(pb.cmd, pb.args, { encoding: 'utf8', shell: pb.shell });
   if (probe.status !== 0) {
     record(
       'gitleaks (CI rules) over authored files',
@@ -53,11 +55,19 @@ record('Secret scan', secrets.length === 0, secrets.join('\n'));
         copyFileSync(f, join(stage, 'src', rel));
       }
       const report = join(stage, 'report.json');
-      const r = spawnSync(
-        bin,
-        ['dir', join(stage, 'src'), '--redact', '--no-banner', '--exit-code', '3', '--report-format', 'json', '--report-path', report],
-        { encoding: 'utf8', shell: process.platform === 'win32' },
-      );
+      const gl = shellSafe(bin, [
+        'dir',
+        join(stage, 'src'),
+        '--redact',
+        '--no-banner',
+        '--exit-code',
+        '3',
+        '--report-format',
+        'json',
+        '--report-path',
+        report,
+      ]);
+      const r = spawnSync(gl.cmd, gl.args, { encoding: 'utf8', shell: gl.shell });
       const findings = existsSync(report) ? JSON.parse(readFileSync(report, 'utf8')) : [];
       const where = findings.map((x) => `${relative(join(stage, 'src'), x.File)}:${x.StartLine} ${x.RuleID}`);
       record(
@@ -104,7 +114,8 @@ record(
 );
 
 // 4. Dependency audit
-const audit = spawnSync('pnpm', ['audit', '--json'], { cwd: ROOT, encoding: 'utf8', shell: process.platform === 'win32' });
+const au = shellSafe('pnpm', ['audit', '--json']);
+const audit = spawnSync(au.cmd, au.args, { cwd: ROOT, encoding: 'utf8', shell: au.shell });
 let counts;
 try {
   counts = JSON.parse(audit.stdout).metadata?.vulnerabilities ?? {};
@@ -116,12 +127,8 @@ record('Dependency audit (pnpm audit)', !counts.error && blocking === 0, JSON.st
 
 // 5. SBOM
 mkdirSync(join(ROOT, 'artifacts'), { recursive: true });
-const sbom = spawnSync('pnpm', ['sbom', '--sbom-format', 'cyclonedx', '--prod'], {
-  cwd: ROOT,
-  encoding: 'utf8',
-  maxBuffer: 64 * 1024 * 1024,
-  shell: process.platform === 'win32',
-});
+const sb = shellSafe('pnpm', ['sbom', '--sbom-format', 'cyclonedx', '--prod']);
+const sbom = spawnSync(sb.cmd, sb.args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, shell: sb.shell });
 let components = [];
 if (sbom.status === 0) {
   writeFileSync(join(ROOT, 'artifacts/sbom.cdx.json'), sbom.stdout);

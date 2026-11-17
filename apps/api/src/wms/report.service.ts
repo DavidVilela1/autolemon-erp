@@ -30,7 +30,11 @@ export class ReportService {
     private readonly stepUpMinutes: number,
   ) {}
 
-  /** Activity history (ledger) with filters; bounded result size. */
+  /**
+   * Activity history (ledger) with filters; bounded result size. The page of ledger rows is
+   * selected first and only those rows are joined: under RLS the planner underestimates the
+   * ledger and would otherwise join all of it before the LIMIT (ADR-0031).
+   */
   async ledger(actor: Actor, warehouseId: string, q: z.infer<typeof LedgerQuery>) {
     return this.runner.read(actor, warehouseId, 'wms.report', (ctx) =>
       rows(
@@ -38,16 +42,19 @@ export class ReportService {
         sql`SELECT l.id::text, l.created_at AS "at", t.txn_type AS type, t.id AS "txnId", t.reference_type AS "refType",
               t.reference_id AS "refId", s.code AS "skuCode", coalesce(n.path, cn.path) AS "nodePath", c.code AS "containerCode",
               l.stock_status AS status, l.qty_delta::text AS delta, u.display_name AS actor, t.note, t.reversal_of AS "reversalOf"
-            FROM inventory_ledger l JOIN inventory_transactions t ON t.id = l.txn_id JOIN skus s ON s.id = l.sku_id
+            FROM (SELECT * FROM inventory_ledger l0
+                   WHERE l0.warehouse_id = ${warehouseId}
+                     AND (${q.skuId ?? null}::uuid IS NULL OR l0.sku_id = ${q.skuId ?? null}::uuid)
+                     AND (${q.from ?? null}::timestamptz IS NULL OR l0.created_at >= ${q.from ?? null}::timestamptz)
+                     AND (${q.to ?? null}::timestamptz IS NULL OR l0.created_at <= ${q.to ?? null}::timestamptz)
+                     AND (${q.type ?? null}::text IS NULL OR EXISTS (SELECT 1 FROM inventory_transactions t0
+                            WHERE t0.id = l0.txn_id AND t0.txn_type = ${q.type ?? null}::text))
+                   ORDER BY l0.id DESC LIMIT ${q.limit}) l
+            JOIN inventory_transactions t ON t.id = l.txn_id JOIN skus s ON s.id = l.sku_id
             JOIN users u ON u.id = t.actor_user_id
             LEFT JOIN storage_nodes n ON n.id = l.holder_node_id
             LEFT JOIN containers c ON c.id = l.holder_container_id LEFT JOIN storage_nodes cn ON cn.id = c.current_node_id
-            WHERE l.warehouse_id = ${warehouseId}
-              AND (${q.skuId ?? null}::uuid IS NULL OR l.sku_id = ${q.skuId ?? null}::uuid)
-              AND (${q.type ?? null}::text IS NULL OR t.txn_type = ${q.type ?? null}::text)
-              AND (${q.from ?? null}::timestamptz IS NULL OR l.created_at >= ${q.from ?? null}::timestamptz)
-              AND (${q.to ?? null}::timestamptz IS NULL OR l.created_at <= ${q.to ?? null}::timestamptz)
-            ORDER BY l.id DESC LIMIT ${q.limit}`,
+            ORDER BY l.id DESC`,
       ),
     );
   }
@@ -125,7 +132,8 @@ export class ReportService {
   /**
    * CSV export of the activity history (ledger) for a bounded period (wms.export + step-up +
    * security audit, CSV-injection safe). Refuses more than EXPORT_MAX_ROWS rows instead of
-   * silently truncating, so an export is always complete for the period it names.
+   * silently truncating, so an export is always complete for the period it names. Ledger rows are
+   * limited before the joins (ADR-0031).
    */
   async exportLedgerCsv(actor: Actor, warehouseId: string, q: z.infer<typeof LedgerExportQuery>): Promise<string> {
     requirePermission(actor, 'wms.export');
@@ -138,7 +146,14 @@ export class ReportService {
               t.id::text AS txn, coalesce(io.number, oo.number, tr.number, rt.number, cs.number) AS document,
               s.code AS sku, coalesce(n.path, cn.path) AS path, c.code AS container, l.stock_status AS status, l.lot_code AS lot,
               l.qty_delta::text AS delta, u.display_name AS actor, t.note
-            FROM inventory_ledger l JOIN inventory_transactions t ON t.id = l.txn_id JOIN skus s ON s.id = l.sku_id
+            FROM (SELECT * FROM inventory_ledger l0
+                   WHERE l0.warehouse_id = ${warehouseId}
+                     AND l0.created_at >= ${q.from}::timestamptz AND l0.created_at <= ${to}::timestamptz
+                     AND (${q.skuId ?? null}::uuid IS NULL OR l0.sku_id = ${q.skuId ?? null}::uuid)
+                     AND (${q.type ?? null}::text IS NULL OR EXISTS (SELECT 1 FROM inventory_transactions t0
+                            WHERE t0.id = l0.txn_id AND t0.txn_type = ${q.type ?? null}::text))
+                   ORDER BY l0.id LIMIT ${EXPORT_MAX_ROWS + 1}) l
+            JOIN inventory_transactions t ON t.id = l.txn_id JOIN skus s ON s.id = l.sku_id
             JOIN users u ON u.id = t.actor_user_id
             LEFT JOIN storage_nodes n ON n.id = l.holder_node_id
             LEFT JOIN containers c ON c.id = l.holder_container_id LEFT JOIN storage_nodes cn ON cn.id = c.current_node_id
@@ -147,11 +162,7 @@ export class ReportService {
             LEFT JOIN transfers tr ON t.reference_type = 'transfer' AND tr.id = t.reference_id
             LEFT JOIN returns rt ON t.reference_type = 'return' AND rt.id = t.reference_id
             LEFT JOIN count_sessions cs ON t.reference_type = 'count' AND cs.id = t.reference_id
-            WHERE l.warehouse_id = ${warehouseId}
-              AND l.created_at >= ${q.from}::timestamptz AND l.created_at <= ${to}::timestamptz
-              AND (${q.skuId ?? null}::uuid IS NULL OR l.sku_id = ${q.skuId ?? null}::uuid)
-              AND (${q.type ?? null}::text IS NULL OR t.txn_type = ${q.type ?? null}::text)
-            ORDER BY l.id LIMIT ${EXPORT_MAX_ROWS + 1}`,
+            ORDER BY l.id`,
       );
       if (data.length > EXPORT_MAX_ROWS) {
         throw new Conflict(`Mais de ${EXPORT_MAX_ROWS} movimentos no período; reduza o intervalo`, 'EXPORT_TOO_LARGE');
