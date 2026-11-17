@@ -22,7 +22,7 @@ import {
   assertScanMatches,
   emitEvent,
   ensurePosition,
-  lockPosition,
+  lockRelocation,
   newTxn,
   nextDocNumber,
   relocate,
@@ -278,7 +278,8 @@ export class InboundService {
       if (cmp(input.qty, remaining) > 0) throw new Conflict(`Quantidade superior ao pendente (${remaining})`, 'QTY_EXCEEDS_TASK');
       const holder = await resolveHolder(ctx, input.to, { allowedKinds: ['SHELF', 'BIN', 'LOCATION'] });
       await assertScanMatches(ctx, input.to, input.scan);
-      const src = await lockPosition(ctx, t.source_position_id);
+      // Receiving position and (existing) target locked together, ascending (ADR-0032).
+      const src = (await lockRelocation(ctx, [t.source_position_id], () => ({ holder, status: 'AVAILABLE' }))).get(t.source_position_id)!;
       const txnId = await newTxn(ctx, 'PUTAWAY', { referenceType: 'putaway_task', referenceId: taskId, idempotencyKey: key });
       const r = await relocate(ctx, txnId, src, input.qty, { holder, status: 'AVAILABLE' });
       const done = toMilli(t.qty_done) + toMilli(input.qty) === toMilli(t.qty_total);

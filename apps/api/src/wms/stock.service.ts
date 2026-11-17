@@ -29,9 +29,11 @@ import {
   emitEvent,
   ensurePosition,
   lockPosition,
+  lockRelocation,
   newTxn,
   type PositionRow,
   reconcile,
+  reconcileFull,
   reconcileReservations,
   relocate,
   registerLot,
@@ -43,7 +45,7 @@ import {
 import { neg } from './inventory/qty.js';
 import type { WmsRunner } from './runner.js';
 
-/** Time budget of one reconciliation (reads the whole ledger; 10 M rows ≈ 10 s on 2 vCPU). */
+/** Time budget of one deep reconciliation (reads the whole ledger; 10 M rows ≈ 10 s on 2 vCPU). */
 export const RECONCILIATION_TIMEOUT_MS = 60_000;
 
 /** Transaction types eligible for automatic reversal. */
@@ -142,18 +144,26 @@ export class StockService {
     requirePermission(actor, 'wms.adjust');
     if (input.toStatus === 'AVAILABLE') requireStepUp(actor, 'inventory.adjust.approve', this.stepUpMinutes);
     return this.runner.command(actor, warehouseId, 'wms.adjust', key, 'stock.status', input, async (ctx) => {
-      const src = await lockPosition(ctx, input.positionId);
+      // Source and (existing) target position locked together, ascending: opposite status
+      // changes at the same holder would otherwise deadlock (ADR-0032).
+      let holder: Awaited<ReturnType<typeof resolveHolder>> | undefined;
+      const src = (
+        await lockRelocation(ctx, [input.positionId], async (peek) => {
+          const ref = input.to ?? { nodeId: peek.holder_node_id ?? undefined, containerId: peek.holder_container_id ?? undefined };
+          holder = await resolveHolder(ctx, ref, {
+            allowedKinds:
+              input.toStatus === 'AVAILABLE' ? ALLOCATABLE_NODE_KINDS : ['QUARANTINE', 'INSPECTION', 'SHELF', 'BIN', 'LOCATION'],
+          });
+          return { holder, status: input.toStatus };
+        })
+      ).get(input.positionId.toLowerCase())!;
       if (!['AVAILABLE', 'QUARANTINE', 'DAMAGED', 'INSPECTION'].includes(src.stock_status)) {
         throw new Conflict('Este stock está em processamento (receção/expedição)', 'STATUS_NOT_CHANGEABLE');
       }
       if (src.stock_status === input.toStatus) throw new Conflict('O stock já tem este estado', 'SAME_STATUS');
       assertFree(src, input.qty);
-      const ref = input.to ?? { nodeId: src.holder_node_id ?? undefined, containerId: src.holder_container_id ?? undefined };
-      const holder = await resolveHolder(ctx, ref, {
-        allowedKinds: input.toStatus === 'AVAILABLE' ? ALLOCATABLE_NODE_KINDS : ['QUARANTINE', 'INSPECTION', 'SHELF', 'BIN', 'LOCATION'],
-      });
       const txnId = await newTxn(ctx, 'STATUS_CHANGE', { note: input.reason, idempotencyKey: key });
-      const r = await relocate(ctx, txnId, src, input.qty, { holder, status: input.toStatus });
+      const r = await relocate(ctx, txnId, src, input.qty, { holder: holder!, status: input.toStatus });
       await this.audit.recordInTx(ctx.tx, {
         companyId: actor.companyId,
         actorUserId: actor.userId,
@@ -275,22 +285,32 @@ export class StockService {
   }
 
   /**
-   * Ledger and reservation reconciliation for a warehouse (both lists must be empty). It reads
-   * the whole ledger, so it gets its own time budget (RECONCILIATION_TIMEOUT_MS instead of the
-   * pool's 15 s) and at most one runs per warehouse at a time — a second request gets 409
-   * RECONCILIATION_RUNNING instead of holding another connection (ADR-0031).
+   * Ledger and reservation reconciliation for a warehouse (all lists must be empty).
+   * Routine form (default): balances against the trigger-maintained ledger totals — one row per
+   * position, flat as the ledger grows (ADR-0032). Deep form (`full`): additionally sums the
+   * whole ledger and checks the totals themselves; it is linear in ledger size, so it gets its
+   * own time budget (RECONCILIATION_TIMEOUT_MS instead of the pool's limit) and at most one deep
+   * run per warehouse at a time — a second gets 409 RECONCILIATION_RUNNING (ADR-0031).
    */
-  async reconciliation(actor: Actor, warehouseId: string) {
+  async reconciliation(actor: Actor, warehouseId: string, opts: { full?: boolean } = {}) {
     return this.runner.read(actor, warehouseId, 'wms.report', async (ctx) => {
+      if (!opts.full) {
+        return {
+          ledgerMismatches: await reconcile({ tx: ctx.tx, warehouseId }),
+          reservationMismatches: await reconcileReservations({ tx: ctx.tx, warehouseId }),
+        };
+      }
       const lock = await one<{ ok: boolean }>(
         ctx.tx,
         sql`SELECT pg_try_advisory_xact_lock(hashtextextended(${`wms.reconcile:${warehouseId}`}, 0)) AS ok`,
       );
       if (!lock.ok) throw new Conflict('Já está a decorrer uma reconciliação deste armazém; tente daqui a pouco', 'RECONCILIATION_RUNNING');
       await one(ctx.tx, sql`SELECT set_config('statement_timeout', ${String(RECONCILIATION_TIMEOUT_MS)}, true)`);
+      const deep = await reconcileFull({ tx: ctx.tx, warehouseId });
       return {
-        ledgerMismatches: await reconcile({ tx: ctx.tx, warehouseId }),
+        ledgerMismatches: deep.ledgerMismatches,
         reservationMismatches: await reconcileReservations({ tx: ctx.tx, warehouseId }),
+        totalsMismatches: deep.totalsMismatches,
       };
     });
   }

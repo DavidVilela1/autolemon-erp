@@ -1,6 +1,6 @@
 {
   "status": "PROVISIONAL",
-  "note": "Proposed by the developer (v0.6.8, extended v0.6.9) for the product owner to confirm or change. Gate E-04 stays BLOCKED until status is AGREED with an approver and date. order_allocate = create an outbound order (1-3 lines from the 20 hottest SKUs) + allocate it, measured end to end; half are cancelled again.",
+  "note": "Proposed by the developer (v0.6.8, extended v0.6.9 and v0.6.13) for the product owner to confirm or change. Gate E-04 stays BLOCKED until status is AGREED with an approver and date. order_allocate = create an outbound order (1-3 lines from the 20 hottest SKUs) + allocate it, measured end to end; half are cancelled again. order_pick = create (1-2 hot lines) + allocate + read + pick every line into one shared packing node, half unpicked back to a bin, measured end to end (4-7 requests). reconciliation = routine (ledger totals); reconciliation_full = deep (sums the whole ledger).",
   "agreedBy": null,
   "agreedAt": null,
   "profiles": {
@@ -48,12 +48,13 @@
     }
   },
   "mix": {
-    "stock_by_sku": 35,
+    "stock_by_sku": 30,
     "sku_search": 20,
     "global_search": 10,
     "ledger_page": 5,
-    "stock_move": 20,
-    "order_allocate": 10
+    "stock_move": 15,
+    "order_allocate": 10,
+    "order_pick": 10
   },
   "targets": {
     "p95Ms": {
@@ -62,13 +63,15 @@
       "global_search": 300,
       "ledger_page": 300,
       "stock_move": 300,
-      "order_allocate": 500
+      "order_allocate": 500,
+      "order_pick": 1000
     },
     "maxErrorRate": 0.001,
     "minThroughputRps": 50
   },
   "oneOffTargetsMs": {
-    "reconciliation": 60000,
+    "reconciliation": 2000,
+    "reconciliation_full": 60000,
     "ledger_csv_run_window": 10000,
     "ledger_csv_over_cap_refused": 10000,
     "ledger_by_sku": 1000

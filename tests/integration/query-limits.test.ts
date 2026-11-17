@@ -45,26 +45,30 @@ describe('Database time limits', () => {
     expect(ok(await A.admin.get(`/api/wms/w/${wh}/stock?skuId=${sku}`))).toHaveLength(1);
   });
 
-  it('reconciliation has its own budget beyond the pool limit, and only one runs per warehouse', async () => {
+  it('deep reconciliation has its own budget beyond the pool limit, and only one runs per warehouse', async () => {
     // Own budget: a 2 s wait inside the reconciliation transaction would exceed the 1 s pool limit.
     const holder = await t.owner.connect();
     try {
       await holder.query('BEGIN');
       await holder.query('LOCK TABLE stock_positions IN ACCESS EXCLUSIVE MODE');
-      const pending = A.admin.get(`/api/wms/w/${wh}/stock/reconciliation`);
+      const pending = A.admin.get(`/api/wms/w/${wh}/stock/reconciliation?full=true`);
       await new Promise((r) => setTimeout(r, 2000));
       // While it runs (blocked), a second reconciliation of the same warehouse is refused.
-      const second = await A.admin.get(`/api/wms/w/${wh}/stock/reconciliation`);
+      const second = await A.admin.get(`/api/wms/w/${wh}/stock/reconciliation?full=true`);
       expect(second.status).toBe(409);
       expect(second.body.error.code).toBe('RECONCILIATION_RUNNING');
       await holder.query('ROLLBACK');
       const first = await pending;
       expect(first.status).toBe(200);
-      expect(first.body).toEqual({ ledgerMismatches: [], reservationMismatches: [] });
+      expect(first.body).toEqual({ ledgerMismatches: [], reservationMismatches: [], totalsMismatches: [] });
     } finally {
       holder.release();
     }
     // The lock is transaction-scoped: the next run proceeds normally.
-    expect(ok(await A.admin.get(`/api/wms/w/${wh}/stock/reconciliation`))).toEqual({ ledgerMismatches: [], reservationMismatches: [] });
+    expect(ok(await A.admin.get(`/api/wms/w/${wh}/stock/reconciliation?full=true`))).toEqual({
+      ledgerMismatches: [],
+      reservationMismatches: [],
+      totalsMismatches: [],
+    });
   });
 });

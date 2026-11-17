@@ -121,6 +121,11 @@ export function translatePgError(err: unknown): DomainError | undefined {
       return new NotFound('Recurso');
     case '22P02':
       return new ValidationFailed(undefined, 'Formato de identificador inválido');
+    case '40P01':
+    case '40001':
+      // Deadlock / serialization failure that survived the transaction retries (database.ts):
+      // the request had no effect and can simply be repeated.
+      return new DomainError(503, 'BUSY_RETRY', 'O sistema está ocupado com outra operação sobre o mesmo stock. Tente de novo.');
     case '57014':
       // statement_timeout (or an operator cancel): a clear, retryable answer instead of a 500.
       return new DomainError(503, 'QUERY_TIMEOUT', 'O pedido demorou demasiado. Tente de novo mais tarde ou reduza o período/filtro.');

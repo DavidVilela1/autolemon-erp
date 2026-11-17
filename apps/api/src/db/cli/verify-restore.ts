@@ -37,10 +37,20 @@ try {
         WHERE p.qty_on_hand <> coalesce(s.total, 0)`,
   );
   if (ledger.length) failures.push(`${ledger.length} positions do not reconcile with the ledger`);
+  // Trigger-maintained totals (ADR-0032) must equal the ledger sums after a restore.
+  const totalsOff = await rows(
+    db.db,
+    sql`SELECT p.id FROM stock_positions p
+        LEFT JOIN (SELECT position_id, sum(qty_delta) AS total FROM inventory_ledger GROUP BY position_id) s ON s.position_id = p.id
+        LEFT JOIN position_ledger_totals t ON t.position_id = p.id
+        WHERE coalesce(t.total, 0) <> coalesce(s.total, 0)`,
+  );
+  if (totalsOff.length) failures.push(`${totalsOff.length} positions have ledger totals that differ from the ledger`);
   const res = await rows(
     db.db,
-    sql`SELECT p.id FROM stock_positions p LEFT JOIN reservations r ON r.position_id = p.id AND r.status = 'ACTIVE'
-        GROUP BY p.id HAVING p.qty_reserved <> coalesce(sum(r.qty_open), 0)`,
+    sql`SELECT p.id FROM stock_positions p
+        LEFT JOIN (SELECT position_id, sum(qty_open) AS open FROM reservations WHERE status = 'ACTIVE' GROUP BY position_id) r ON r.position_id = p.id
+        WHERE p.qty_reserved <> coalesce(r.open, 0)`,
   );
   if (res.length) failures.push(`${res.length} positions have inconsistent reservations`);
   const audit = new AuditService(db);

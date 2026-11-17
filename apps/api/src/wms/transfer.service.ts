@@ -96,14 +96,17 @@ export class TransferService {
       // Pick list for the source: visible only inside the source warehouse scope (RLS), empty otherwise.
       const pickList = await rows(
         tx,
-        sql`SELECT r.id AS "reservationId", r.transfer_line_id AS "lineId", r.position_id AS "positionId", s.code AS "skuCode",
+        sql`WITH r AS MATERIALIZED (
+              SELECT r.id, r.transfer_line_id, r.position_id, r.qty_open FROM transfer_lines l
+              JOIN reservations r ON r.transfer_line_id = l.id AND r.status = 'ACTIVE'
+              WHERE l.transfer_id = ${id})
+            SELECT r.id AS "reservationId", r.transfer_line_id AS "lineId", r.position_id AS "positionId", s.code AS "skuCode",
               r.qty_open::text AS "qtyOpen", coalesce(n.path, cn.path) AS "nodePath", c.code AS "containerCode",
               nullif(p.lot_code, '') AS lot
-            FROM reservations r JOIN transfer_lines l ON l.id = r.transfer_line_id
-            JOIN stock_positions p ON p.id = r.position_id JOIN skus s ON s.id = p.sku_id
+            FROM r JOIN stock_positions p ON p.id = r.position_id JOIN skus s ON s.id = p.sku_id
             LEFT JOIN storage_nodes n ON n.id = p.holder_node_id LEFT JOIN containers c ON c.id = p.holder_container_id
             LEFT JOIN storage_nodes cn ON cn.id = c.current_node_id
-            WHERE l.transfer_id = ${id} AND r.status = 'ACTIVE' ORDER BY coalesce(n.path, cn.path), s.code`,
+            ORDER BY coalesce(n.path, cn.path), s.code`,
       );
       return { ...h, lines, pickList };
     });

@@ -196,8 +196,9 @@ export class WmsWarehouseController {
     return this.s.stock.summary(actorOf(req), uuidParam(wh));
   }
   @Get('stock/reconciliation')
-  reconciliation(@Req() req: AppRequest, @Param('wh') wh: string) {
-    return this.s.stock.reconciliation(actorOf(req), uuidParam(wh));
+  reconciliation(@Req() req: AppRequest, @Param('wh') wh: string, @Query() q: unknown) {
+    const p = parse(z.object({ full: z.enum(['true', 'false']).optional() }).strict(), q);
+    return this.s.stock.reconciliation(actorOf(req), uuidParam(wh), { full: p.full === 'true' });
   }
   @Post('stock/opening')
   opening(@Req() req: AppRequest, @Param('wh') wh: string, @Body() body: unknown) {

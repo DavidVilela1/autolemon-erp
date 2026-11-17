@@ -2,6 +2,47 @@
 
 All notable changes. Owning module: repository. Format: Keep a Changelog; versioning: SemVer.
 
+## [0.6.13-WMS] — 2026-11-17
+
+Continuation (T-11 remainder). Gate state stays **`WMS_IN_PROGRESS`** (PASS 20 · FAIL 3 ·
+BLOCKED 10 · NOT_RUN 1). Two migrations (0010, 0011). Race tests and a picking load scenario
+found three more deadlocks and a slow order view; all fixed and covered by tests (ADR-0032).
+
+### Added
+
+- **Incremental reconciliation** (migration 0010): `position_ledger_totals`, maintained by an
+  `AFTER INSERT` trigger on the append-only ledger, back-filled under a ledger write lock. The
+  routine reconciliation compares each balance with its total (one row per position, flat as the
+  ledger grows); `GET …/stock/reconciliation?full=true` also sums the whole ledger and checks the
+  totals themselves (60 s budget, one per warehouse). The restore verifier checks totals too.
+- **Picking load scenario** `order_pick`: order → allocate → read → pick every line into one
+  shared packing node, half unpicked back to a bin (provisional p95 target 1 000 ms).
+- Load one-offs `reconciliation` (routine, target 2 s) and `reconciliation_full` (deep, 60 s);
+  the ledger-growth run also times the migration-0010 back-fill aggregate.
+- Migration 0011: indexes for active reservations by order line and packages by order.
+
+### Fixed
+
+- **Deadlocks in pick vs unpick, replenishment vs move, and opposite status changes.** These
+  relocations locked the source first and the target later. Under sustained contention all three
+  retries could deadlock and the request failed with HTTP 500. New `lockRelocation()` locks
+  sources and existing targets together, ascending; used by pick, unpick, replenishment, status
+  change, return disposition and putaway (moves already did this since v0.6.9).
+- **A deadlock that survives the retries returns 503 `BUSY_RETRY`**, not 500.
+- **Order view slow under load** (p50 172 ms, p95 550 ms): the planner started from every active
+  reservation. The order and transfer pick lists now start from the document's lines (migration
+  0011 indexes): p50 23 ms, p95 36 ms.
+- `lockPositions` lower-cases ids before sorting so its order matches PostgreSQL's uuid order.
+- Reservation reconciliation aggregates active reservations first (history no longer slows it).
+
+### Tests
+
+- `tests/security/ledger-totals.test.ts` (5): totals exact after real operations; routine and
+  deep checks catch a tampered balance or total; runtime role cannot write totals; RLS.
+- `lock-ordering.test.ts`: three new races; each fails on v0.6.12 and passes now.
+- Upgrade test back-fills totals on a populated v0.5.0 database.
+- `apps/api/src/common/errors.test.ts`: 40P01/40001 → 503 `BUSY_RETRY`, 57014 → 503.
+
 ## [0.6.12-WMS] — 2026-11-17
 
 Follow-up to v0.6.11 from the owner's Windows run. Gate state stays **`WMS_IN_PROGRESS`**

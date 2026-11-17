@@ -40,6 +40,11 @@ Owning module: repository. A continuation developer should be able to start from
   `platform/monitoring/security-monitor.ts` with a test (ADR-0026).
 - Security-relevant changes update `docs/security/asvs/assessment.json` and `pnpm asvs:render`
   in the same commit (ADR-0028); `asvs-assessment.test.ts` fails if the report is stale.
+- **Stock locking (ADR-0031/0032):** code that relocates stock must lock with `lockRelocation`
+  (sources + existing targets, ascending); allocation uses `lockAllocationCandidates`. New
+  concurrent paths get a race in `tests/integration/lock-ordering.test.ts` (deadlock counter).
+- **Queries under RLS (ADR-0031/0032):** start from the selective side (the document's lines, a
+  page of ledger ids) — the planner's estimates for RLS-protected tables are unreliable.
 - Never commit `*.pem` or `audit-digest-*.json` (ignored and excluded from the archive; ADR-0027).
 - **Commit messages (product-owner rule):** a full message, never just a title. First line
   `vX.Y.Z: <summary>`, blank line, then a context paragraph (session, gate state) and sections

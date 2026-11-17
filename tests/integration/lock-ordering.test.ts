@@ -5,6 +5,9 @@
  * by line and a move locked source before target, so these patterns deadlocked (hidden by the
  * retry, visible as 1–3 s latency spikes in the load harness). The check reads the database's own
  * deadlock counter, so a retried deadlock still fails the test.
+ * v0.6.13 adds the other relocations that have a reverse path on the same two rows: pick vs
+ * unpick (bin ↔ packing node), replenishment vs an opposite move, and opposite status changes
+ * at one bin. Each race runs both directions concurrently many times.
  * @module tests/integration
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -92,5 +95,120 @@ describe('Lock ordering under concurrency (ADR-0031)', () => {
     expect(total.rows[0]!.s).toBe('4000.000');
     const rec = ok(await A.admin.get(`/api/wms/w/${wh}/stock/reconciliation`));
     expect(rec).toEqual({ ledgerMismatches: [], reservationMismatches: [] });
+  });
+});
+
+describe('Relocations with a reverse path never deadlock (v0.6.13)', () => {
+  let w3: string;
+  let bin1: string;
+  let bin2: string;
+  let pack: string;
+  const sku = async (code: string) => ok(await A.admin.post('/api/wms/skus', { code, description: code })).id as string;
+  const positionAt = async (skuId: string, nodeId: string, status = 'AVAILABLE') =>
+    (
+      await t.owner.query<{ id: string }>(
+        'SELECT id FROM stock_positions WHERE warehouse_id = $1 AND sku_id = $2 AND holder_node_id = $3 AND stock_status = $4',
+        [w3, skuId, nodeId, status],
+      )
+    ).rows[0]!.id;
+  const race = async (n: number, pair: (i: number) => Promise<Array<{ status: number; body: unknown }>>) => {
+    await settle();
+    const before = await deadlocks();
+    for (let batch = 0; batch < n; batch++) {
+      const results = (await Promise.all(Array.from({ length: 4 }, (_, k) => pair(batch * 4 + k)))).flat();
+      for (const r of results) expect([200, 201], JSON.stringify(r.body)).toContain(r.status);
+    }
+    await settle();
+    expect(await deadlocks()).toBe(before);
+    expect(ok(await A.admin.get(`/api/wms/w/${w3}/stock/reconciliation?full=true`))).toEqual({
+      ledgerMismatches: [],
+      reservationMismatches: [],
+      totalsMismatches: [],
+    });
+  };
+
+  beforeAll(async () => {
+    w3 = ok(await A.admin.post('/api/admin/warehouses', { code: 'LCK-W3', name: 'Corridas' })).id;
+    const z = await node(A.admin, w3, 'ZONE', 'R-Z');
+    bin1 = await node(A.admin, w3, 'LOCATION', 'R-1', z);
+    bin2 = await node(A.admin, w3, 'LOCATION', 'R-2', z);
+    pack = await node(A.admin, w3, 'DISPATCH', 'R-EXP');
+  });
+
+  it('pick (bin → packing) racing unpick (packing → bin) of the same SKU', async () => {
+    const P = await sku('LCK-PICK');
+    ok(await A.admin.post(`/api/wms/w/${w3}/stock/opening`, { lines: [{ skuId: P, to: { nodeId: bin1 }, qty: 500 }] }));
+    type Order = { id: string; pickList: Array<{ reservationId: string }>; lines: Array<{ id: string }> };
+    const allocated = async (): Promise<Order> => {
+      const o = ok(await A.admin.post(`/api/wms/w/${w3}/outbound`, { lines: [{ skuId: P, qty: 1 }] }));
+      ok(await A.admin.post(`/api/wms/w/${w3}/outbound/${o.id}/allocate`));
+      return ok(await A.admin.get(`/api/wms/w/${w3}/outbound/${o.id}`));
+    };
+    const pickBody = (o: Order) => ({
+      reservationId: o.pickList[0]!.reservationId,
+      qty: 1,
+      barcode: 'LCK-PICK',
+      packingNodeId: pack,
+    });
+    // Orders already picked (their units wait at the packing node) and orders ready to pick.
+    const picked: Order[] = [];
+    for (let i = 0; i < 20; i++) {
+      const o = await allocated();
+      ok(await A.admin.post(`/api/wms/w/${w3}/outbound/${o.id}/pick`, pickBody(o)));
+      picked.push(o);
+    }
+    const ready: Order[] = [];
+    for (let i = 0; i < 20; i++) ready.push(await allocated());
+    await race(5, (i) =>
+      Promise.all([
+        A.admin.post(`/api/wms/w/${w3}/outbound/${ready[i]!.id}/pick`, pickBody(ready[i]!)),
+        A.admin.post(`/api/wms/w/${w3}/outbound/${picked[i]!.id}/unpick`, {
+          lineId: picked[i]!.lines[0]!.id,
+          qty: 1,
+          fromNodeId: pack,
+          to: { nodeId: bin1 },
+        }),
+      ]),
+    );
+  });
+
+  it('replenishment (bulk → pick bin) racing a move in the opposite direction', async () => {
+    const R = await sku('LCK-REPL');
+    ok(
+      await A.admin.post(`/api/wms/w/${w3}/stock/opening`, {
+        lines: [
+          { skuId: R, to: { nodeId: bin1 }, qty: 500 },
+          { skuId: R, to: { nodeId: bin2 }, qty: 500 },
+        ],
+      }),
+    );
+    // The old code (lock source, then target) deadlocks with the move only when the pick-bin
+    // position sorts BELOW the bulk position; pick the bins so that is always the case.
+    const [p1, p2] = [await positionAt(R, bin1), await positionAt(R, bin2)];
+    const [pickPos, bulkPos, pickBin, bulkBin] = p1 < p2 ? [p1, p2, bin1, bin2] : [p2, p1, bin2, bin1];
+    const rule = ok(
+      await A.admin.post(`/api/wms/w/${w3}/replenishment/rules`, { skuId: R, pickNodeId: pickBin, minQty: 1, targetQty: 100 }),
+    );
+    await race(5, () =>
+      Promise.all([
+        A.admin.post(`/api/wms/w/${w3}/replenishment/execute`, { ruleId: rule.id, fromPositionId: bulkPos, qty: 1 }),
+        A.admin.post(`/api/wms/w/${w3}/stock/move`, { positionId: pickPos, qty: 1, to: { nodeId: bulkBin } }),
+      ]),
+    );
+  });
+
+  it('opposite status changes (AVAILABLE ↔ QUARANTINE) at the same bin', async () => {
+    const Q = await sku('LCK-STAT');
+    ok(await A.admin.post(`/api/wms/w/${w3}/stock/opening`, { lines: [{ skuId: Q, to: { nodeId: bin2 }, qty: 500 }] }));
+    const av = await positionAt(Q, bin2);
+    ok(await A.admin.post(`/api/wms/w/${w3}/stock/status`, { positionId: av, qty: 100, toStatus: 'QUARANTINE', reason: 'Inspeção' }));
+    const q = await positionAt(Q, bin2, 'QUARANTINE');
+    await A.admin.stepUp(); // releasing to AVAILABLE requires step-up
+    await race(5, () =>
+      Promise.all([
+        A.admin.post(`/api/wms/w/${w3}/stock/status`, { positionId: av, qty: 1, toStatus: 'QUARANTINE', reason: 'Inspeção' }),
+        A.admin.post(`/api/wms/w/${w3}/stock/status`, { positionId: q, qty: 1, toStatus: 'AVAILABLE', reason: 'Libertado' }),
+      ]),
+    );
   });
 });

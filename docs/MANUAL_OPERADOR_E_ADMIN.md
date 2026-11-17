@@ -1,4 +1,4 @@
-# Manual do operador e do administrador — AutoLemon WMS v0.6.12
+# Manual do operador e do administrador — AutoLemon WMS v0.6.13
 
 Módulo responsável: WMS / formação. Público: operadores de armazém, chefes de armazém e
 administradores da empresa. Este manual descreve o que a aplicação faz **hoje**; não substitui a
@@ -50,7 +50,8 @@ chefe de armazém.
   vez (confirmação de identidade); _Ajustar_ exige motivo e confirmação.
 - **Exportar movimentos**: Histórico → datas _De/Até_ (máximo 366 dias) → _Exportar movimentos
   do período_. **Exportar stock**: Relatórios. Todas as exportações ficam registadas na auditoria.
-- **Relatórios**: reconciliação (deve dizer que saldos e reservas coincidem), faltas/excessos na
+- **Relatórios**: reconciliação (deve dizer que saldos e reservas coincidem; é rápida mesmo com
+  muito histórico — a verificação completa de todo o histórico faz-se pela API com `?full=true`), faltas/excessos na
   receção, diferenças de contagem, em trânsito, **validades a expirar** (lotes que expiram nos
   próximos _N_ dias, 30 por omissão, e lotes já expirados assinalados a vermelho — os expirados
   nunca são alocados; ponha-os em quarentena ou abata-os).

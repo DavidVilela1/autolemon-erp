@@ -29,8 +29,12 @@ Windows PowerShell: the same commands. Each run uses a fresh disposable database
   difference. The API retries deadlocks, so they show up as latency, not errors; a non-zero
   count is a locking bug (ADR-0031), not load.
 - **Step breakdown** for multi-request scenarios (`order_allocate.create/allocate/cancel`).
-- **One-off timings** that grow with history (`oneOffTargetsMs`): full reconciliation, 7-day
-  ledger CSV export, ledger by SKU.
+- **One-off timings** that grow with history (`oneOffTargetsMs`): routine reconciliation
+  (ledger totals, should stay flat), deep reconciliation (sums the whole ledger), CSV export of
+  the run window, an over-cap export that must be refused with 409, ledger by SKU. The
+  ledger-growth run also times the aggregate that migration 0010 runs to back-fill the totals.
+- **Scenarios with several requests** (`order_allocate`, `order_pick`) are measured end to end;
+  their per-step timings are in the step breakdown.
 
 ## Agreeing the targets (product owner)
 

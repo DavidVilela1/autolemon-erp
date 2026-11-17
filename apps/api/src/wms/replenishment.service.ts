@@ -14,7 +14,7 @@ import type { ExecuteReplenishmentInput, ReplenishmentRuleInput } from '@autolem
 import { Conflict } from '../common/errors.js';
 import { one, rows } from '../db/database.js';
 import type { Actor } from '../platform/authz/actor.js';
-import { assertFree, assertScanMatches, lockPosition, newTxn, relocate, requireNodeKind, requireSku } from './inventory/engine.js';
+import { assertFree, assertScanMatches, lockRelocation, newTxn, relocate, requireNodeKind, requireSku } from './inventory/engine.js';
 import { cmp, fromMilli, sub, toMilli } from './inventory/qty.js';
 import type { WmsRunner } from './runner.js';
 
@@ -109,12 +109,15 @@ export class ReplenishmentService {
         sql`SELECT sku_id, pick_node_id, target_qty::text FROM replenishment_rules WHERE id = ${input.ruleId} AND warehouse_id = ${warehouseId}`,
         'Regra',
       );
-      const src = await lockPosition(ctx, input.fromPositionId);
+      const holder = await requireNodeKind(ctx, rule.pick_node_id, ['SHELF', 'BIN', 'LOCATION']);
+      // Source and (existing) pick-bin position locked together, ascending (ADR-0032).
+      const src = (await lockRelocation(ctx, [input.fromPositionId], () => ({ holder, status: 'AVAILABLE' }))).get(
+        input.fromPositionId.toLowerCase(),
+      )!;
       if (src.sku_id !== rule.sku_id || src.stock_status !== 'AVAILABLE')
         throw new Conflict('Posição de origem inválida', 'POSITION_MISMATCH');
       if (src.holder_node_id === rule.pick_node_id) throw new Conflict('Origem já é a localização de picking', 'SAME_POSITION');
       assertFree(src, input.qty);
-      const holder = await requireNodeKind(ctx, rule.pick_node_id, ['SHELF', 'BIN', 'LOCATION']);
       await assertScanMatches(ctx, { nodeId: rule.pick_node_id }, input.scan);
       const txnId = await newTxn(ctx, 'REPLENISH', { referenceType: 'replenishment_rule', referenceId: input.ruleId, idempotencyKey: key });
       const r = await relocate(ctx, txnId, src, input.qty, { holder, status: 'AVAILABLE' });

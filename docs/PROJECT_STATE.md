@@ -1,8 +1,8 @@
-# Project state — AutoLemon ERP v0.6.12-WMS
+# Project state — AutoLemon ERP v0.6.13-WMS
 
 Owning module: repository. Last updated: 2026-11-16 (Europe/Lisbon). Archive:
-`AutoLemon-ERP-v0.6.12-WMS.zip` (root `autolemon-erp/`); its SHA-256 is in the adjacent
-`AutoLemon-ERP-v0.6.12-WMS.zip.sha256` (a file cannot contain its own hash).
+`AutoLemon-ERP-v0.6.13-WMS.zip` (root `autolemon-erp/`); its SHA-256 is in the adjacent
+`AutoLemon-ERP-v0.6.13-WMS.zip.sha256` (a file cannot contain its own hash).
 
 ## 1. Summary
 
@@ -11,6 +11,14 @@ Development Priority Update (WMS first), **Reusable Continuation Prompt v0.6** a
 Production Readiness Gate v0.6**. WMS release gate state: **`WMS_IN_PROGRESS`**
 (`docs/WMS_RELEASE_GATE.md`: PASS 20 · FAIL 3 · BLOCKED 10 · NOT_RUN 1). **Not production-ready.**
 No other ERP business module has been started.
+
+v0.6.13 (2026-11-17, continuation, T-11 remainder): reconciliation is now incremental — a
+database trigger keeps a running ledger total per position (migration 0010), so the routine check
+reads one row per position; `?full=true` still sums the whole ledger. New race tests found three
+more deadlocks (pick vs unpick, replenishment vs move, opposite status changes; under sustained
+contention they failed with HTTP 500) — fixed with `lockRelocation`; exhausted deadlock retries
+now return 503 `BUSY_RETRY`. A new picking load scenario found the order view slow under load
+(p95 550 ms) — fixed with order-first queries and migration 0011 (p95 36 ms). ADR-0032.
 
 v0.6.12 (2026-11-17, owner report): after e2e on Windows the API server kept running (only its
 `cmd.exe` wrapper was stopped) and logged errors against the dropped test database every 5 s.
@@ -95,6 +103,23 @@ accessibility sweep, and the release gate as code.
 
 ## 3. Migrations and rollback plan
 
+v0.6.13 adds **`0010_ledger_totals.sql`** (new table `position_ledger_totals`, `SECURITY DEFINER`
+trigger on the ledger, back-fill under a ledger write lock) and **`0011_order_lookup_indexes.sql`**
+(two indexes). Both additive. Upgrade: `pnpm db:migrate` in a quiet period (OPERATIONS.md,
+"Migrations that take locks"). Rehearsed by restoring a **pre-0010 backup** (16 Nov 2026, schema 0009) with `pnpm restore:smoke
+<manifest>`: 0010 and 0011 applied, verifier PASSED including the new totals-vs-ledger check (small
+dataset: 4 positions); and by the upgrade test (populated v0.5.0 schema → current, totals
+back-filled exactly). On the 10.1 M-row ledger the back-fill aggregate took 1.5 s with the data
+freshly written and cached; expect more from a cold disk. Rollback: redeploy
+v0.6.12 — it does not read the new table and the trigger only maintains it; to remove both
+migrations: `DROP TRIGGER inventory_ledger_totals ON inventory_ledger; DROP FUNCTION
+inventory_ledger_totals(); DROP TABLE position_ledger_totals; DROP INDEX reservations_outbound_line;
+DROP INDEX containers_outbound; DELETE FROM schema_migrations WHERE version IN ('0010','0011');` —
+or restore the pre-upgrade backup.
+
+v0.6.9–v0.6.12 add **no migration**. v0.6.10 adds the optional setting `DB_STATEMENT_TIMEOUT_MS`
+(ignored by older versions). Rollback: redeploy v0.6.8.
+
 v0.6.8 adds **no migration** and no runtime change (test tooling, CI and docs only). Rollback:
 redeploy v0.6.7.
 
@@ -134,48 +159,48 @@ restoring a real v0.5 backup and upgrading it. Rollback: redeploy the previous a
 schema change is backward compatible) or restore the pre-upgrade backup; no down migrations
 (`docs/DATABASE.md` §1a).
 
-## 4. Last verified command outputs (workspace, 2026-11-16)
+## 4. Last verified command outputs (workspace, 2026-11-17)
 
 Environment: Ubuntu 24.04, Node **22.23.4**, pnpm **12.18.0**, PostgreSQL **16.15** (disposable
 local cluster), 2 vCPU / 7.8 GB, Google Chrome for Testing for Playwright. Docker, PostgreSQL 18
 and Node 26 were not available here.
 
-| Command                                      | Result                                                                                                                        |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm format:check` / `lint` / `typecheck`   | clean; documentation gate 141 files, 383 exported symbols                                                                     |
-| `pnpm api:check` / `asvs:check`              | OpenAPI matches code (107 paths / 117 operations) / 253 ASVS requirements OK                                                  |
-| `pnpm gate:check`                            | `WMS_IN_PROGRESS`; PASS 20 · FAIL 3 · BLOCKED 10 · NOT_RUN 1                                                                  |
-| `pnpm test:all`                              | exit 0 — unit 52, integration 52, security 107, e2e 2                                                                         |
-| `pnpm test:load` (smoke)                     | PASSED — 500 SKUs / 2 000 positions / 8 users: 439 req/s, 0 errors, all p95 ≤ 110 ms                                          |
-| `pnpm test:load -- --profile representative` | PASSED — 20 000 SKUs / 100 000 positions / 25 users: 275 req/s, 0 errors, p95 101–156 ms; conservation + reconciliation clean |
-| `pnpm test:load -- --profile stress`         | report only — 60 users: 250 req/s, 0 errors, p95 283–328 ms (4 of 5 above the 25-user targets); invariants clean              |
-| `pnpm security:scan`                         | all PASS incl. **gitleaks 8.24.3**; audit 0 critical / 0 high / 1 moderate (dev-only, SEC-OPEN-009); SBOM 122 components      |
-| `pnpm backup:local` / `restore:smoke`        | written (off-site NOT CONFIGURED) / PASSED (1.8 s)                                                                            |
-| `pnpm build`                                 | contracts + API + web (390 kB JS / 109 kB gzip)                                                                               |
+| Command                                      | Result                                                                                                                                              |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm format:check` / `lint` / `typecheck`   | clean; documentation gate 148 files, 391 exported symbols                                                                                           |
+| `pnpm api:check` / `asvs:check`              | OpenAPI matches code (107 paths) / 253 ASVS requirements OK                                                                                         |
+| `pnpm gate:check`                            | `WMS_IN_PROGRESS`; PASS 20 · FAIL 3 · BLOCKED 10 · NOT_RUN 1                                                                                        |
+| `pnpm test:all`                              | exit 0 — unit 54, integration 59, security 115, e2e 2; no API/Vite process left afterwards                                                          |
+| `pnpm test:load` (smoke)                     | PASSED — 500 SKUs / 2 000 positions / 8 users: 171 req/s, 0 errors, 0 deadlocks                                                                     |
+| `pnpm test:load -- --profile representative` | **FAILED** one provisional target — 25 users: 125 req/s, 0 errors, 0 deadlocks, `order_pick` p95 1 017 ms (> 1 000); everything else within targets |
+| `pnpm test:load -- --profile ledger-growth`  | PASSED — 10.1 M ledger rows: 130 req/s, 0 errors, 0 deadlocks; routine reconciliation 467 ms, deep 11.1 s                                           |
+| `pnpm security:scan`                         | all PASS incl. **gitleaks 8.24.3**; audit 0 critical / 0 high / 1 moderate (dev-only, SEC-OPEN-009); SBOM 122 components                            |
+| `pnpm backup:local` / `restore:smoke`        | written (off-site NOT CONFIGURED) / PASSED (3.0 s); pre-0010 backup restored and upgraded through 0010/0011: PASSED                                 |
+| `pnpm build`                                 | contracts + API + web (390 kB JS / 109 kB gzip)                                                                                                     |
 
-Not run here: Docker Compose stack, PostgreSQL 18, Node 26, CodeQL/Trivy (CI only), DAST, load on
-production-equivalent hardware or over a network, availability/soak tests, screen-reader testing,
-Windows run (owner), any production control.
+Not run here: Docker Compose stack, PostgreSQL 18, Node 26, CodeQL/Trivy (CI only), DAST, the
+stress profile (last run v0.6.8), load on production-equivalent hardware or over a network,
+availability/soak tests, screen-reader testing, the owner's Windows run of v0.6.13, any
+production control.
 
 ## 5. Clean-room verification from the ZIP
 
-Run 2026-11-17 on the v0.6.12 archive: copied only the ZIP + `.sha256` into an empty directory
-**whose path contains a space** (`/tmp/cr 18`) and followed `README-LOCAL-TESTING.md` "Without
+Run 2026-11-17 on the v0.6.13 archive: copied only the ZIP + `.sha256` into an empty directory
+**whose path contains a space** (`/tmp/cr 19`) and followed `README-LOCAL-TESTING.md` "Without
 Docker (native PostgreSQL)" (local PostgreSQL 16.15, fresh database; Playwright via
-`PLAYWRIGHT_CHROME_PATH`). Linux only: the Windows shell and `taskkill` paths are exercised when
-the suite runs on Windows.
+`PLAYWRIGHT_CHROME_PATH`). Linux only: the Windows shell and `taskkill` paths run when the suite
+runs on Windows.
 
 | Step                                                        | Result                                                                                                |
 | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `sha256sum -c`                                              | OK                                                                                                    |
 | extract → `autolemon-erp/`                                  | OK — no `.env`, `node_modules`, `.git`, `invitations-dev.txt`, backups, artifacts, `*.pem` or digests |
 | `pnpm install --frozen-lockfile`                            | OK (Node 22.23.4, pnpm 12.18.0)                                                                       |
-| `cp .env.example .env` → `pnpm db:migrate` → `pnpm db:seed` | 9 migrations applied (0001…0009); seed OK                                                             |
-| `pnpm asvs:check`                                           | 253 requirements OK                                                                                   |
-| `pnpm test:all` (format, lint, typecheck, OpenAPI, gate…)   | **exit 0** — unit 52, integration 56, security 110, e2e 2; no API/Vite process left afterwards        |
-| `pnpm test:load` (smoke)                                    | PASSED — 294 req/s, 0 errors, 0 deadlocks                                                             |
+| `cp .env.example .env` → `pnpm db:migrate` → `pnpm db:seed` | 11 migrations applied (0001…0011); seed OK                                                            |
+| `pnpm test:all` (format, lint, typecheck, OpenAPI, gate…)   | **exit 0** — unit 54, integration 59, security 115, e2e 2; no API/Vite process left afterwards        |
+| `pnpm test:load` (smoke)                                    | PASSED — 161 req/s, 0 errors, 0 deadlocks                                                             |
 | `pnpm security:scan` (with `GITLEAKS_BIN`)                  | exit 0                                                                                                |
-| `pnpm restore:smoke`                                        | PASSED (2.5 s)                                                                                        |
+| `pnpm restore:smoke`                                        | PASSED (2.6 s)                                                                                        |
 | `pnpm build`                                                | exit 0                                                                                                |
 | `pnpm dev`                                                  | web :5173 → 200; `/api/health` → 200; `/api/auth/session` without cookie → 401                        |
 
@@ -197,17 +222,19 @@ The final archive differs from the clean-room archive only in this section.
   signal counts are per API process; parser-level rejections carry no actor; load
   baseline measured on 2 vCPU with the generator on the same machine, targets provisional;
   allocation now locks all candidate positions of the document's SKUs up front, so two orders for
-  the same hot SKU serialise for the whole allocation (ADR-0031); lock-ordering regression covers
-  positions only (not documents/containers); full reconciliation is linear in ledger size (60 s
-  budget, one run per warehouse; incremental reconciliation not built yet); no fixed cap on concurrent sessions per user (documented compensating controls).
+  the same hot SKU serialise for the whole allocation (ADR-0031); stock relocations lock source and
+  target together (ADR-0032); pack/unpack rely on the order lock (reviewed, not race-tested);
+  the deep reconciliation (`?full=true`) is still linear in ledger size (60 s budget, one per
+  warehouse) — the routine check is not; every ledger insert also updates one totals row;
+  migrations 0010/0011 block writes while they run (ledger back-fill; two indexes); no fixed cap on concurrent sessions per user (documented compensating controls).
 
 ## 7. Next three WMS tasks
 
-1. O-02: owner reports the CI results of the v0.6.3–v0.6.9 pushes; then container image signing
-   (cosign keyless) and a deployment workflow gated on manual approval (no deployment).
-2. E-04 sign-off: owner agrees `docs/perf/targets.json`; representative and ledger-growth
-   profiles repeated on staging hardware.
-3. T-11 remainder (no owner input needed): picking-contention scenario (pick + confirm on shared
-   bins) with the deadlock counter, lock-ordering coverage for documents/containers, and an
-   incremental reconciliation (checkpointed like the audit chain) so it stays flat as the ledger
-   grows. In parallel when the owner chooses a provider: staging readiness pack (T-05).
+1. Owner decisions (quick): O-02 — branch protection on `main`, confirm the `node-next` and
+   `release-candidate` jobs, decide on the single-developer reviewer alternative, run
+   `gh attestation verify`; E-04 — agree or change `docs/perf/targets.json`.
+2. S-05 code part (no owner input): scheduled daily signed audit digest (ADR-0027) with a
+   pluggable hand-off to write-once storage, monitored by the security monitor (missed digest →
+   alert). Deploying the storage itself stays blocked on the target environment.
+3. S-03: external KMS provider for envelope encryption — needs the owner's choice (AWS KMS,
+   Azure Key Vault, Google Cloud KMS or self-hosted Vault Transit); no purchase without approval.

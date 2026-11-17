@@ -1,4 +1,4 @@
-# Operations — AutoLemon ERP v0.6.12
+# Operations — AutoLemon ERP v0.6.13
 
 Owning module: operations. **Production deployment is not configured and not approved.** This
 document describes how the system is configured and operated, and what must exist first.
@@ -117,6 +117,10 @@ with DPO within 72 h.
 - Migrations are forward-only; every release must be compatible with the previous app version
   for one deploy (expand → migrate → contract pattern).
 - Rollback = redeploy previous image; never edit applied migrations (checksum guard aborts).
+- **Migrations that take locks.** 0010 (v0.6.13) back-fills the per-position ledger totals while
+  holding a lock that blocks ledger writes — roughly 10 s per 10 million ledger rows; 0011 builds
+  two indexes, blocking writes to `reservations` and `containers` for seconds. Run the migration
+  job in a quiet period; reads are not blocked.
 - Before upgrade: backup + restore smoke; after: reconciliation endpoint must return empty lists.
 
 ## 8. Useful operator queries

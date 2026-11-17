@@ -315,10 +315,12 @@ describe('Acceptance: autonomous WMS end-to-end (real Postgres)', () => {
   });
 
   it('records outbox events and publishes them with no subscribers (WMS-only)', async () => {
-    const n = await t.services.outbox.runOnce();
+    // Files of this project share one database, so other tests' events may be pending too:
+    // drain in batches (100 per company per run), then nothing is left to publish.
+    let n = 0;
+    for (let i = 0, got = -1; got !== 0 && i < 100; i++) n += got = await t.services.outbox.runOnce();
     expect(n).toBeGreaterThan(5);
-    const again = await t.services.outbox.runOnce();
-    expect(again).toBe(0);
+    expect(await t.services.outbox.runOnce()).toBe(0);
   });
 
   it('keeps every invariant: ledger = balances, reservations = reserved, audit chain intact', async () => {

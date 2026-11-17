@@ -141,7 +141,7 @@ describe('Migration upgrade rehearsal (v0.5.0 schema → current)', () => {
     if (dir) rmSync(dir, { recursive: true, force: true });
   });
 
-  it('upgrades a populated v0.5.0 database and back-fills lots in transit', async () => {
+  it('upgrades a populated v0.5.0 database, back-fills lots in transit and ledger totals', async () => {
     expect(dbName).toMatch(/^[a-z0-9_]+$/);
     await t.owner.query(`CREATE DATABASE ${dbName}`);
     dir = mkdtempSync(join(tmpdir(), 'al-mig-'));
@@ -169,6 +169,42 @@ describe('Migration upgrade rehearsal (v0.5.0 schema → current)', () => {
         [c, tr, s],
       );
 
+      // v0.5-shaped stock history: two positions, three ledger rows (10 - 3 = 7, and 4).
+      const n = (
+        await db.query(
+          `INSERT INTO storage_nodes (company_id, warehouse_id, kind, code, name, holds_stock, depth, path)
+           VALUES ($1, $2, 'STAGING', 'S1', 'S1', true, 0, 'S1') RETURNING id`,
+          [c, w1],
+        )
+      ).rows[0].id;
+      const pos = async (status: string, qty: number) =>
+        (
+          await db.query(
+            `INSERT INTO stock_positions (company_id, warehouse_id, sku_id, holder_node_id, stock_status, qty_on_hand)
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+            [c, w1, s, n, status, qty],
+          )
+        ).rows[0].id as string;
+      const p1 = await pos('AVAILABLE', 7);
+      const p2 = await pos('QUARANTINE', 4);
+      const txn = (
+        await db.query(
+          `INSERT INTO inventory_transactions (company_id, warehouse_id, txn_type, actor_user_id) VALUES ($1, $2, 'OPENING', gen_random_uuid()) RETURNING id`,
+          [c, w1],
+        )
+      ).rows[0].id;
+      for (const [p, d, st] of [
+        [p1, 10, 'AVAILABLE'],
+        [p1, -3, 'AVAILABLE'],
+        [p2, 4, 'QUARANTINE'],
+      ] as const) {
+        await db.query(
+          `INSERT INTO inventory_ledger (company_id, warehouse_id, txn_id, position_id, sku_id, holder_node_id, stock_status, lot_code, qty_delta)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, '', $8)`,
+          [c, w1, txn, p, s, n, st, d],
+        );
+      }
+
       const applied = await migrate(upgUrl); // the real, current migration set
       expect(applied).toEqual(
         listMigrations()
@@ -178,6 +214,19 @@ describe('Migration upgrade rehearsal (v0.5.0 schema → current)', () => {
 
       const lots = (await db.query(`SELECT lot_code, qty_shipped::text, qty_received::text, qty_lost::text FROM transfer_line_lots`)).rows;
       expect(lots).toEqual([{ lot_code: '', qty_shipped: '5.000', qty_received: '2.000', qty_lost: '0.000' }]);
+      // 0010 back-fills the per-position ledger totals from the existing ledger (ADR-0032) ...
+      const totals = (await db.query(`SELECT position_id, total::text FROM position_ledger_totals ORDER BY total`)).rows;
+      expect(totals).toEqual([
+        { position_id: p2, total: '4.000' },
+        { position_id: p1, total: '7.000' },
+      ]);
+      // ... and the trigger keeps them exact for new ledger rows.
+      await db.query(
+        `INSERT INTO inventory_ledger (company_id, warehouse_id, txn_id, position_id, sku_id, holder_node_id, stock_status, lot_code, qty_delta)
+         VALUES ($1, $2, $3, $4, $5, $6, 'AVAILABLE', '', -2)`,
+        [c, w1, txn, p1, s, n],
+      );
+      expect((await db.query(`SELECT total::text FROM position_ledger_totals WHERE position_id = $1`, [p1])).rows[0].total).toBe('5.000');
       // Re-running is a no-op; checksums of applied files are enforced.
       expect(await migrate(upgUrl)).toEqual([]);
     } finally {

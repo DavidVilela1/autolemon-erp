@@ -37,6 +37,7 @@ import {
   applyDelta,
   emitEvent,
   lockPosition,
+  lockRelocation,
   newTxn,
   nextDocNumber,
   type PositionRow,
@@ -121,16 +122,22 @@ export class OutboundService {
               l.lot_code AS lot
             FROM outbound_lines l JOIN skus s ON s.id = l.sku_id WHERE l.outbound_id = ${id} ORDER BY l.line_no`,
       );
+      // Start from this order's lines (indexed), not from all active reservations: under RLS the
+      // planner's estimates are unreliable and it otherwise joined every active reservation with
+      // every SKU before filtering (ADR-0032, migration 0011).
       const pickList = await rows(
         ctx.tx,
-        sql`SELECT r.id AS "reservationId", r.outbound_line_id AS "lineId", r.position_id AS "positionId", s.code AS "skuCode",
+        sql`WITH r AS MATERIALIZED (
+              SELECT r.id, r.outbound_line_id, r.position_id, r.qty_open FROM outbound_lines l
+              JOIN reservations r ON r.outbound_line_id = l.id AND r.status = 'ACTIVE'
+              WHERE l.outbound_id = ${id})
+            SELECT r.id AS "reservationId", r.outbound_line_id AS "lineId", r.position_id AS "positionId", s.code AS "skuCode",
               r.qty_open::text AS "qtyOpen", coalesce(n.path, cn.path) AS "nodePath", c.code AS "containerCode",
               nullif(p.lot_code, '') AS lot
-            FROM reservations r JOIN stock_positions p ON p.id = r.position_id JOIN skus s ON s.id = p.sku_id
+            FROM r JOIN stock_positions p ON p.id = r.position_id JOIN skus s ON s.id = p.sku_id
             LEFT JOIN storage_nodes n ON n.id = p.holder_node_id
             LEFT JOIN containers c ON c.id = p.holder_container_id LEFT JOIN storage_nodes cn ON cn.id = c.current_node_id
-            JOIN outbound_lines l ON l.id = r.outbound_line_id
-            WHERE l.outbound_id = ${id} AND r.status = 'ACTIVE' ORDER BY coalesce(n.path, cn.path), c.code NULLS FIRST`,
+            ORDER BY coalesce(n.path, cn.path), c.code NULLS FIRST`,
       );
       const packages = await rows(
         ctx.tx,
@@ -261,7 +268,7 @@ export class OutboundService {
       const packing = await requireNodeKind(ctx, input.packingNodeId, ['DISPATCH']);
       let txnId: string | null = null;
       if (isPositive(qty)) {
-        const pos = await lockPosition(ctx, r.position_id);
+        const pos = (await lockRelocation(ctx, [r.position_id], () => ({ holder: packing, status: 'PICKED' }))).get(r.position_id)!;
         txnId = await newTxn(ctx, 'PICK', { referenceType: 'outbound', referenceId: id, idempotencyKey: key });
         await relocate(ctx, txnId, pos, qty, { holder: packing, status: 'PICKED' }, { consumeReserved: qty });
         await ctx.tx.execute(sql`UPDATE outbound_lines SET qty_allocated = qty_allocated - ${qty}::numeric,
@@ -358,11 +365,17 @@ export class OutboundService {
       if (cmp(input.qty, loose) > 0) throw new Conflict(`Só há ${loose} unidades separadas fora de volumes`, 'QTY_EXCEEDS_UNPACKED');
       await requireNodeKind(ctx, input.fromNodeId, ['DISPATCH']);
       const target = await resolveHolder(ctx, input.to, { allowedKinds: ALLOCATABLE_NODE_KINDS });
-      const sources = await rows<PositionRow>(
+      const candidates = await rows<{ id: string }>(
         ctx.tx,
-        sql`SELECT * FROM stock_positions WHERE warehouse_id = ${warehouseId} AND sku_id = ${line.sku_id}
-            AND holder_node_id = ${input.fromNodeId} AND stock_status = 'PICKED' AND qty_on_hand > 0 ORDER BY id FOR UPDATE`,
+        sql`SELECT id FROM stock_positions WHERE warehouse_id = ${warehouseId} AND sku_id = ${line.sku_id}
+            AND holder_node_id = ${input.fromNodeId} AND stock_status = 'PICKED' AND qty_on_hand > 0 ORDER BY id`,
       );
+      const locked = await lockRelocation(
+        ctx,
+        candidates.map((c) => c.id),
+        () => ({ holder: target, status: 'AVAILABLE' }),
+      );
+      const sources = [...locked.values()].filter((p) => isPositive(p.qty_on_hand)).sort((a, b) => (a.id < b.id ? -1 : 1));
       const txnId = await newTxn(ctx, 'UNPICK', { referenceType: 'outbound', referenceId: id, note: input.reason, idempotencyKey: key });
       let remaining = toMilli(input.qty);
       for (const src of sources) {
@@ -590,8 +603,8 @@ export class OutboundService {
     const active = await rows<{ id: string; position_id: string; outbound_line_id: string; qty_open: string }>(
       ctx.tx,
       sql`SELECT r.id, r.position_id, r.outbound_line_id, r.qty_open::text FROM reservations r
-          JOIN outbound_lines l ON l.id = r.outbound_line_id
-          WHERE l.outbound_id = ${outboundId} AND r.status = 'ACTIVE' ORDER BY r.position_id FOR UPDATE OF r`,
+          WHERE r.outbound_line_id IN (SELECT id FROM outbound_lines WHERE outbound_id = ${outboundId})
+            AND r.status = 'ACTIVE' ORDER BY r.position_id FOR UPDATE OF r`,
     );
     for (const r of active) {
       await lockPosition(ctx, r.position_id);

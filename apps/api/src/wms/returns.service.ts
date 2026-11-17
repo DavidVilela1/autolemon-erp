@@ -18,6 +18,7 @@ import {
   emitEvent,
   ensurePosition,
   lockPosition,
+  lockRelocation,
   newTxn,
   nextDocNumber,
   relocate,
@@ -107,8 +108,8 @@ export class ReturnsService {
         );
         const pending = sub(line.qty_received, sum([line.qty_saleable, line.qty_quarantined, line.qty_damaged, line.qty_scrapped]));
         if (cmp(d.qty, pending) > 0) throw new Conflict(`Só há ${pending} unidades por inspecionar`, 'QTY_EXCEEDS_PENDING');
-        const src = await lockPosition(ctx, line.inspection_position_id);
         if (d.disposition === 'SCRAP') {
+          const src = await lockPosition(ctx, line.inspection_position_id);
           await applyDelta(ctx, txnId, src, neg(d.qty));
           await ctx.tx.execute(sql`UPDATE return_lines SET qty_scrapped = qty_scrapped + ${d.qty}::numeric WHERE id = ${line.id}`);
           continue;
@@ -121,6 +122,10 @@ export class ReturnsService {
         } as const;
         const s = spec[d.disposition];
         const holder = await resolveHolder(ctx, d.to, { allowedKinds: s.kinds });
+        // Inspection position and (existing) target locked together, ascending (ADR-0032).
+        const src = (await lockRelocation(ctx, [line.inspection_position_id], () => ({ holder, status: s.status }))).get(
+          line.inspection_position_id,
+        )!;
         await relocate(ctx, txnId, src, d.qty, { holder, status: s.status });
         // Column name comes from the constant map above (reviewed raw SQL identifier).
         await ctx.tx.execute(sql`UPDATE return_lines SET ${sql.raw(s.col)} = ${sql.raw(s.col)} + ${d.qty}::numeric WHERE id = ${line.id}`);

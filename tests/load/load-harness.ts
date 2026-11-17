@@ -36,7 +36,7 @@ import { performance } from 'node:perf_hooks';
 import { EXPORT_MAX_ROWS } from '../../apps/api/src/wms/report.service.js';
 import { type Client, ok, staff, startApp, tenant } from '../helpers/harness.js';
 
-type Scenario = 'stock_by_sku' | 'sku_search' | 'global_search' | 'ledger_page' | 'stock_move' | 'order_allocate';
+type Scenario = 'stock_by_sku' | 'sku_search' | 'global_search' | 'ledger_page' | 'stock_move' | 'order_allocate' | 'order_pick';
 interface Profile {
   description: string;
   warehouses: number;
@@ -104,6 +104,8 @@ try {
   const aisle = await node({ kind: 'AISLE', code: 'LZ-A1', name: 'Corredor 1', parentId: zone });
   const rack = await node({ kind: 'RACK', code: 'LZ-A1-R1', name: 'Estante 1', parentId: aisle });
   const shelf = await node({ kind: 'SHELF', code: 'LZ-A1-R1-P1', name: 'Prateleira 1', parentId: rack });
+  // One shared packing node: every picker drops PICKED stock here (contention on the same rows).
+  const packing = await node({ kind: 'DISPATCH', code: 'LZ-EXP', name: 'Expedição' });
   const bins: string[] = [];
   for (let b = 0; b < profile.bins; b++) {
     bins.push(await node({ kind: 'BIN', code: `LZ-B${String(b).padStart(5, '0')}`, name: `Compartimento ${b}`, parentId: shelf }));
@@ -128,6 +130,7 @@ try {
   // Ledger growth: net-zero +1/-1 pairs on existing positions, spread over the last 365 days in
   // MOVE transactions of 50 pairs. Positions and reconciliation stay consistent by construction.
   let historySeconds = 0;
+  let backfillSeconds = 0;
   if (profile.ledgerHistoryRows) {
     const h0 = performance.now();
     const pairs = Math.floor(profile.ledgerHistoryRows / 2);
@@ -166,6 +169,13 @@ try {
     await t.owner.query('ANALYZE inventory_ledger; ANALYZE inventory_transactions');
     historySeconds = (performance.now() - h0) / 1000;
     log(`ledger history added in ${historySeconds.toFixed(1)} s`);
+    // What migration 0010's back-fill costs on this ledger: the same GROUP BY (ADR-0032).
+    const b0 = performance.now();
+    await t.owner.query(
+      'SELECT count(*) FROM (SELECT position_id, company_id, warehouse_id, sum(qty_delta) FROM inventory_ledger GROUP BY 1, 2, 3) x',
+    );
+    backfillSeconds = (performance.now() - b0) / 1000;
+    log(`ledger-totals back-fill aggregate: ${backfillSeconds.toFixed(1)} s`);
   }
   const ledgerRows = Number(
     (await t.owner.query<{ n: string }>('SELECT count(*)::text AS n FROM inventory_ledger WHERE warehouse_id = $1', [wh])).rows[0]!.n,
@@ -177,7 +187,7 @@ try {
   log(`seeded ${skuIds.length} SKUs, ${bins.length} bins, ${positions.length} positions in ${seedSeconds.toFixed(1)} s`);
 
   // ------------------------------------------------------------------ users
-  const perms = ['wms.view', 'wms.putaway', 'wms.report', 'wms.outbound.manage'];
+  const perms = ['wms.view', 'wms.putaway', 'wms.report', 'wms.outbound.manage', 'wms.pick'];
   // Hot set: every virtual user allocates from the same 20 SKUs (contention on the same rows).
   const hotSkus = skuIds.slice(0, 20);
   const vus: Array<{ c: Client; positions: typeof positions; bins: string[] }> = [];
@@ -205,6 +215,7 @@ try {
     ledger_page: [],
     stock_move: [],
     order_allocate: [],
+    order_pick: [],
   };
   const errors: Record<string, number> = {};
   /** Per-step timings of multi-request scenarios (diagnostics, not targets). */
@@ -256,6 +267,44 @@ try {
         const alloc = await step('order_allocate.allocate', () => vu.c.post(`/api/wms/w/${wh}/outbound/${created.body.id}/allocate`));
         if (alloc.status >= 300 || Math.random() < 0.5) return alloc.status;
         return (await step('order_allocate.cancel', () => vu.c.post(`/api/wms/w/${wh}/outbound/${created.body.id}/cancel`))).status;
+      }
+      case 'order_pick': {
+        // Picking on the hot set: order (1-2 lines) → allocate → pick every pick-list line into
+        // the shared packing node (barcode = SKU code); half of the orders are unpicked back to
+        // a bin (customer cancelled) — the opposite direction over the same rows (ADR-0032).
+        const n = 1 + Math.floor(Math.random() * 2);
+        const chosen = [...new Set(Array.from({ length: n }, () => rnd(hotSkus)))];
+        const created = await step('order_pick.create', () =>
+          vu.c.post(`/api/wms/w/${wh}/outbound`, {
+            externalRef: `PICK-${Math.floor(Math.random() * 1e9)}`,
+            lines: chosen.map((skuId) => ({ skuId, qty: '1' })),
+          }),
+        );
+        if (created.status >= 300) return created.status;
+        const id = created.body.id as string;
+        const alloc = await step('order_pick.allocate', () => vu.c.post(`/api/wms/w/${wh}/outbound/${id}/allocate`));
+        if (alloc.status >= 300) return alloc.status;
+        const o = await step('order_pick.read', () => vu.c.get(`/api/wms/w/${wh}/outbound/${id}`));
+        if (o.status >= 300) return o.status;
+        for (const r of o.body.pickList as Array<{ reservationId: string; skuCode: string; qtyOpen: string }>) {
+          const pk = await step('order_pick.pick', () =>
+            vu.c.post(`/api/wms/w/${wh}/outbound/${id}/pick`, {
+              reservationId: r.reservationId,
+              qty: r.qtyOpen,
+              barcode: r.skuCode,
+              packingNodeId: packing,
+            }),
+          );
+          if (pk.status >= 300) return pk.status;
+        }
+        if (Math.random() < 0.5) return 200;
+        for (const l of o.body.lines as Array<{ id: string }>) {
+          const up = await step('order_pick.unpick', () =>
+            vu.c.post(`/api/wms/w/${wh}/outbound/${id}/unpick`, { lineId: l.id, qty: '1', fromNodeId: packing, to: { nodeId: rnd(bins) } }),
+          );
+          if (up.status >= 300) return up.status;
+        }
+        return 200;
       }
     }
   }
@@ -315,8 +364,12 @@ try {
     const r = await fn();
     return { ms: +(performance.now() - t0).toFixed(1), r };
   };
+  // Routine reconciliation (trigger-maintained totals; flat as the ledger grows) and the deep
+  // form that sums the whole ledger and checks the totals too (ADR-0032).
   const reconT = await timed(() => T.admin.get(`/api/wms/w/${wh}/stock/reconciliation`));
   const recon = ok(reconT.r);
+  const reconFullT = await timed(() => T.admin.get(`/api/wms/w/${wh}/stock/reconciliation?full=true`));
+  const reconFull = ok(reconFullT.r);
   await T.admin.stepUp();
   const now = new Date().toISOString();
   // Export of the activity during the run (within EXPORT_MAX_ROWS), and a 7-day window that
@@ -338,6 +391,7 @@ try {
   const bySkuT = await timed(() => T.admin.get(`/api/wms/w/${wh}/reports/ledger?skuId=${hotSkus[0]}&limit=100`));
   const oneOffs = [
     { name: 'reconciliation', ms: reconT.ms, status: reconT.r.status },
+    { name: 'reconciliation_full', ms: reconFullT.ms, status: reconFullT.r.status },
     { name: 'ledger_csv_run_window', ms: csvT.ms, status: csvT.r.status, rows: csvRows(csvT.r) },
     ...(csvCapT ? [{ name: 'ledger_csv_over_cap_refused', ms: csvCapT.ms, status: csvCapT.r.status, expect: 409 }] : []),
     { name: 'ledger_by_sku', ms: bySkuT.ms, status: bySkuT.r.status },
@@ -359,7 +413,13 @@ try {
       .rows[0]!.n,
   );
   const conservation = totalBefore === totalAfter;
-  const reconciled = recon.ledgerMismatches.length === 0 && recon.reservationMismatches.length === 0 && overReserved === 0;
+  const reconciled =
+    recon.ledgerMismatches.length === 0 &&
+    recon.reservationMismatches.length === 0 &&
+    reconFull.ledgerMismatches.length === 0 &&
+    reconFull.reservationMismatches.length === 0 &&
+    reconFull.totalsMismatches.length === 0 &&
+    overReserved === 0;
 
   // ------------------------------------------------------------------ report
   const results = scenarios.map((s) => {
@@ -409,6 +469,7 @@ try {
       ledgerRows,
       seedSeconds: +seedSeconds.toFixed(1),
       historySeconds: +historySeconds.toFixed(1),
+      backfillAggregateSeconds: +backfillSeconds.toFixed(1),
     },
     virtualUsers: profile.virtualUsers,
     measuredSeconds: +measuredSeconds.toFixed(1),
@@ -449,7 +510,7 @@ try {
     '',
     `Environment: Node ${env.node}, ${env.cpus}, ${env.memoryGb} GB RAM, PostgreSQL ${env.postgres}; load generator and API on the same machine, in-process (no network). Not the target environment.`,
     '',
-    `Dataset: ${report.dataset.skus} SKUs, ${report.dataset.bins} bins, ${report.dataset.positions} stock positions (seeded in ${report.dataset.seedSeconds} s through the real opening-stock command), ${report.dataset.ledgerRows} ledger rows${historySeconds ? ` (incl. synthetic history added in ${report.dataset.historySeconds} s)` : ''}. ${profile.virtualUsers} virtual users, ${report.measuredSeconds} s measured after ${profile.warmupSeconds} s warm-up.`,
+    `Dataset: ${report.dataset.skus} SKUs, ${report.dataset.bins} bins, ${report.dataset.positions} stock positions (seeded in ${report.dataset.seedSeconds} s through the real opening-stock command), ${report.dataset.ledgerRows} ledger rows${historySeconds ? ` (incl. synthetic history added in ${report.dataset.historySeconds} s; the migration-0010 back-fill aggregate over it took ${report.dataset.backfillAggregateSeconds} s)` : ''}. ${profile.virtualUsers} virtual users, ${report.measuredSeconds} s measured after ${profile.warmupSeconds} s warm-up.`,
     '',
     `Throughput **${report.throughputRps} req/s** (target ≥ ${cfg.targets.minThroughputRps}) · error rate **${report.errorRate}** (target ≤ ${cfg.targets.maxErrorRate}).`,
     '',

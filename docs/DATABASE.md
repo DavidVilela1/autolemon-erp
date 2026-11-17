@@ -1,4 +1,4 @@
-# Database — AutoLemon ERP v0.6.12
+# Database — AutoLemon ERP v0.6.13
 
 Owning module: platform/db. Engine: PostgreSQL 18 (target; Docker Compose) — the automated test
 evidence in this build was produced on PostgreSQL **16.15** because the build environment could
@@ -17,6 +17,8 @@ not pull the 18 image (see `docs/PROJECT_STATE.md`). No 17/18-only features are 
 | `0007_lots_and_serials.sql`      | `sku_lots` (company-wide lot/serial master with optional expiry; RLS by company; runtime role may only fill a missing `expires_on`), `outbound_lines.lot_code` (requested lot), trigger `wms_serial_guard` (SECURITY DEFINER; ≤ 1 unit per serial position and one on-hand position per serial per company; advisory lock against concurrent receipts) — ADR-0024 |
 | `0008_transfer_reservations.sql` | `reservations.transfer_line_id` (composite FK to `transfer_lines`; `outbound_line_id` now nullable; CHECK exactly one demand line), partial index on active transfer reservations, `transfer_lines.qty_reserved` — ADR-0025                                                                                                                                       |
 | `0009_security_monitoring.sql`   | `security_alerts` (one OPEN alert per company+rule via partial unique index; runtime role: no DELETE, column-limited UPDATE; trigger `security_alerts_guard` makes acknowledgement one-way), `audit_chain_checkpoints` (incremental verification), index `security_audit_time_action` — ADR-0026                                                                  |
+| `0010_ledger_totals.sql`         | `position_ledger_totals` (sum of ledger deltas per position, written only by the `AFTER INSERT` trigger `inventory_ledger_totals` on the append-only ledger; runtime role: SELECT only, RLS), back-filled under a ledger write lock — ADR-0032                                                                                                                    |
+| `0011_order_lookup_indexes.sql`  | indexes `reservations_outbound_line` (active reservations by order line) and `containers_outbound` (packages by order) — ADR-0032                                                                                                                                                                                                                                 |
 
 Runner: `apps/api/src/db/migrator.ts` — forward-only, one transaction per file, advisory lock,
 SHA-256 checksum per applied file (edited applied migration ⇒ abort). Migrations run with the
@@ -118,7 +120,15 @@ company+time, sessions by user (active). Measured with the load harness (ADR-003
 **Query rule under RLS (ADR-0031).** RLS predicates use `current_setting()`, so the planner
 cannot estimate their selectivity and badly underestimates rows of RLS-protected tables. A
 query that joins a large table (ledger, audit) and then applies `ORDER BY … LIMIT` must limit
-that table first in a sub-select and join only the selected rows.
+that table first in a sub-select and join only the selected rows. More generally, start from the
+selective side: "the reservations of this order" starts from the order's lines (indexed), in a
+`MATERIALIZED` CTE when the planner would otherwise start from the big table (ADR-0032 §3).
+
+**Ledger totals (ADR-0032, migration 0010).** `position_ledger_totals` holds the sum of each
+position's ledger deltas, maintained only by the `AFTER INSERT` trigger on the append-only ledger
+(`SECURITY DEFINER`; the runtime role can read but not write it). Routine reconciliation compares
+balances with these totals; `?full=true` and the restore verifier also check the totals against
+the ledger itself.
 
 ## 6. Row-Level Security (defence in depth)
 

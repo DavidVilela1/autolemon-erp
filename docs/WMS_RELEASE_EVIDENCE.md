@@ -1,4 +1,4 @@
-# WMS release evidence — v0.6.12
+# WMS release evidence — v0.6.13
 
 Owning module: release management. Companion of `docs/WMS_RELEASE_GATE.md` (criteria and
 status, generated from `docs/WMS_RELEASE_STATUS.json`). This file records **how** each piece of
@@ -58,6 +58,20 @@ window 618 ms, over-cap 409 in 1 931 ms, by SKU 24 ms — PASSED (provisional). 
 Windows workstation the v0.6.9 reconciliation exceeded the 15 s statement limit (HTTP 500);
 fixed in v0.6.10 (`tests/integration/query-limits.test.ts`), owner re-run pending.
 
+v0.6.13 (ADR-0032) — mix adds `order_pick` (order → allocate → read → pick into one shared
+packing node, half unpicked; 10 %); reconciliation measured in both forms:
+
+| Profile        | Dataset / users                          | Throughput | Errors | p95 (ms) stock · sku · global · ledger · move · allocate · pick | Deadlocks | One-offs (ms)                                                                            | Result                                         |
+| -------------- | ---------------------------------------- | ---------- | ------ | --------------------------------------------------------------- | --------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| smoke          | 500 SKUs, 2 000 positions, 8 users       | 171 req/s  | 0      | 26 · 27 · 30 · 32 · 54 · 171 · 340                              | 0         | reconciliation 21 · full 29                                                              | PASSED (provisional)                           |
+| representative | 20 000 SKUs, 100 000 positions, 25 users | 125 req/s  | 0      | 134 · 193 · 188 · 144 · 172 · 481 · **1 017**                   | 0         | reconciliation 306 · full 561 · CSV window 164 · by SKU 7                                | **FAILED** (`order_pick` > 1 000, provisional) |
+| ledger-growth  | same + **10 100 000 ledger rows**        | 130 req/s  | 0      | 128 · 185 · 186 · 136 · 164 · 461 · 986                         | 0         | reconciliation **467** · full 11 072 · CSV window 819 · over-cap 409 in 2 406 · by SKU 9 | PASSED (provisional)                           |
+
+Found and fixed in v0.6.13: three relocation deadlocks (race tests; HTTP 500 under sustained
+contention) and the order view starting from all active reservations (p95 550 → 36 ms in smoke).
+Closed-loop users without think time saturate the 2 vCPUs; multi-request flows (`order_pick`)
+are the first to cross their targets (ADR-0032).
+
 Found and fixed during these runs: deadlocks in allocation/moves (10 per smoke run before the
 fix, 0 after; `tests/integration/lock-ordering.test.ts`) and the ledger page joining the whole
 ledger before limiting (4.1 s at 300 000 rows before, 132 ms p95 at 10 M rows after).
@@ -70,15 +84,16 @@ Details: `docs/perf/LAST_RUN_*.md`.
 
 Reported by the owner (console output pasted into the session; not re-run by the assistant):
 
-| Date       | Version | Command         | Result                                                                                                                                                                                                      |
-| ---------- | ------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-11-16 | v0.6.9  | `ledger-growth` | Seeded 10 M rows; reconciliation returned HTTP 500 (statement timeout) → fixed in v0.6.10                                                                                                                   |
-| 2026-11-17 | v0.6.10 | `pnpm test:all` | format, lint, typecheck, OpenAPI, gate: OK; unit 52/52, integration 56/56 (incl. lock-ordering, query-limits), security 107/107; **e2e did not start**: `'C:\Program' is not recognized` → fixed in v0.6.11 |
-| 2026-11-17 | v0.6.11 | `pnpm test:all` | e2e started; afterwards the API server kept running and logged "database does not exist" every 5 s (orphaned process) → fixed in v0.6.12                                                                    |
+| Date       | Version | Command                                       | Result                                                                                                                                                                                                      |
+| ---------- | ------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-11-16 | v0.6.9  | `ledger-growth`                               | Seeded 10 M rows; reconciliation returned HTTP 500 (statement timeout) → fixed in v0.6.10                                                                                                                   |
+| 2026-11-17 | v0.6.10 | `pnpm test:all`                               | format, lint, typecheck, OpenAPI, gate: OK; unit 52/52, integration 56/56 (incl. lock-ordering, query-limits), security 107/107; **e2e did not start**: `'C:\Program' is not recognized` → fixed in v0.6.11 |
+| 2026-11-17 | v0.6.11 | `pnpm test:all`                               | e2e started; afterwards the API server kept running and logged "database does not exist" every 5 s (orphaned process) → fixed in v0.6.12                                                                    |
+| 2026-11-17 | v0.6.12 | `pnpm test:all`, commit, push, GitHub Actions | Owner reported the suite passed (no output pasted), committed v0.6.9–v0.6.12 together and pushed; owner reported the CI run green (job list not pasted)                                                     |
 
 The e2e failure was in the test tooling, not the product: `scripts/with-test-db.mjs` ran Node's own
 path through the Windows shell unquoted. All repository scripts now spawn through `shellSafe`
-(`tests/security/script-spawn.test.ts`). Owner re-run of `pnpm test:all` and `ledger-growth` on v0.6.12 pending.
+(`tests/security/script-spawn.test.ts`). Owner re-run of `ledger-growth` pending; owner run of v0.6.13 (`pnpm test:all`) pending.
 
 ## 3. Test files → criteria
 

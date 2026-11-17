@@ -103,9 +103,12 @@ export async function lockPosition(ctx: OpCtx, positionId: string): Promise<Posi
   );
 }
 
-/** Locks several positions in ascending id order (deadlock avoidance). */
+/**
+ * Locks several positions in ascending id order (deadlock avoidance). Ids are lower-cased first so
+ * the order matches PostgreSQL's uuid order (`ORDER BY id` in `lockAllocationCandidates`).
+ */
 export async function lockPositions(ctx: OpCtx, ids: string[]): Promise<Map<string, PositionRow>> {
-  const unique = [...new Set(ids)].sort();
+  const unique = [...new Set(ids.map((id) => id.toLowerCase()))].sort();
   const out = new Map<string, PositionRow>();
   for (const id of unique) out.set(id, await lockPosition(ctx, id));
   return out;
@@ -454,10 +457,76 @@ export async function lockAllocationCandidates(ctx: Pick<OpCtx, 'tx'>, warehouse
   );
 }
 
+/** Identity of a source position as read before locking. */
+export interface PositionPeek {
+  id: string;
+  sku_id: string;
+  stock_status: StockStatus;
+  lot_code: string;
+  holder_node_id: string | null;
+  holder_container_id: string | null;
+}
+
+/** Where relocated stock goes: holder and resulting status (SKU and lot are the source's). */
+export interface RelocationTarget {
+  holder: Pick<Holder, 'nodeId' | 'containerId'>;
+  status: StockStatus;
+}
+
+/**
+ * Locks the source positions of a relocation together with every target position that already
+ * exists, all in ascending id order (ADR-0031/0032). Without this, two relocations in opposite
+ * directions over the same two rows deadlock: pick (bin → packing) vs unpick (packing → bin),
+ * replenishment vs an opposite move, AVAILABLE → QUARANTINE vs QUARANTINE → AVAILABLE. A target
+ * that does not exist yet is created later by `ensurePosition`, after these locks, so it cannot
+ * take part in a cycle. `target` may validate and throw; it runs before any lock is taken.
+ * Returns the locked sources by (lower-case) id.
+ * @throws Conflict CONCURRENT_CHANGE if a source changed status/lot between the read and the lock.
+ */
+export async function lockRelocation(
+  ctx: OpCtx,
+  sourceIds: string[],
+  target: (src: PositionPeek) => Promise<RelocationTarget> | RelocationTarget,
+): Promise<Map<string, PositionRow>> {
+  const ids = [...new Set(sourceIds.map((id) => id.toLowerCase()))];
+  const peeks = await rows<PositionPeek>(
+    ctx.tx,
+    sql`SELECT id, sku_id, stock_status, lot_code, holder_node_id, holder_container_id FROM stock_positions
+        WHERE id IN (${sql.join(
+          ids.map((id) => sql`${id}::uuid`),
+          sql`, `,
+        )}) AND warehouse_id = ${ctx.warehouseId}`,
+  );
+  if (peeks.length !== ids.length) throw new NotFound('Posição de stock');
+  const lockIds = [...ids];
+  for (const p of peeks) {
+    const tg = await target(p);
+    const existing = await row<{ id: string }>(
+      ctx.tx,
+      sql`SELECT id FROM stock_positions
+          WHERE warehouse_id = ${ctx.warehouseId} AND sku_id = ${p.sku_id} AND stock_status = ${tg.status}
+            AND lot_code = ${p.lot_code}
+            AND holder_node_id IS NOT DISTINCT FROM ${tg.holder.nodeId ?? null}::uuid
+            AND holder_container_id IS NOT DISTINCT FROM ${tg.holder.containerId ?? null}::uuid`,
+    );
+    if (existing) lockIds.push(existing.id);
+  }
+  const locked = await lockPositions(ctx, lockIds);
+  const sources = new Map<string, PositionRow>();
+  for (const p of peeks) {
+    const src = locked.get(p.id)!;
+    if (src.stock_status !== p.stock_status || src.lot_code !== p.lot_code) {
+      throw new Conflict('A posição foi alterada entretanto; tente novamente', 'CONCURRENT_CHANGE');
+    }
+    sources.set(p.id, src);
+  }
+  return sources;
+}
+
 /**
  * Locks a move's source position and, when it already exists, its target position together in
- * ascending id order (two moves in opposite directions, or a move racing an allocation of the
- * same SKU, would otherwise deadlock). Returns the locked source.
+ * ascending id order (`lockRelocation` with the status unchanged). Returns the locked source and
+ * the target holder.
  * @throws Conflict CONCURRENT_CHANGE if the source changed status/lot between the read and the lock.
  */
 export async function lockMoveSourceAndTarget(
@@ -465,26 +534,12 @@ export async function lockMoveSourceAndTarget(
   positionId: string,
   target: (src: { sku_id: string; stock_status: StockStatus; lot_code: string }) => Promise<Pick<Holder, 'nodeId' | 'containerId'>>,
 ): Promise<{ src: PositionRow; holder: Pick<Holder, 'nodeId' | 'containerId'> }> {
-  const peek = await one<{ sku_id: string; stock_status: StockStatus; lot_code: string }>(
-    ctx.tx,
-    sql`SELECT sku_id, stock_status, lot_code FROM stock_positions WHERE id = ${positionId} AND warehouse_id = ${ctx.warehouseId}`,
-    'Posição de stock',
-  );
-  const holder = await target(peek);
-  const existing = await row<{ id: string }>(
-    ctx.tx,
-    sql`SELECT id FROM stock_positions
-        WHERE warehouse_id = ${ctx.warehouseId} AND sku_id = ${peek.sku_id} AND stock_status = ${peek.stock_status}
-          AND lot_code = ${peek.lot_code}
-          AND holder_node_id IS NOT DISTINCT FROM ${holder.nodeId ?? null}::uuid
-          AND holder_container_id IS NOT DISTINCT FROM ${holder.containerId ?? null}::uuid`,
-  );
-  const locked = await lockPositions(ctx, existing ? [positionId, existing.id] : [positionId]);
-  const src = locked.get(positionId)!;
-  if (src.stock_status !== peek.stock_status || src.lot_code !== peek.lot_code) {
-    throw new Conflict('A posição foi alterada entretanto; tente novamente', 'CONCURRENT_CHANGE');
-  }
-  return { src, holder };
+  let holder: Pick<Holder, 'nodeId' | 'containerId'> | undefined;
+  const locked = await lockRelocation(ctx, [positionId], async (p) => {
+    holder = await target(p);
+    return { holder, status: p.stock_status };
+  });
+  return { src: locked.get(positionId.toLowerCase())!, holder: holder! };
 }
 
 /** Resolves a barcode/SKU code to a SKU id, or undefined. */
@@ -531,33 +586,70 @@ export async function warehouseCode(ctx: Pick<OpCtx, 'tx' | 'companyId' | 'wareh
   return r.code;
 }
 
+/** A position whose stored balance disagrees with its ledger. */
+export interface LedgerMismatch {
+  position_id: string;
+  on_hand: string;
+  ledger: string;
+}
+
 /**
- * Ledger reconciliation (INVARIANT L1): positions whose balance differs from the ledger sum.
- * Must always return an empty list; exposed through reports and asserted by tests. The ledger is
- * aggregated per position first and then joined (one pass over the ledger, no per-position
- * nested loop): about 1.7x faster at 2 M rows (ADR-0031). Still linear in ledger size.
+ * Ledger reconciliation (INVARIANT L1), routine form: positions whose balance differs from their
+ * ledger total. The total per position is maintained by the database itself
+ * (`position_ledger_totals`, AFTER INSERT trigger on the append-only ledger; ADR-0032), so this
+ * reads one row per position and stays flat as the ledger grows. Must always return [].
  */
-export async function reconcile(
-  ctx: Pick<OpCtx, 'tx'> & { warehouseId: string },
-): Promise<Array<{ position_id: string; on_hand: string; ledger: string }>> {
+export async function reconcile(ctx: Pick<OpCtx, 'tx'> & { warehouseId: string }): Promise<LedgerMismatch[]> {
   return rows(
     ctx.tx,
-    sql`SELECT p.id AS position_id, p.qty_on_hand::text AS on_hand, coalesce(s.total, 0.000)::text AS ledger
+    sql`SELECT p.id AS position_id, p.qty_on_hand::text AS on_hand, coalesce(t.total, 0.000)::text AS ledger
         FROM stock_positions p
-        LEFT JOIN (SELECT position_id, sum(qty_delta) AS total FROM inventory_ledger
-                    WHERE warehouse_id = ${ctx.warehouseId} GROUP BY position_id) s ON s.position_id = p.id
-        WHERE p.warehouse_id = ${ctx.warehouseId} AND p.qty_on_hand <> coalesce(s.total, 0)`,
+        LEFT JOIN position_ledger_totals t ON t.position_id = p.id
+        WHERE p.warehouse_id = ${ctx.warehouseId} AND p.qty_on_hand <> coalesce(t.total, 0)`,
   );
 }
 
-/** Reservation reconciliation (INVARIANT L3). Must always be empty. */
+/**
+ * Deep ledger reconciliation: sums the whole ledger per position (one pass, aggregate first)
+ * and compares it with both the stored balance and the trigger-maintained total. Linear in
+ * ledger size (≈10 s at 10 M rows on 2 vCPU); callers give it its own time budget.
+ */
+export async function reconcileFull(
+  ctx: Pick<OpCtx, 'tx'> & { warehouseId: string },
+): Promise<{ ledgerMismatches: LedgerMismatch[]; totalsMismatches: Array<{ position_id: string; total: string; ledger: string }> }> {
+  const all = await rows<{ position_id: string; on_hand: string; total: string; ledger: string }>(
+    ctx.tx,
+    sql`SELECT p.id AS position_id, p.qty_on_hand::text AS on_hand,
+               coalesce(t.total, 0.000)::text AS total, coalesce(s.sum, 0.000)::text AS ledger
+        FROM stock_positions p
+        LEFT JOIN (SELECT position_id, sum(qty_delta) AS sum FROM inventory_ledger
+                    WHERE warehouse_id = ${ctx.warehouseId} GROUP BY position_id) s ON s.position_id = p.id
+        LEFT JOIN position_ledger_totals t ON t.position_id = p.id
+        WHERE p.warehouse_id = ${ctx.warehouseId}
+          AND (p.qty_on_hand <> coalesce(s.sum, 0) OR coalesce(t.total, 0) <> coalesce(s.sum, 0))`,
+  );
+  return {
+    ledgerMismatches: all
+      .filter((r) => cmp(r.on_hand, r.ledger) !== 0)
+      .map(({ position_id, on_hand, ledger }) => ({ position_id, on_hand, ledger })),
+    totalsMismatches: all
+      .filter((r) => cmp(r.total, r.ledger) !== 0)
+      .map(({ position_id, total, ledger }) => ({ position_id, total, ledger })),
+  };
+}
+
+/**
+ * Reservation reconciliation (INVARIANT R1): positions whose reserved quantity differs from the
+ * sum of their ACTIVE reservations. Aggregates the active reservations first (partial index), so
+ * reservation history does not slow it down. Must always return [].
+ */
 export async function reconcileReservations(ctx: Pick<OpCtx, 'tx'> & { warehouseId: string }): Promise<Array<{ position_id: string }>> {
   return rows(
     ctx.tx,
     sql`SELECT p.id AS position_id FROM stock_positions p
-        LEFT JOIN reservations r ON r.position_id = p.id AND r.status = 'ACTIVE'
-        WHERE p.warehouse_id = ${ctx.warehouseId}
-        GROUP BY p.id HAVING p.qty_reserved <> coalesce(sum(r.qty_open), 0)`,
+        LEFT JOIN (SELECT position_id, sum(qty_open) AS open FROM reservations
+                    WHERE warehouse_id = ${ctx.warehouseId} AND status = 'ACTIVE' GROUP BY position_id) r ON r.position_id = p.id
+        WHERE p.warehouse_id = ${ctx.warehouseId} AND p.qty_reserved <> coalesce(r.open, 0)`,
   );
 }
 
