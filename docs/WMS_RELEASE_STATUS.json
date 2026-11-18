@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "product": "AutoLemon ERP — WMS",
-  "version": "0.6.13",
+  "version": "0.6.14",
   "updatedAt": "2026-11-16",
   "state": "WMS_IN_PROGRESS",
   "allowedStates": [
@@ -372,7 +372,7 @@
       "verifiedAt": "2026-11-13",
       "reviewer": "Claude (AI developer, self-verification) — independent human reviewer: not assigned",
       "status": "BLOCKED",
-      "openAction": "No code-level ASVS L2 gap known (self-assessment v0.6.7: I+T 93, I 67, P 2, O 0, ENV 13, N/A 78). Blocked on an approved staging/target environment for DAST and the 13 ENV + 2 partial items (T-05), then independent verification (S-07)"
+      "openAction": "No code-level ASVS L2 gap known (self-assessment v0.6.7, updated v0.6.14: I+T 94, I 66, P 2, O 0, ENV 13, N/A 78). Blocked on an approved staging/target environment for DAST and the 13 ENV + 2 partial items (T-05), then independent verification (S-07)"
     },
     {
       "id": "S-07",

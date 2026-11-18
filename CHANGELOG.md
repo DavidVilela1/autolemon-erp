@@ -2,6 +2,36 @@
 
 All notable changes. Owning module: repository. Format: Keep a Changelog; versioning: SemVer.
 
+## [0.6.14-WMS] — 2026-11-18
+
+Fix for the owner's CI run of v0.6.13: `pnpm security:scan` failed because a new advisory was
+published against a development dependency. Gate state stays **`WMS_IN_PROGRESS`** (PASS 20 ·
+FAIL 3 · BLOCKED 10 · NOT_RUN 1). No product code, no migration.
+
+### Fixed
+
+- **Dependency audit blocked CI on a development-only advisory with no fix available.**
+  GHSA-fc5q-39xc-vjpf (picomatch <=4.0.7, ReDoS through crafted extglobs, high) is reached only
+  through ESLint/typescript-eslint and Vite/Vitest, which match patterns written by the
+  developers; production dependencies are clean (`pnpm audit --prod`). No patched picomatch
+  exists yet. Recorded as SEC-OPEN-020 with a dated exception until 2026-12-31.
+
+### Changed
+
+- **Audit policy is now enforced from a file, per advisory.** `security:scan` runs the audit for
+  all dependencies and for production only (`evaluateAudit` in `scripts/lib.mjs`):
+  HIGH/CRITICAL in production always blocks; development-only ones block unless the exact
+  advisory is excepted in `docs/security/audit-exceptions.json` (reason, open item, expiry at most
+  90 days); expired exceptions block; stale ones warn. Previously every HIGH blocked and the one
+  accepted moderate was documented only in prose.
+- `scripts/lib.d.mts` types the helpers for TypeScript tests.
+
+### Tests
+
+- `tests/security/audit-policy.test.ts` (5): production findings cannot be excepted, dev-only
+  needs a valid exception, expired/over-long exceptions block, stale ones warn, the repository
+  exceptions file is well formed. ASVS V15.2.1 moves from I to I+T (I+T 94 · I 66).
+
 ## [0.6.13-WMS] — 2026-11-17
 
 Continuation (T-11 remainder). Gate state stays **`WMS_IN_PROGRESS`** (PASS 20 · FAIL 3 ·

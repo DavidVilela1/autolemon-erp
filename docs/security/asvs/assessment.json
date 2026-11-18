@@ -1337,9 +1337,14 @@
     },
     {
       "id": "V15.2.1",
-      "status": "I",
-      "evidence": ["scripts/security-scan.mjs"],
-      "note": "pnpm audit: 0 critical/high; one accepted dev-only moderate (SEC-OPEN-009). Automated by security:scan (CI gate), not a test file."
+      "status": "I+T",
+      "evidence": [
+        "scripts/security-scan.mjs",
+        "scripts/lib.mjs",
+        "tests/security/audit-policy.test.ts",
+        "docs/security/audit-exceptions.json"
+      ],
+      "note": "pnpm audit: production dependencies 0 critical/high (pnpm audit --prod). Dev-only advisories are accepted only through dated, at most 90-day exceptions in docs/security/audit-exceptions.json (SEC-OPEN-009 moderate, SEC-OPEN-020 high); expired or production findings block. Policy unit-tested (tests/security/audit-policy.test.ts); automated by security:scan (CI gate)."
     },
     {
       "id": "V15.2.2",

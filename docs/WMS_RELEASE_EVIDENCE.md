@@ -1,4 +1,4 @@
-# WMS release evidence — v0.6.13
+# WMS release evidence — v0.6.14
 
 Owning module: release management. Companion of `docs/WMS_RELEASE_GATE.md` (criteria and
 status, generated from `docs/WMS_RELEASE_STATUS.json`). This file records **how** each piece of
@@ -84,12 +84,13 @@ Details: `docs/perf/LAST_RUN_*.md`.
 
 Reported by the owner (console output pasted into the session; not re-run by the assistant):
 
-| Date       | Version | Command                                       | Result                                                                                                                                                                                                      |
-| ---------- | ------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-11-16 | v0.6.9  | `ledger-growth`                               | Seeded 10 M rows; reconciliation returned HTTP 500 (statement timeout) → fixed in v0.6.10                                                                                                                   |
-| 2026-11-17 | v0.6.10 | `pnpm test:all`                               | format, lint, typecheck, OpenAPI, gate: OK; unit 52/52, integration 56/56 (incl. lock-ordering, query-limits), security 107/107; **e2e did not start**: `'C:\Program' is not recognized` → fixed in v0.6.11 |
-| 2026-11-17 | v0.6.11 | `pnpm test:all`                               | e2e started; afterwards the API server kept running and logged "database does not exist" every 5 s (orphaned process) → fixed in v0.6.12                                                                    |
-| 2026-11-17 | v0.6.12 | `pnpm test:all`, commit, push, GitHub Actions | Owner reported the suite passed (no output pasted), committed v0.6.9–v0.6.12 together and pushed; owner reported the CI run green (job list not pasted)                                                     |
+| Date       | Version | Command                                       | Result                                                                                                                                                                                                                                                      |
+| ---------- | ------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-11-16 | v0.6.9  | `ledger-growth`                               | Seeded 10 M rows; reconciliation returned HTTP 500 (statement timeout) → fixed in v0.6.10                                                                                                                                                                   |
+| 2026-11-17 | v0.6.10 | `pnpm test:all`                               | format, lint, typecheck, OpenAPI, gate: OK; unit 52/52, integration 56/56 (incl. lock-ordering, query-limits), security 107/107; **e2e did not start**: `'C:\Program' is not recognized` → fixed in v0.6.11                                                 |
+| 2026-11-17 | v0.6.11 | `pnpm test:all`                               | e2e started; afterwards the API server kept running and logged "database does not exist" every 5 s (orphaned process) → fixed in v0.6.12                                                                                                                    |
+| 2026-11-17 | v0.6.12 | `pnpm test:all`, commit, push, GitHub Actions | Owner reported the suite passed (no output pasted), committed v0.6.9–v0.6.12 together and pushed; owner reported the CI run green (job list not pasted)                                                                                                     |
+| 2026-11-18 | v0.6.13 | GitHub Actions `pnpm security:scan`           | **FAIL**: `pnpm audit` 1 high (GHSA-fc5q-39xc-vjpf, picomatch, dev-only, published after v0.6.13 was verified) + 1 moderate; gitleaks not installed in that job (WARN, full-history gitleaks runs separately) → audit policy and exception added in v0.6.14 |
 
 The e2e failure was in the test tooling, not the product: `scripts/with-test-db.mjs` ran Node's own
 path through the Windows shell unquoted. All repository scripts now spawn through `shellSafe`

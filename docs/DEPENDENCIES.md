@@ -56,11 +56,12 @@ installs use `--frozen-lockfile`. Registry: https://registry.npmjs.org/<package>
   OpenAPI generator (no decorator metadata reflection).
 - **react-router** — tiny hash router suffices (ADR-0007).
 
-## Security advisories (pnpm audit, 2026-11-09)
+## Security advisories (pnpm audit, 2026-11-18)
 
-| Advisory                                      | Severity | Path                            | Runtime? | Decision                                 |
-| --------------------------------------------- | -------- | ------------------------------- | -------- | ---------------------------------------- |
-| GHSA-g3hv-75wg-m249 minimatch ReDoS (<11.0.1) | moderate | eslint, typescript-eslint (dev) | No       | Accepted until 2026-12-31 (SEC-OPEN-009) |
+| Advisory                                                    | Severity | Path                                                            | Runtime? | Decision                                                                        |
+| ----------------------------------------------------------- | -------- | --------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------- |
+| GHSA-g3hv-75wg-m249 minimatch ReDoS (<11.0.1)               | moderate | eslint, typescript-eslint (dev)                                 | No       | Accepted until 2026-12-31 (SEC-OPEN-009)                                        |
+| GHSA-fc5q-39xc-vjpf picomatch ReDoS (<=4.0.7, no patch yet) | high     | eslint/typescript-eslint, vite/vitest via tinyglobby/fdir (dev) | No       | Accepted until 2026-12-31 (SEC-OPEN-020; `docs/security/audit-exceptions.json`) |
 
 No high/critical advisories. `pnpm security:scan` re-checks on every run (blocks HIGH/CRITICAL).
 

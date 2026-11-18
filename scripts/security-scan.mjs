@@ -13,7 +13,8 @@
  *  2. SAST-lite: forbidden sinks (eval, new Function, innerHTML, dangerouslySetInnerHTML,
  *     child_process with shell input) in application code.
  *  3. Raw SQL review gate: every `sql.raw(` must be in the reviewed allowlist.
- *  4. Dependency audit: `pnpm audit` — HIGH/CRITICAL block; moderate/low are reported.
+ *  4. Dependency audit: `pnpm audit` — HIGH/CRITICAL in production deps block; dev-only HIGH/CRITICAL
+ *     block unless excepted in docs/security/audit-exceptions.json (≤ 90 days); moderate/low reported.
  *  5. SBOM (CycloneDX 1.7) generation → artifacts/sbom.cdx.json.
  *  6. License policy over the SBOM: copyleft (GPL/AGPL/SSPL) in production deps blocks.
  */
@@ -22,7 +23,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync,
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { shellSafe } from './dev-env.mjs';
-import { authoredFiles, scanSecrets } from './lib.mjs';
+import { authoredFiles, evaluateAudit, scanSecrets } from './lib.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const results = [];
@@ -113,17 +114,37 @@ record(
   raw.length ? `Unreviewed sql.raw in: ${raw.join(', ')}` : `Reviewed: ${[...RAW_SQL_ALLOWLIST.keys()].join(', ')}`,
 );
 
-// 4. Dependency audit
-const au = shellSafe('pnpm', ['audit', '--json']);
-const audit = spawnSync(au.cmd, au.args, { cwd: ROOT, encoding: 'utf8', shell: au.shell });
-let counts;
+// 4. Dependency audit — policy in lib.mjs evaluateAudit (production HIGH/CRITICAL always block;
+// dev-only ones need an unexpired exception in docs/security/audit-exceptions.json).
+const runAudit = (args) => {
+  const r = shellSafe('pnpm', ['audit', '--json', ...args]);
+  const out = spawnSync(r.cmd, r.args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, shell: r.shell });
+  const json = JSON.parse(out.stdout);
+  return {
+    counts: json.metadata?.vulnerabilities ?? {},
+    advisories: Object.values(json.advisories ?? {}).map((a) => ({
+      id: a.github_advisory_id,
+      severity: a.severity,
+      module: a.module_name,
+    })),
+  };
+};
 try {
-  counts = JSON.parse(audit.stdout).metadata?.vulnerabilities ?? {};
-} catch {
-  counts = { error: 'audit output not parseable (offline?)' };
+  const all = runAudit([]);
+  const prod = runAudit(['--prod']);
+  const { exceptions } = JSON.parse(readFileSync(join(ROOT, 'docs/security/audit-exceptions.json'), 'utf8'));
+  const today = new Date().toISOString().slice(0, 10);
+  const verdict = evaluateAudit({ advisories: all.advisories, prodIds: new Set(prod.advisories.map((a) => a.id)), exceptions, today });
+  const detail = [
+    `all: ${JSON.stringify(all.counts)}; production: ${JSON.stringify(prod.counts)}`,
+    ...verdict.blocking.map((x) => `BLOCKING ${x}`),
+    ...verdict.accepted.map((x) => `accepted ${x}`),
+    ...verdict.warnings.map((x) => `warning ${x}`),
+  ].join('\n');
+  record('Dependency audit (pnpm audit)', verdict.ok, detail);
+} catch (e) {
+  record('Dependency audit (pnpm audit)', false, `audit output not parseable (offline?): ${String(e).slice(0, 120)}`);
 }
-const blocking = (counts.high ?? 0) + (counts.critical ?? 0);
-record('Dependency audit (pnpm audit)', !counts.error && blocking === 0, JSON.stringify(counts));
 
 // 5. SBOM
 mkdirSync(join(ROOT, 'artifacts'), { recursive: true });

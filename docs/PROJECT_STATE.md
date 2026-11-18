@@ -1,8 +1,8 @@
-# Project state — AutoLemon ERP v0.6.13-WMS
+# Project state — AutoLemon ERP v0.6.14-WMS
 
 Owning module: repository. Last updated: 2026-11-16 (Europe/Lisbon). Archive:
-`AutoLemon-ERP-v0.6.13-WMS.zip` (root `autolemon-erp/`); its SHA-256 is in the adjacent
-`AutoLemon-ERP-v0.6.13-WMS.zip.sha256` (a file cannot contain its own hash).
+`AutoLemon-ERP-v0.6.14-WMS.zip` (root `autolemon-erp/`); its SHA-256 is in the adjacent
+`AutoLemon-ERP-v0.6.14-WMS.zip.sha256` (a file cannot contain its own hash).
 
 ## 1. Summary
 
@@ -11,6 +11,12 @@ Development Priority Update (WMS first), **Reusable Continuation Prompt v0.6** a
 Production Readiness Gate v0.6**. WMS release gate state: **`WMS_IN_PROGRESS`**
 (`docs/WMS_RELEASE_GATE.md`: PASS 20 · FAIL 3 · BLOCKED 10 · NOT_RUN 1). **Not production-ready.**
 No other ERP business module has been started.
+
+v0.6.14 (2026-11-18, owner CI report): `security:scan` failed in CI on a newly published
+advisory in development tooling (GHSA-fc5q-39xc-vjpf, picomatch ReDoS, high, no fix released).
+Production dependencies are clean. The audit policy is now enforced per advisory from
+`docs/security/audit-exceptions.json` (production HIGH/CRITICAL always block; dev-only need a
+dated exception, at most 90 days); SEC-OPEN-020 accepted until 2026-12-31. No product change.
 
 v0.6.13 (2026-11-17, continuation, T-11 remainder): reconciliation is now incremental — a
 database trigger keeps a running ledger total per position (migration 0010), so the routine check
@@ -159,24 +165,24 @@ restoring a real v0.5 backup and upgrading it. Rollback: redeploy the previous a
 schema change is backward compatible) or restore the pre-upgrade backup; no down migrations
 (`docs/DATABASE.md` §1a).
 
-## 4. Last verified command outputs (workspace, 2026-11-17)
+## 4. Last verified command outputs (workspace, 2026-11-18; load profiles 2026-11-17)
 
 Environment: Ubuntu 24.04, Node **22.23.4**, pnpm **12.18.0**, PostgreSQL **16.15** (disposable
 local cluster), 2 vCPU / 7.8 GB, Google Chrome for Testing for Playwright. Docker, PostgreSQL 18
 and Node 26 were not available here.
 
-| Command                                      | Result                                                                                                                                              |
-| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm format:check` / `lint` / `typecheck`   | clean; documentation gate 148 files, 391 exported symbols                                                                                           |
-| `pnpm api:check` / `asvs:check`              | OpenAPI matches code (107 paths) / 253 ASVS requirements OK                                                                                         |
-| `pnpm gate:check`                            | `WMS_IN_PROGRESS`; PASS 20 · FAIL 3 · BLOCKED 10 · NOT_RUN 1                                                                                        |
-| `pnpm test:all`                              | exit 0 — unit 54, integration 59, security 115, e2e 2; no API/Vite process left afterwards                                                          |
-| `pnpm test:load` (smoke)                     | PASSED — 500 SKUs / 2 000 positions / 8 users: 171 req/s, 0 errors, 0 deadlocks                                                                     |
-| `pnpm test:load -- --profile representative` | **FAILED** one provisional target — 25 users: 125 req/s, 0 errors, 0 deadlocks, `order_pick` p95 1 017 ms (> 1 000); everything else within targets |
-| `pnpm test:load -- --profile ledger-growth`  | PASSED — 10.1 M ledger rows: 130 req/s, 0 errors, 0 deadlocks; routine reconciliation 467 ms, deep 11.1 s                                           |
-| `pnpm security:scan`                         | all PASS incl. **gitleaks 8.24.3**; audit 0 critical / 0 high / 1 moderate (dev-only, SEC-OPEN-009); SBOM 122 components                            |
-| `pnpm backup:local` / `restore:smoke`        | written (off-site NOT CONFIGURED) / PASSED (3.0 s); pre-0010 backup restored and upgraded through 0010/0011: PASSED                                 |
-| `pnpm build`                                 | contracts + API + web (390 kB JS / 109 kB gzip)                                                                                                     |
+| Command                                      | Result                                                                                                                                                                 |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm format:check` / `lint` / `typecheck`   | clean; documentation gate 149 files, 391 exported symbols                                                                                                              |
+| `pnpm api:check` / `asvs:check`              | OpenAPI matches code (107 paths) / 253 ASVS requirements OK                                                                                                            |
+| `pnpm gate:check`                            | `WMS_IN_PROGRESS`; PASS 20 · FAIL 3 · BLOCKED 10 · NOT_RUN 1                                                                                                           |
+| `pnpm test:all`                              | exit 0 — unit 54, integration 59, security 120, e2e 2; no API/Vite process left afterwards                                                                             |
+| `pnpm test:load` (smoke)                     | PASSED — 500 SKUs / 2 000 positions / 8 users: 171 req/s, 0 errors, 0 deadlocks                                                                                        |
+| `pnpm test:load -- --profile representative` | **FAILED** one provisional target — 25 users: 125 req/s, 0 errors, 0 deadlocks, `order_pick` p95 1 017 ms (> 1 000); everything else within targets                    |
+| `pnpm test:load -- --profile ledger-growth`  | PASSED — 10.1 M ledger rows: 130 req/s, 0 errors, 0 deadlocks; routine reconciliation 467 ms, deep 11.1 s                                                              |
+| `pnpm security:scan`                         | all PASS incl. **gitleaks 8.24.3**; production audit clean; all-deps 1 high + 1 moderate, both dev-only and excepted (SEC-OPEN-020, SEC-OPEN-009); SBOM 122 components |
+| `pnpm backup:local` / `restore:smoke`        | written (off-site NOT CONFIGURED) / PASSED (2.1 s); pre-0010 backup restored and upgraded through 0010/0011: PASSED                                                    |
+| `pnpm build`                                 | contracts + API + web (390 kB JS / 109 kB gzip)                                                                                                                        |
 
 Not run here: Docker Compose stack, PostgreSQL 18, Node 26, CodeQL/Trivy (CI only), DAST, the
 stress profile (last run v0.6.8), load on production-equivalent hardware or over a network,
@@ -185,11 +191,10 @@ production control.
 
 ## 5. Clean-room verification from the ZIP
 
-Run 2026-11-17 on the v0.6.13 archive: copied only the ZIP + `.sha256` into an empty directory
-**whose path contains a space** (`/tmp/cr 19`) and followed `README-LOCAL-TESTING.md` "Without
+Run 2026-11-18 on the v0.6.14 archive: copied only the ZIP + `.sha256` into an empty directory
+**whose path contains a space** (`/tmp/cr 20`) and followed `README-LOCAL-TESTING.md` "Without
 Docker (native PostgreSQL)" (local PostgreSQL 16.15, fresh database; Playwright via
-`PLAYWRIGHT_CHROME_PATH`). Linux only: the Windows shell and `taskkill` paths run when the suite
-runs on Windows.
+`PLAYWRIGHT_CHROME_PATH`). Linux only.
 
 | Step                                                        | Result                                                                                                |
 | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
@@ -197,10 +202,10 @@ runs on Windows.
 | extract → `autolemon-erp/`                                  | OK — no `.env`, `node_modules`, `.git`, `invitations-dev.txt`, backups, artifacts, `*.pem` or digests |
 | `pnpm install --frozen-lockfile`                            | OK (Node 22.23.4, pnpm 12.18.0)                                                                       |
 | `cp .env.example .env` → `pnpm db:migrate` → `pnpm db:seed` | 11 migrations applied (0001…0011); seed OK                                                            |
-| `pnpm test:all` (format, lint, typecheck, OpenAPI, gate…)   | **exit 0** — unit 54, integration 59, security 115, e2e 2; no API/Vite process left afterwards        |
-| `pnpm test:load` (smoke)                                    | PASSED — 161 req/s, 0 errors, 0 deadlocks                                                             |
-| `pnpm security:scan` (with `GITLEAKS_BIN`)                  | exit 0                                                                                                |
-| `pnpm restore:smoke`                                        | PASSED (2.6 s)                                                                                        |
+| `pnpm test:all` (format, lint, typecheck, OpenAPI, gate…)   | **exit 0** — unit 54, integration 59, security 120, e2e 2; no API/Vite process left afterwards        |
+| `pnpm security:scan` without / with `GITLEAKS_BIN`          | exit 0 / exit 0 (picomatch advisory accepted as dev-only until 2026-12-31)                            |
+| `pnpm test:load` (smoke)                                    | PASSED — 203 req/s                                                                                    |
+| `pnpm restore:smoke`                                        | PASSED (2.4 s)                                                                                        |
 | `pnpm build`                                                | exit 0                                                                                                |
 | `pnpm dev`                                                  | web :5173 → 200; `/api/health` → 200; `/api/auth/session` without cookie → 401                        |
 
@@ -208,7 +213,8 @@ The final archive differs from the clean-room archive only in this section.
 
 ## 6. Known vulnerabilities and residual risks
 
-- `pnpm audit`: 1 moderate dev-only advisory (SEC-OPEN-009, time-boxed exception).
+- `pnpm audit`: production clean; 2 dev-only advisories under dated exceptions until 2026-12-31 —
+  picomatch high (SEC-OPEN-020, no fix released yet) and minimatch moderate (SEC-OPEN-009).
 - Release blockers: SEC-OPEN-002/003/004 (corpus to be provisioned)/005/007/008/010/012/013/018 (see
   `docs/security/SECURITY_OPEN_ITEMS.md`).
 - Residual: staff may still use TOTP (phishable); API clients may omit the destination scan;

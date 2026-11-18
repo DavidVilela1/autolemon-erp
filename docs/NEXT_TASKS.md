@@ -1,4 +1,4 @@
-# Next tasks — ordered roadmap (WMS hardening first) — updated v0.6.13
+# Next tasks — ordered roadmap (WMS hardening first) — updated v0.6.14
 
 Owning module: architecture. Each task lists dependencies and the acceptance test that closes it.
 **Product-owner rule (2026-11-10):** the entire autonomous WMS must be production-ready, verified

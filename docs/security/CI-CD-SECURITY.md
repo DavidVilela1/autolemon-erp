@@ -5,25 +5,25 @@ YAML-validated; never executed** (no GitHub repository/runner was connected — 
 
 ## 1. Default-deny pipeline
 
-| Job / step                                | Command                                                                                      | Blocks merge on        | Evidence output            |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------- | -------------------------- |
-| Clean install                             | `pnpm install --frozen-lockfile`                                                             | lockfile drift         | log                        |
-| Format                                    | `pnpm format:check`                                                                          | any diff               | log                        |
-| Lint + documentation gate                 | `pnpm lint` (ESLint security rules + `scripts/check-file-headers.mjs`)                       | any error/warning      | log                        |
-| Types                                     | `pnpm typecheck` (strict, all workspaces + scripts)                                          | any error              | log                        |
-| API compatibility                         | `pnpm api:check` (generated OpenAPI must equal committed)                                    | drift                  | log                        |
-| Unit + property                           | `pnpm test:unit`                                                                             | failure                | log                        |
-| Migrations                                | `pnpm db:migrate` twice on empty DB (idempotent, checksum verified)                          | failure                | log                        |
-| Integration (real Postgres, ephemeral DB) | `pnpm test:integration`                                                                      | failure                | log                        |
-| Security negative tests                   | `pnpm test:security`                                                                         | failure                | log                        |
-| Browser E2E + axe                         | `pnpm test:e2e`                                                                              | failure                | Playwright report artifact |
-| Local scanners                            | `pnpm security:scan` (secrets, SAST-lite, raw SQL gate, audit HIGH/CRITICAL, SBOM, licenses) | any FAIL               | `artifacts/sbom.cdx.json`  |
-| Build                                     | `pnpm build`                                                                                 | failure                | —                          |
-| CodeQL                                    | `security-extended`                                                                          | alerts per repo policy | Security tab               |
-| gitleaks                                  | full history                                                                                 | any finding            | log                        |
-| Trivy fs/IaC/secret                       | HIGH/CRITICAL                                                                                | finding                | log                        |
-| Container build + Trivy image             | HIGH/CRITICAL                                                                                | finding                | log                        |
-| Scheduled (weekly)                        | same as above incl. property tests and advisories                                            | failure                | log                        |
+| Job / step                                | Command                                                                                                | Blocks merge on        | Evidence output            |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------ | ---------------------- | -------------------------- |
+| Clean install                             | `pnpm install --frozen-lockfile`                                                                       | lockfile drift         | log                        |
+| Format                                    | `pnpm format:check`                                                                                    | any diff               | log                        |
+| Lint + documentation gate                 | `pnpm lint` (ESLint security rules + `scripts/check-file-headers.mjs`)                                 | any error/warning      | log                        |
+| Types                                     | `pnpm typecheck` (strict, all workspaces + scripts)                                                    | any error              | log                        |
+| API compatibility                         | `pnpm api:check` (generated OpenAPI must equal committed)                                              | drift                  | log                        |
+| Unit + property                           | `pnpm test:unit`                                                                                       | failure                | log                        |
+| Migrations                                | `pnpm db:migrate` twice on empty DB (idempotent, checksum verified)                                    | failure                | log                        |
+| Integration (real Postgres, ephemeral DB) | `pnpm test:integration`                                                                                | failure                | log                        |
+| Security negative tests                   | `pnpm test:security`                                                                                   | failure                | log                        |
+| Browser E2E + axe                         | `pnpm test:e2e`                                                                                        | failure                | Playwright report artifact |
+| Local scanners                            | `pnpm security:scan` (secrets, SAST-lite, raw SQL gate, dependency audit policy below, SBOM, licenses) | any FAIL               | `artifacts/sbom.cdx.json`  |
+| Build                                     | `pnpm build`                                                                                           | failure                | —                          |
+| CodeQL                                    | `security-extended`                                                                                    | alerts per repo policy | Security tab               |
+| gitleaks                                  | full history                                                                                           | any finding            | log                        |
+| Trivy fs/IaC/secret                       | HIGH/CRITICAL                                                                                          | finding                | log                        |
+| Container build + Trivy image             | HIGH/CRITICAL                                                                                          | finding                | log                        |
+| Scheduled (weekly)                        | same as above incl. property tests and advisories                                                      | failure                | log                        |
 
 Not yet automated (manual/staging gates, mandatory before release): DAST (OWASP ZAP), full
 warehouse lifecycle acceptance on staging, failover/restore smoke on staging, rollback smoke,
@@ -92,3 +92,18 @@ candidate with a verified attestation has been produced.
   compatibility).
 - Exceptions: time-boxed, written, human-signed; never for known exploitable critical/high
   findings in a production release; no disabling tests to get green builds.
+
+## Dependency audit policy (v0.6.14)
+
+`pnpm security:scan` runs `pnpm audit` twice — all dependencies and production only — and applies
+`evaluateAudit` (`scripts/lib.mjs`, tested in `tests/security/audit-policy.test.ts`):
+
+- HIGH/CRITICAL in a **production** dependency: always blocks; no exception is possible.
+- HIGH/CRITICAL only in **development tooling**: blocks unless that exact advisory id has an
+  exception in `docs/security/audit-exceptions.json` with a reason, an open item and an expiry at
+  most 90 days after it was recorded. The owner accepts an exception by committing that file.
+- An expired or over-long exception blocks; an exception for an advisory no longer reported is a
+  warning (remove it). Moderate/low are reported only.
+
+Current exceptions: GHSA-fc5q-39xc-vjpf (picomatch, high, SEC-OPEN-020) and GHSA-g3hv-75wg-m249
+(minimatch, moderate, SEC-OPEN-009), both until 2026-12-31.

@@ -69,3 +69,43 @@ export function scanSecrets(files, root = ROOT) {
   }
   return findings;
 }
+
+/** Longest a dependency-audit exception may run before it must be re-decided (days). */
+export const AUDIT_EXCEPTION_MAX_DAYS = 90;
+
+/**
+ * Dependency-audit policy (docs/security/CI-CD-SECURITY.md):
+ * - HIGH/CRITICAL in a production dependency always blocks — no exception possible;
+ * - HIGH/CRITICAL only in development tooling blocks unless that exact advisory id has an
+ *   unexpired exception (≤ AUDIT_EXCEPTION_MAX_DAYS) in docs/security/audit-exceptions.json;
+ * - an expired or over-long exception blocks; an exception for an advisory no longer reported
+ *   is a warning (remove it); moderate/low are reported only.
+ * @param {{ advisories: Array<{ id: string, severity: string, module: string }>, prodIds: Set<string>,
+ *   exceptions: Array<{ advisory: string, recorded: string, expires: string }>, today: string }} input
+ * @returns {{ ok: boolean, blocking: string[], accepted: string[], warnings: string[] }}
+ */
+export function evaluateAudit({ advisories, prodIds, exceptions, today }) {
+  const blocking = [];
+  const accepted = [];
+  const warnings = [];
+  const day = (s) => Date.parse(`${s}T00:00:00Z`);
+  for (const e of exceptions) {
+    if (!(day(e.expires) >= day(today))) blocking.push(`exception ${e.advisory} expired on ${e.expires}`);
+    if (!(day(e.expires) - day(e.recorded) <= AUDIT_EXCEPTION_MAX_DAYS * 86_400_000)) {
+      blocking.push(`exception ${e.advisory} runs longer than ${AUDIT_EXCEPTION_MAX_DAYS} days`);
+    }
+    if (!advisories.some((a) => a.id === e.advisory)) warnings.push(`exception ${e.advisory} no longer needed — remove it`);
+  }
+  for (const a of advisories) {
+    if (a.severity !== 'high' && a.severity !== 'critical') continue;
+    const label = `${a.id} ${a.module} (${a.severity})`;
+    if (prodIds.has(a.id)) {
+      blocking.push(`${label} in a production dependency`);
+      continue;
+    }
+    const ex = exceptions.find((e) => e.advisory === a.id);
+    if (ex && day(ex.expires) >= day(today)) accepted.push(`${label}, dev-only, accepted until ${ex.expires}`);
+    else blocking.push(`${label}, dev-only, no valid exception`);
+  }
+  return { ok: blocking.length === 0, blocking, accepted, warnings };
+}

@@ -1,0 +1,23 @@
+{
+  "policy": "Dependency-audit exceptions (scripts/lib.mjs evaluateAudit, docs/security/CI-CD-SECURITY.md). Only for advisories that affect development tooling alone; HIGH/CRITICAL in production dependencies always block. Each exception names one advisory id, has a reason, and expires within 90 days; the owner accepts it by committing this file. Remove an entry as soon as the advisory is fixed upstream.",
+  "exceptions": [
+    {
+      "advisory": "GHSA-fc5q-39xc-vjpf",
+      "package": "picomatch <=4.0.7",
+      "severity": "high",
+      "openItem": "SEC-OPEN-020",
+      "reason": "ReDoS through crafted single-branch repeated extglobs. picomatch is reached only through development tooling (eslint/typescript-eslint, vite/vitest via tinyglobby and fdir), which matches glob patterns written by the developers in configuration files; no untrusted pattern reaches it. Not in the production dependency tree (pnpm audit --prod: no known vulnerabilities). No patched version published (latest 4.0.7).",
+      "recorded": "2026-11-18",
+      "expires": "2026-12-31"
+    },
+    {
+      "advisory": "GHSA-g3hv-75wg-m249",
+      "package": "minimatch >=7.0.0 <11.0.1",
+      "severity": "moderate",
+      "openItem": "SEC-OPEN-009",
+      "reason": "ReDoS via globparts amplification in eslint/typescript-eslint (development tooling only, developer-written patterns). Moderate: reported, not blocking; listed so every accepted advisory is in one place.",
+      "recorded": "2026-11-18",
+      "expires": "2026-12-31"
+    }
+  ]
+}
